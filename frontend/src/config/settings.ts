@@ -10,13 +10,13 @@ interface Settings {
 
 const productionSettings: Settings = {
     apiUrl: 'https://ra-api.ironcliff.ai',
-    appName: 'Orchestrator',
+    appName: 'AutoSage',
     logoUrl: '/cognify-icon.svg'  // Using existing icon
 };
 
 const developmentSettings: Settings = {
     apiUrl: 'http://localhost:8000',
-    appName: 'Orchestrator (Dev)',
+    appName: 'AutoSage (Dev)',
     logoUrl: '/cognify-icon.svg'  // Using existing icon
 };
 

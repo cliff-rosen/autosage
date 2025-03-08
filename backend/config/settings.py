@@ -7,7 +7,7 @@ load_dotenv(override=True)
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "Orchestrator"
+    APP_NAME: str = "AutoSage"
     SETTING_VERSION: str = "0.0.1"
 
     # Database settings
