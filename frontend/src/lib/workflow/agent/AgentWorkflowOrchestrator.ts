@@ -220,11 +220,37 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             throw new Error(`Question Development failed: ${result.error}`);
         }
 
-        // Extract improved question
-        const improvedQuestion = result.outputs?.[WORKFLOW_VARIABLES.IMPROVED_QUESTION] as string;
+        // Extract improved question from the result
+        // The LLM returns a JSON object with improvedQuestion and explanation
+        let improvedQuestion = '';
+
+        if (result.outputs?.[WORKFLOW_VARIABLES.IMPROVED_QUESTION]) {
+            const output = result.outputs[WORKFLOW_VARIABLES.IMPROVED_QUESTION];
+
+            // Check if the output is already parsed as an object
+            if (typeof output === 'object' && output !== null && 'improvedQuestion' in output) {
+                improvedQuestion = output.improvedQuestion as string;
+            }
+            // Check if it's a string that needs to be parsed as JSON
+            else if (typeof output === 'string') {
+                try {
+                    const parsedOutput = JSON.parse(output);
+                    improvedQuestion = parsedOutput.improvedQuestion;
+                } catch (error) {
+                    // If parsing fails, use the output as is
+                    console.error('Failed to parse improved question output as JSON:', error);
+                    improvedQuestion = output;
+                }
+            } else {
+                // Fallback to using the output as is
+                improvedQuestion = String(output);
+            }
+        }
 
         if (!improvedQuestion) {
-            throw new Error('Question Development did not produce an improved question');
+            // If we couldn't extract an improved question, use the original
+            console.warn('Could not extract improved question, using original');
+            improvedQuestion = question;
         }
 
         return { improvedQuestion };
