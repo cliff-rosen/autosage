@@ -66,11 +66,11 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 step_type: WorkflowStepType.ACTION,
                 tool_id: 'llm_tool_id', // Reference to appropriate LLM tool
                 parameter_mappings: {
-                    'prompt': WORKFLOW_VARIABLES.ORIGINAL_QUESTION,
-                },
+                    prompt: WORKFLOW_VARIABLES.ORIGINAL_QUESTION,
+                } as any,
                 output_mappings: {
-                    'improved_question': WORKFLOW_VARIABLES.IMPROVED_QUESTION,
-                },
+                    improved_question: WORKFLOW_VARIABLES.IMPROVED_QUESTION,
+                } as any,
                 sequence_number: 1,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -85,13 +85,13 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 step_type: WorkflowStepType.ACTION,
                 tool_id: 'llm_evaluation_tool_id', // Reference to evaluation LLM tool
                 parameter_mappings: {
-                    'original_question': WORKFLOW_VARIABLES.ORIGINAL_QUESTION,
-                    'improved_question': WORKFLOW_VARIABLES.IMPROVED_QUESTION,
-                },
+                    original_question: WORKFLOW_VARIABLES.ORIGINAL_QUESTION,
+                    improved_question: WORKFLOW_VARIABLES.IMPROVED_QUESTION,
+                } as any,
                 output_mappings: {
-                    'evaluation_score': WORKFLOW_VARIABLES.QUESTION_IMPROVEMENT_CONFIDENCE,
-                    'evaluation_feedback': WORKFLOW_VARIABLES.QUESTION_IMPROVEMENT_FEEDBACK,
-                },
+                    evaluation_score: WORKFLOW_VARIABLES.QUESTION_IMPROVEMENT_CONFIDENCE,
+                    evaluation_feedback: WORKFLOW_VARIABLES.QUESTION_IMPROVEMENT_FEEDBACK,
+                } as any,
                 sequence_number: 2,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -103,12 +103,12 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 workflow_id: workflowId,
                 label: 'Update Iteration Count',
                 description: 'Increment the iteration counter',
-                step_type: WorkflowStepType.COUNTER,
-                counter_variable: WORKFLOW_VARIABLES.QUESTION_IMPROVEMENT_ITERATIONS,
+                step_type: WorkflowStepType.COUNTER as any,
+                counter_variable: WORKFLOW_VARIABLES.QUESTION_IMPROVEMENT_ITERATIONS as any,
                 sequence_number: 3,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-            }
+            } as any
         ]
     };
 

@@ -14,7 +14,7 @@ import {
     WorkflowCompleteEvent,
     WORKFLOW_VARIABLES
 } from '../../../types/agent-workflows';
-import { WorkflowEngine } from '../../workflow/workflowEngine';
+import { AgentWorkflowEngine } from './AgentWorkflowEngine';
 import { createQuestionDevelopmentWorkflow } from './definitions/questionDevelopmentWorkflow';
 import { createKnowledgeBaseDevelopmentWorkflow } from './definitions/knowledgeBaseDevelopmentWorkflow';
 import { createAnswerGenerationWorkflow } from './definitions/answerGenerationWorkflow';
@@ -26,13 +26,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     private sessionId: string;
     private status: OrchestrationStatus;
     private eventEmitter: EventEmitter;
-    private workflowEngine: WorkflowEngine;
+    private workflowEngine: AgentWorkflowEngine;
     private config: AgentWorkflowConfig;
 
-    constructor(workflowEngine?: WorkflowEngine) {
+    constructor(workflowEngine?: AgentWorkflowEngine) {
         this.sessionId = uuidv4();
         this.eventEmitter = new EventEmitter();
-        this.workflowEngine = workflowEngine || new WorkflowEngine();
+        this.workflowEngine = workflowEngine || new AgentWorkflowEngine();
         this.config = {};
 
         // Initialize status
@@ -128,12 +128,12 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Update status with error
             this.updateStatus({
                 currentPhase: 'failed',
-                error: error.message,
+                error: error instanceof Error ? error.message : String(error),
                 endTime: new Date().toISOString()
             });
 
             // Emit error event
-            this.emitError(error.message);
+            this.emitError(error instanceof Error ? error.message : String(error));
 
             throw error;
         }
@@ -312,13 +312,21 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         const { agent_workflow_type } = workflow;
 
         // Apply max iterations
-        if (this.config.maxIterationsPerPhase?.[agent_workflow_type]) {
-            workflow.max_iterations = this.config.maxIterationsPerPhase[agent_workflow_type];
+        if (this.config.maxIterationsPerPhase &&
+            agent_workflow_type in this.config.maxIterationsPerPhase) {
+            const maxIterations = this.config.maxIterationsPerPhase[agent_workflow_type as keyof typeof this.config.maxIterationsPerPhase];
+            if (maxIterations !== undefined) {
+                workflow.max_iterations = maxIterations;
+            }
         }
 
         // Apply confidence threshold
-        if (this.config.confidenceThresholds?.[agent_workflow_type]) {
-            workflow.confidence_threshold = this.config.confidenceThresholds[agent_workflow_type];
+        if (this.config.confidenceThresholds &&
+            agent_workflow_type in this.config.confidenceThresholds) {
+            const threshold = this.config.confidenceThresholds[agent_workflow_type as keyof typeof this.config.confidenceThresholds];
+            if (threshold !== undefined) {
+                workflow.confidence_threshold = threshold;
+            }
         }
     }
 
