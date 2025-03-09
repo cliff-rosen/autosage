@@ -13,6 +13,10 @@ const NEEDS_IMPROVEMENT = 'needs_improvement' as WorkflowVariableName;
 const CONFIDENCE_SCORE = 'confidence_score' as WorkflowVariableName;
 const FIELD_LIST = 'field_list' as WorkflowVariableName;
 
+// Define a constant for the prompt template IDs
+const QUESTION_IMPROVER_TEMPLATE = 'question-improver' as WorkflowVariableName;
+const QUESTION_EVALUATOR_TEMPLATE = 'question-improvement-evaluator' as WorkflowVariableName;
+
 /**
  * Creates a Question Development workflow
  */
@@ -27,65 +31,42 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
         tool_type: 'llm',
         signature: {
             parameters: [
+
                 {
                     name: 'question' as ToolParameterName,
                     description: 'Value for {{question}} in the prompt',
                     schema: {
-                        name: 'question',
                         type: 'string',
                         is_array: false,
-                        description: ''
+                        description: 'Question to improve'
                     },
                     required: true
-                },
-                {
-                    name: 'feedback' as ToolParameterName,
-                    description: 'Value for {{feedback}} in the prompt',
-                    schema: {
-                        name: 'feedback',
-                        type: 'string',
-                        is_array: false,
-                        description: ''
-                    },
-                    required: false
-                },
-                {
-                    name: 'originalQuestion' as ToolParameterName,
-                    description: 'Value for {{originalQuestion}} in the prompt',
-                    schema: {
-                        name: 'originalQuestion',
-                        type: 'string',
-                        is_array: false,
-                        description: ''
-                    },
-                    required: false
-                },
-                {
-                    name: 'improvedQuestion' as ToolParameterName,
-                    description: 'Value for {{improvedQuestion}} in the prompt',
-                    schema: {
-                        name: 'improvedQuestion',
-                        type: 'string',
-                        is_array: false,
-                        description: ''
-                    },
-                    required: false
                 }
             ],
             outputs: [
                 {
                     name: 'response' as ToolOutputName,
-                    description: 'Default output',
+                    description: 'Improved question with explanation',
                     schema: {
-                        type: 'string',
+                        type: 'object',
                         is_array: false,
-                        description: 'Default output'
+                        description: 'Improved question with explanation',
+                        fields: {
+                            improvedQuestion: {
+                                type: 'string',
+                                is_array: false,
+                                description: 'The improved version of the question'
+                            },
+                            explanation: {
+                                type: 'string',
+                                is_array: false,
+                                description: 'Explanation of the improvements made'
+                            }
+                        }
                     }
                 }
             ]
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        }
     };
 
     const llmEvalTool: Tool = {
@@ -96,13 +77,23 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
         signature: {
             parameters: [
                 {
+                    name: 'prompt_template_id' as ToolParameterName,
+                    description: 'ID of the prompt template to use',
+                    schema: {
+                        type: 'string',
+                        is_array: false,
+                        description: 'Prompt template ID'
+                    },
+                    required: true,
+                    default: 'question-improvement-evaluator'
+                },
+                {
                     name: 'originalQuestion' as ToolParameterName,
                     description: 'Value for {{originalQuestion}} in the prompt',
                     schema: {
-                        name: 'originalQuestion',
                         type: 'string',
                         is_array: false,
-                        description: ''
+                        description: 'Original question from user'
                     },
                     required: true
                 },
@@ -110,10 +101,9 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                     name: 'improvedQuestion' as ToolParameterName,
                     description: 'Value for {{improvedQuestion}} in the prompt',
                     schema: {
-                        name: 'improvedQuestion',
                         type: 'string',
                         is_array: false,
-                        description: ''
+                        description: 'Improved version of the question'
                     },
                     required: true
                 }
@@ -121,11 +111,11 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
             outputs: [
                 {
                     name: 'response' as ToolOutputName,
-                    description: 'Default output',
+                    description: 'Evaluation of question improvement',
                     schema: {
                         type: 'object',
                         is_array: false,
-                        description: 'Evaluation result',
+                        description: 'Evaluation of question improvement',
                         fields: {
                             confidenceScore: {
                                 type: 'number',
@@ -136,19 +126,12 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                                 type: 'string',
                                 is_array: false,
                                 description: 'Detailed evaluation of the improvement'
-                            },
-                            needsMoreImprovement: {
-                                type: 'boolean',
-                                is_array: false,
-                                description: 'Whether the question needs further improvement'
                             }
                         }
                     }
                 }
             ]
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        }
     };
 
     const workflow: AgentWorkflow = {
@@ -240,11 +223,12 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 tool: llmTool, // Include the complete tool object
                 prompt_template_id: 'question-improver', // Reference to the prompt template
                 parameter_mappings: {
-                    ['question' as ToolParameterName]: ORIGINAL_QUESTION,
-                    ['feedback' as ToolParameterName]: EVALUATION_FEEDBACK,
+                    ['prompt_template_id' as ToolParameterName]: QUESTION_IMPROVER_TEMPLATE,
+                    ['question' as ToolParameterName]: ORIGINAL_QUESTION
                 },
                 output_mappings: {
-                    ['response' as ToolOutputName]: IMPROVED_QUESTION,
+                    ['response.improvedQuestion' as ToolOutputName]: IMPROVED_QUESTION,
+                    ['response.explanation' as ToolOutputName]: EVALUATION_FEEDBACK
                 },
                 sequence_number: 1,
                 created_at: new Date().toISOString(),
@@ -262,11 +246,14 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 tool: llmEvalTool, // Include the complete tool object
                 prompt_template_id: 'question-improvement-evaluator', // Reference to the evaluation prompt template
                 parameter_mappings: {
+                    ['prompt_template_id' as ToolParameterName]: QUESTION_EVALUATOR_TEMPLATE,
                     ['originalQuestion' as ToolParameterName]: ORIGINAL_QUESTION,
-                    ['improvedQuestion' as ToolParameterName]: IMPROVED_QUESTION,
+                    ['improvedQuestion' as ToolParameterName]: IMPROVED_QUESTION
                 },
                 output_mappings: {
                     ['response' as ToolOutputName]: EVALUATION_RESULT,
+                    ['response.confidenceScore' as ToolOutputName]: CONFIDENCE_SCORE,
+                    ['response.evaluation' as ToolOutputName]: EVALUATION_FEEDBACK
                 },
                 sequence_number: 2,
                 created_at: new Date().toISOString(),
@@ -280,17 +267,15 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 label: 'Check Confidence',
                 description: 'Check if the confidence score meets the threshold or needs more improvement',
                 step_type: WorkflowStepType.EVALUATION,
-                tool_id: null, // No tool for evaluation steps
-                tool: null, // No tool for evaluation steps
                 parameter_mappings: {}, // Empty but required
                 output_mappings: {}, // Empty but required
                 evaluation_config: {
                     conditions: [
                         {
                             condition_id: uuidv4(),
-                            variable: `${EVALUATION_RESULT}.needsMoreImprovement` as WorkflowVariableName,
-                            operator: 'equals',
-                            value: true,
+                            variable: CONFIDENCE_SCORE as WorkflowVariableName,
+                            operator: 'less_than',
+                            value: 0.7,
                             target_step_index: 0, // Go back to the first step if more improvement is needed
                         }
                     ],
