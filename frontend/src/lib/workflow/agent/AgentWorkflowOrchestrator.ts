@@ -5,7 +5,6 @@ import {
     AgentWorkflowConfig,
     AgentWorkflowEventType,
     AgentWorkflowOrchestratorInterface,
-    AgentWorkflowType,
     ErrorEvent,
     OrchestrationPhase,
     OrchestrationStatus,

@@ -1,6 +1,7 @@
 import { AgentWorkflow } from '../../../types/agent-workflows';
 import { WorkflowVariableName } from '../../../types/workflows';
 import { v4 as uuidv4 } from 'uuid';
+import { WorkflowEngine } from '../workflowEngine';
 
 /**
  * Interface for a workflow job
@@ -46,70 +47,108 @@ export class AgentWorkflowEngine {
         });
 
         try {
-            // Simulate workflow execution
-            console.log(`Executing workflow: ${job.workflow.name}`);
+            console.log(`AgentWorkflowEngine.runJob: Executing workflow: ${job.workflow.name}`);
+            console.log('job', job);
 
-            // Wait a bit to simulate processing
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Initialize workflow with inputs
+            const workflow = { ...job.workflow };
+            console.log('workflow', workflow);
 
-            // For demonstration purposes, we'll just return the inputs as outputs
-            // with some additional processing
+            // Initialize workflow state with input variables
+            if (!workflow.state) {
+                workflow.state = [];
+            }
+
+            // Add input values to workflow state
+            for (const [inputName, inputValue] of Object.entries(job.inputs)) {
+                // Find the variable in the workflow state
+                const existingVarIndex = workflow.state.findIndex(v => v.name === inputName);
+
+                if (existingVarIndex >= 0) {
+                    // Update existing variable
+                    workflow.state[existingVarIndex] = {
+                        ...workflow.state[existingVarIndex],
+                        value: inputValue
+                    };
+                } else {
+                    // This is a fallback for inputs that aren't defined in the workflow
+                    // In a production system, you might want to validate inputs against the workflow definition
+                    console.warn(`Input ${inputName} not found in workflow state, adding it dynamically`);
+                    workflow.state.push({
+                        variable_id: uuidv4(),
+                        name: inputName as WorkflowVariableName,
+                        io_type: 'input',
+                        required: true,
+                        schema: {
+                            type: typeof inputValue as any,
+                            description: `Dynamically added input ${inputName}`,
+                            is_array: Array.isArray(inputValue)
+                        },
+                        value: inputValue
+                    });
+                }
+            }
+
+            // Execute each step in the workflow sequentially
+            let currentStepIndex = 0;
+            let updatedState = [...workflow.state];
+            let success = true;
+            let error: string | undefined;
+
+            while (currentStepIndex < workflow.steps.length) {
+                console.log(`Executing step ${currentStepIndex + 1} of ${workflow.steps.length}`);
+
+                // Execute the current step
+                const stepResult = await WorkflowEngine.executeStepSimple(
+                    { ...workflow, state: updatedState },
+                    currentStepIndex
+                );
+
+                // Update the workflow state
+                updatedState = stepResult.updatedState;
+
+                // Check if the step execution was successful
+                if (!stepResult.result.success) {
+                    success = false;
+                    error = stepResult.result.error;
+                    console.error(`Step ${currentStepIndex + 1} failed: ${error}`);
+                    break;
+                }
+
+                // Move to the next step
+                currentStepIndex = stepResult.nextStepIndex;
+
+                // Check if we've reached the end of the workflow
+                if (currentStepIndex >= workflow.steps.length) {
+                    console.log('Workflow execution completed successfully');
+                    break;
+                }
+            }
+
+            // Extract outputs from the final workflow state
             const outputs: Record<string, any> = {};
-
-            // Process based on workflow type
-            switch (job.workflow.agent_workflow_type) {
-                case 'QUESTION_DEVELOPMENT':
-                    // Improve the question
-                    const originalQuestion = job.inputs['original_question'] as string;
-                    outputs['improved_question'] = `Improved: ${originalQuestion}`;
-                    outputs['question_improvement_confidence'] = 0.85;
-                    outputs['question_improvement_iterations'] = 1;
-                    outputs['question_improvement_feedback'] = 'Question improved successfully';
-                    break;
-
-                case 'KNOWLEDGE_BASE_DEVELOPMENT':
-                    // Create a knowledge base
-                    const question = job.inputs['kb_input_question'] as string;
-                    outputs['knowledge_base'] = [
-                        { source: 'Wikipedia', content: `Information about ${question}` },
-                        { source: 'Research Paper', content: 'Additional relevant information' }
-                    ];
-                    outputs['kb_completeness_score'] = 0.9;
-                    outputs['kb_gaps'] = ['Some minor gaps in information'];
-                    outputs['kb_sources'] = [
-                        { name: 'Wikipedia', url: 'https://wikipedia.org' },
-                        { name: 'Research Paper', url: 'https://example.com/paper' }
-                    ];
-                    break;
-
-                case 'ANSWER_GENERATION':
-                    // Generate an answer
-                    const answerQuestion = job.inputs['answer_input_question'] as string;
-                    const knowledgeBase = job.inputs['answer_input_kb'];
-                    outputs['final_answer'] = `Here is a comprehensive answer to "${answerQuestion}" based on the knowledge base.`;
-                    outputs['answer_confidence'] = 0.95;
-                    outputs['answer_sources'] = [
-                        { name: 'Wikipedia', url: 'https://wikipedia.org' }
-                    ];
-                    break;
-
-                default:
-                    throw new Error(`Unsupported workflow type: ${job.workflow.agent_workflow_type}`);
+            for (const variable of updatedState) {
+                if (variable.io_type === 'output' && variable.value !== undefined) {
+                    outputs[variable.name] = variable.value;
+                }
             }
 
             // Update job status
             this.activeJobs.set(jobId, {
                 job,
-                status: 'completed'
+                status: success ? 'completed' : 'failed'
             });
 
-            // Return success result
+            // Return result
             return {
                 jobId,
-                success: true,
-                outputs
+                success,
+                outputs: success ? outputs : undefined,
+                error: success ? undefined : error
             };
         } catch (error) {
+            console.error('Error executing workflow:', error);
+
             // Update job status
             this.activeJobs.set(jobId, {
                 job,
