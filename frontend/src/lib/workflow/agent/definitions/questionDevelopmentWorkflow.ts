@@ -6,16 +6,14 @@ import { ToolOutputName, ToolParameterName, Tool } from '../../../../types/tools
 
 // Define custom workflow variables
 const ORIGINAL_QUESTION = 'original_question' as WorkflowVariableName;
-const IMPROVED_QUESTION = 'improved_question' as WorkflowVariableName;
-const EVALUATION_RESULT = 'evaluation_result' as WorkflowVariableName;
-const EVALUATION_FEEDBACK = 'evaluation_feedback' as WorkflowVariableName;
-const NEEDS_IMPROVEMENT = 'needs_improvement' as WorkflowVariableName;
-const CONFIDENCE_SCORE = 'confidence_score' as WorkflowVariableName;
-const FIELD_LIST = 'field_list' as WorkflowVariableName;
+const IMPROVED_QUESTION_OBJECT = 'improved_question_object' as WorkflowVariableName;
+const IMPROVED_QUESTION_PROPERTY = 'improved_question_object.improvedQuestion' as WorkflowVariableName;
+const QUESTION_EVAL_OBJECT = 'question_eval_object' as WorkflowVariableName;
+const CONFIDENCE_SCORE = 'question_eval_object.confidenceScore' as WorkflowVariableName;
 
 // Define a constant for the prompt template IDs
-const QUESTION_IMPROVER_TEMPLATE = 'question-improver' as WorkflowVariableName;
-const QUESTION_EVALUATOR_TEMPLATE = 'question-improvement-evaluator' as WorkflowVariableName;
+const QUESTION_IMPROVER_TEMPLATE_ID = 'question-improver';
+const QUESTION_EVALUATOR_TEMPLATE_ID = 'question-improvement-evaluator';
 
 /**
  * Creates a Question Development workflow
@@ -24,14 +22,13 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
     const workflowId = uuidv4();
 
     // Define tool objects
-    const llmTool: Tool = {
+    const questionImproverTool: Tool = {
         tool_id: 'llm',
-        name: 'Language Model',
-        description: 'Executes prompts using a language model',
+        name: 'Question Improver LLM',
+        description: 'Improves a question using a language model',
         tool_type: 'llm',
         signature: {
             parameters: [
-
                 {
                     name: 'question' as ToolParameterName,
                     description: 'Value for {{question}} in the prompt',
@@ -69,24 +66,13 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
         }
     };
 
-    const llmEvalTool: Tool = {
+    const questionEvaluatorTool: Tool = {
         tool_id: 'llm',
-        name: 'Language Model',
-        description: 'Executes prompts using a language model',
+        name: 'Question Evaluator LLM',
+        description: 'Evaluates question improvements using a language model',
         tool_type: 'llm',
         signature: {
             parameters: [
-                {
-                    name: 'prompt_template_id' as ToolParameterName,
-                    description: 'ID of the prompt template to use',
-                    schema: {
-                        type: 'string',
-                        is_array: false,
-                        description: 'Prompt template ID'
-                    },
-                    required: true,
-                    default: 'question-improvement-evaluator'
-                },
                 {
                     name: 'originalQuestion' as ToolParameterName,
                     description: 'Value for {{originalQuestion}} in the prompt',
@@ -156,55 +142,24 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 true
             ),
 
-            // Output variable - improved question
+            // Output variable - improved question object (matches Question Improver template output)
             createWorkflowVariable(
                 uuidv4(),
-                IMPROVED_QUESTION,
-                createBasicSchema('string', 'The improved version of the question', false),
+                IMPROVED_QUESTION_OBJECT,
+                createObjectSchema({
+                    improvedQuestion: createBasicSchema('string', 'The improved version of the question'),
+                    explanation: createBasicSchema('string', 'Explanation of the improvements made')
+                }, 'Improved question with explanation'),
                 'output'
             ),
 
-            // Output variable - evaluation feedback
+            // Output variable - question evaluation object (matches Question Improvement Eval template output)
             createWorkflowVariable(
                 uuidv4(),
-                EVALUATION_FEEDBACK,
-                createBasicSchema('string', 'Feedback on the question improvement', false),
-                'output'
-            ),
-
-            // Output variable - confidence score
-            createWorkflowVariable(
-                uuidv4(),
-                CONFIDENCE_SCORE,
-                createBasicSchema('number', 'Confidence score for the question improvement', false),
-                'output'
-            ),
-
-            // Output variable - needs improvement flag
-            createWorkflowVariable(
-                uuidv4(),
-                NEEDS_IMPROVEMENT,
-                createBasicSchema('boolean', 'Whether the question needs further improvement', false),
-                'output'
-            ),
-
-            // Field list for extraction
-            createWorkflowVariable(
-                uuidv4(),
-                FIELD_LIST,
-                createBasicSchema('string', 'List of fields to extract', false),
-                'input',
-                true
-            ),
-
-            // Output variable - evaluation result (JSON object)
-            createWorkflowVariable(
-                uuidv4(),
-                EVALUATION_RESULT,
+                QUESTION_EVAL_OBJECT,
                 createObjectSchema({
                     confidenceScore: createBasicSchema('number', 'Confidence score between 0 and 1'),
-                    evaluation: createBasicSchema('string', 'Detailed evaluation of the improvement'),
-                    needsMoreImprovement: createBasicSchema('boolean', 'Whether the question needs further improvement')
+                    evaluation: createBasicSchema('string', 'Detailed evaluation of the improvement')
                 }, 'Evaluation of the question improvement'),
                 'output'
             )
@@ -220,15 +175,13 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 description: 'Use LLM to analyze and improve the original question',
                 step_type: WorkflowStepType.ACTION,
                 tool_id: 'llm', // Reference to LLM tool
-                tool: llmTool, // Include the complete tool object
-                prompt_template_id: 'question-improver', // Reference to the prompt template
+                tool: questionImproverTool, // Include the complete tool object
+                prompt_template_id: QUESTION_IMPROVER_TEMPLATE_ID, // Reference to the prompt template
                 parameter_mappings: {
-                    ['prompt_template_id' as ToolParameterName]: QUESTION_IMPROVER_TEMPLATE,
                     ['question' as ToolParameterName]: ORIGINAL_QUESTION
                 },
                 output_mappings: {
-                    ['response.improvedQuestion' as ToolOutputName]: IMPROVED_QUESTION,
-                    ['response.explanation' as ToolOutputName]: EVALUATION_FEEDBACK
+                    ['response' as ToolOutputName]: IMPROVED_QUESTION_OBJECT
                 },
                 sequence_number: 1,
                 created_at: new Date().toISOString(),
@@ -243,28 +196,25 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                 description: 'Calculate confidence score for the question improvement',
                 step_type: WorkflowStepType.ACTION,
                 tool_id: 'llm', // Reference to LLM tool
-                tool: llmEvalTool, // Include the complete tool object
-                prompt_template_id: 'question-improvement-evaluator', // Reference to the evaluation prompt template
+                tool: questionEvaluatorTool, // Include the complete tool object
+                prompt_template_id: QUESTION_EVALUATOR_TEMPLATE_ID, // Reference to the evaluation prompt template
                 parameter_mappings: {
-                    ['prompt_template_id' as ToolParameterName]: QUESTION_EVALUATOR_TEMPLATE,
                     ['originalQuestion' as ToolParameterName]: ORIGINAL_QUESTION,
-                    ['improvedQuestion' as ToolParameterName]: IMPROVED_QUESTION
+                    ['improvedQuestion' as ToolParameterName]: IMPROVED_QUESTION_PROPERTY
                 },
                 output_mappings: {
-                    ['response' as ToolOutputName]: EVALUATION_RESULT,
-                    ['response.confidenceScore' as ToolOutputName]: CONFIDENCE_SCORE,
-                    ['response.evaluation' as ToolOutputName]: EVALUATION_FEEDBACK
+                    ['response' as ToolOutputName]: QUESTION_EVAL_OBJECT
                 },
                 sequence_number: 2,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             },
 
-            // Step 3: Conditional Check for Confidence Threshold
+            // Step 3: Check Confidence Score
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
-                label: 'Check Confidence',
+                label: 'Check Confidence Score',
                 description: 'Check if the confidence score meets the threshold or needs more improvement',
                 step_type: WorkflowStepType.EVALUATION,
                 parameter_mappings: {}, // Empty but required
@@ -273,13 +223,13 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                     conditions: [
                         {
                             condition_id: uuidv4(),
-                            variable: CONFIDENCE_SCORE as WorkflowVariableName,
+                            variable: CONFIDENCE_SCORE,
                             operator: 'less_than',
-                            value: 0.7,
-                            target_step_index: 0, // Go back to the first step if more improvement is needed
+                            value: 0.7, // Threshold for confidence score
+                            target_step_index: 0, // Jump back to step 1 (index 0) if confidence is too low
                         }
                     ],
-                    default_action: 'continue',
+                    default_action: 'continue', // Continue to the next step if all conditions fail
                     maximum_jumps: 3 // Maximum number of improvement iterations
                 } as EvaluationConfig,
                 sequence_number: 3,
