@@ -1,16 +1,16 @@
-import { Schema, ValueType, Variable } from '../types/schemas';
-import { WorkflowVariableName } from '../types/workflows';
+import { Schema, ValueType, Variable } from '../types/schema';
+import { WorkflowVariableName, WorkflowVariable } from '../types/workflows';
 
 /**
  * Create a workflow variable
  */
 export const createWorkflowVariable = (
     variable_id: string,
-    name: WorkflowVariableName | string,
+    name: string,
     schema: Schema,
     io_type: 'input' | 'output' | 'evaluation',
-    required: boolean = true
-): Variable & { name: WorkflowVariableName; io_type: 'input' | 'output' | 'evaluation'; required?: boolean } => {
+    required: boolean = false
+): WorkflowVariable => {
     return {
         variable_id,
         name: name as WorkflowVariableName,
@@ -25,11 +25,13 @@ export const createWorkflowVariable = (
  */
 export const createBasicSchema = (
     type: ValueType,
-    description?: string
+    description?: string,
+    is_array: boolean = false
 ): Schema => {
     return {
         type,
-        description: description || `A ${type} value`
+        description: description || `A ${type} value`,
+        is_array
     };
 };
 
@@ -41,10 +43,8 @@ export const createArraySchema = (
     description?: string
 ): Schema => {
     return {
-        type: 'array',
-        items: {
-            type: itemType
-        },
+        type: itemType,
+        is_array: true,
         description: description || `An array of ${itemType} values`
     };
 };
@@ -53,14 +53,14 @@ export const createArraySchema = (
  * Create an object schema for a workflow variable
  */
 export const createObjectSchema = (
-    properties: Record<string, Schema>,
+    fields: Record<string, Schema>,
     description?: string,
-    required?: string[]
+    is_array: boolean = false
 ): Schema => {
     return {
         type: 'object',
-        properties,
-        required,
+        fields,
+        is_array,
         description: description || 'An object value'
     };
 }; 
