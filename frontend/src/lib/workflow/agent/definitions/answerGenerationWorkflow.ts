@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AgentWorkflow, AgentWorkflowType, WORKFLOW_VARIABLES } from '../../../../types/agent-workflows';
 import { WorkflowStatus, WorkflowStepId, WorkflowStepType, WorkflowVariableName } from '../../../../types/workflows';
 import { createArraySchema, createBasicSchema, createWorkflowVariable } from '../../../../utils/workflowUtils';
+import { ToolOutputName, ToolParameterName } from '../../../../types/tools';
 
 /**
  * Creates an Answer Generation workflow
@@ -13,10 +14,10 @@ export const createAnswerGenerationWorkflow = (): AgentWorkflow => {
         workflow_id: workflowId,
         agent_workflow_type: AgentWorkflowType.ANSWER_GENERATION,
         name: 'Answer Generation Agent',
-        description: 'Generates comprehensive answers based on the knowledge base',
+        description: 'Generates a comprehensive answer based on the knowledge base',
         status: WorkflowStatus.DRAFT,
         max_iterations: 3,
-        confidence_threshold: 0.9,
+        confidence_threshold: 0.8,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
 
@@ -59,112 +60,89 @@ export const createAnswerGenerationWorkflow = (): AgentWorkflow => {
                 'answer_iterations' as WorkflowVariableName,
                 createBasicSchema('number', 'Number of iterations performed'),
                 'output'
+            ),
+            createWorkflowVariable(
+                uuidv4(),
+                'answer_draft' as WorkflowVariableName,
+                createBasicSchema('string', 'Draft of the answer'),
+                'output'
             )
         ],
 
         // Define workflow steps
         steps: [
-            // Step 1: Create Answer Plan (LLM)
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
-                label: 'Create Answer Plan',
-                description: 'Create a plan for answering the question',
+                label: 'Analyze Knowledge Base',
+                description: 'Analyze the knowledge base to identify key information',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_tool_id',
+                tool_id: 'kb_analyzer_tool',
                 parameter_mappings: {
-                    question: WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION,
-                    knowledge_base: WORKFLOW_VARIABLES.ANSWER_INPUT_KB,
-                } as any,
+                    ['question' as ToolParameterName]: WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION,
+                    ['knowledge_base' as ToolParameterName]: WORKFLOW_VARIABLES.ANSWER_INPUT_KB
+                },
                 output_mappings: {
-                    answer_plan: 'answer_plan' as WorkflowVariableName,
-                } as any,
+                    ['analysis' as ToolOutputName]: 'kb_analysis' as WorkflowVariableName
+                },
                 sequence_number: 1,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             },
-
-            // Step 2: Draft Answer (LLM)
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
                 label: 'Draft Answer',
                 description: 'Create a draft answer based on the knowledge base',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_tool_id',
+                tool_id: 'answer_drafter_tool',
                 parameter_mappings: {
-                    question: WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION,
-                    knowledge_base: WORKFLOW_VARIABLES.ANSWER_INPUT_KB,
-                    answer_plan: 'answer_plan' as WorkflowVariableName,
-                } as any,
+                    ['question' as ToolParameterName]: WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION,
+                    ['knowledge_base' as ToolParameterName]: WORKFLOW_VARIABLES.ANSWER_INPUT_KB,
+                    ['analysis' as ToolParameterName]: 'kb_analysis' as WorkflowVariableName
+                },
                 output_mappings: {
-                    draft_answer: 'draft_answer' as WorkflowVariableName,
-                    cited_sources: WORKFLOW_VARIABLES.ANSWER_SOURCES,
-                } as any,
+                    ['draft' as ToolOutputName]: 'answer_draft' as WorkflowVariableName,
+                    ['sources' as ToolOutputName]: WORKFLOW_VARIABLES.ANSWER_SOURCES
+                },
                 sequence_number: 2,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             },
-
-            // Step 3: Evaluate Answer (LLM)
-            {
-                step_id: uuidv4() as WorkflowStepId,
-                workflow_id: workflowId,
-                label: 'Evaluate Answer',
-                description: 'Evaluate the quality of the draft answer',
-                step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_evaluation_tool_id',
-                parameter_mappings: {
-                    question: WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION,
-                    knowledge_base: WORKFLOW_VARIABLES.ANSWER_INPUT_KB,
-                    answer: 'draft_answer' as WorkflowVariableName,
-                } as any,
-                output_mappings: {
-                    evaluation_score: WORKFLOW_VARIABLES.ANSWER_CONFIDENCE,
-                    evaluation_feedback: 'answer_feedback' as WorkflowVariableName,
-                } as any,
-                sequence_number: 3,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            },
-
-            // Step 4: Refine Answer (LLM)
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
                 label: 'Refine Answer',
-                description: 'Refine the answer based on evaluation feedback',
+                description: 'Refine the draft answer for clarity and completeness',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_tool_id',
+                tool_id: 'answer_refiner_tool',
                 parameter_mappings: {
-                    draft_answer: 'draft_answer' as WorkflowVariableName,
-                    feedback: 'answer_feedback' as WorkflowVariableName,
-                    knowledge_base: WORKFLOW_VARIABLES.ANSWER_INPUT_KB,
-                } as any,
+                    ['question' as ToolParameterName]: WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION,
+                    ['draft' as ToolParameterName]: 'answer_draft' as WorkflowVariableName,
+                    ['knowledge_base' as ToolParameterName]: WORKFLOW_VARIABLES.ANSWER_INPUT_KB
+                },
                 output_mappings: {
-                    refined_answer: WORKFLOW_VARIABLES.FINAL_ANSWER,
-                    updated_sources: WORKFLOW_VARIABLES.ANSWER_SOURCES,
-                } as any,
-                sequence_number: 4,
+                    ['final_answer' as ToolOutputName]: WORKFLOW_VARIABLES.FINAL_ANSWER,
+                    ['confidence' as ToolOutputName]: WORKFLOW_VARIABLES.ANSWER_CONFIDENCE
+                },
+                sequence_number: 3,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             },
-
-            // Step 5: Update Iteration Count
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
-                label: 'Update Iteration Count',
-                description: 'Increment the iteration counter',
+                label: 'Track Iterations',
+                description: 'Track the number of iterations performed',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'counter_tool_id',
-                parameter_mappings: {} as any,
+                tool_id: 'iteration_tracker_tool',
+                parameter_mappings: {},
                 output_mappings: {
-                    count: 'answer_iterations' as WorkflowVariableName,
-                } as any,
-                sequence_number: 5,
+                    ['iterations' as ToolOutputName]: 'answer_iterations' as WorkflowVariableName
+                },
+                sequence_number: 4,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             }
         ]
     };

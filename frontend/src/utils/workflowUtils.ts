@@ -1,4 +1,4 @@
-import { Schema, ValueType, Variable } from '../types/schema';
+import { Schema, ValueType } from '../types/schema';
 import { WorkflowVariableName, WorkflowVariable } from '../types/workflows';
 
 /**

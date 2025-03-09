@@ -47,12 +47,12 @@ export class AgentWorkflowEngine {
         });
 
         try {
-            console.log(`AgentWorkflowEngine.runJob: Executing workflow: ${job.workflow.name}`);
-            console.log('job', job);
+            console.log(`🚀 [JOB ${jobId}] Starting workflow job: ${job.workflow.name}`);
+            console.time(`⏱️ Job ${jobId} Execution Time`);
 
             // Initialize workflow with inputs
             const workflow = { ...job.workflow };
-            console.log('workflow', workflow);
+            console.log(`📋 [JOB ${jobId}] Workflow has ${workflow.steps.length} steps`);
 
             // Initialize workflow state with input variables
             if (!workflow.state) {
@@ -60,6 +60,7 @@ export class AgentWorkflowEngine {
             }
 
             // Add input values to workflow state
+            console.log(`📥 [JOB ${jobId}] Setting up workflow inputs`);
             for (const [inputName, inputValue] of Object.entries(job.inputs)) {
                 // Find the variable in the workflow state
                 const existingVarIndex = workflow.state.findIndex(v => v.name === inputName);
@@ -70,10 +71,11 @@ export class AgentWorkflowEngine {
                         ...workflow.state[existingVarIndex],
                         value: inputValue
                     };
+                    console.log(`📥 [JOB ${jobId}] Updated input: ${inputName}`);
                 } else {
                     // This is a fallback for inputs that aren't defined in the workflow
                     // In a production system, you might want to validate inputs against the workflow definition
-                    console.warn(`Input ${inputName} not found in workflow state, adding it dynamically`);
+                    console.warn(`⚠️ [JOB ${jobId}] Input ${inputName} not found in workflow state, adding it dynamically`);
                     workflow.state.push({
                         variable_id: uuidv4(),
                         name: inputName as WorkflowVariableName,
@@ -95,8 +97,12 @@ export class AgentWorkflowEngine {
             let success = true;
             let error: string | undefined;
 
+            console.log(`🔄 [JOB ${jobId}] Starting workflow execution`);
+
             while (currentStepIndex < workflow.steps.length) {
-                console.log(`Executing step ${currentStepIndex + 1} of ${workflow.steps.length}`);
+                const step = workflow.steps[currentStepIndex];
+                console.log(`▶️ [JOB ${jobId}] Executing step ${currentStepIndex + 1}/${workflow.steps.length}: ${step.label}`);
+                console.time(`⏱️ [JOB ${jobId}] Step ${currentStepIndex + 1} Execution Time`);
 
                 // Execute the current step
                 const stepResult = await WorkflowEngine.executeStepSimple(
@@ -111,25 +117,41 @@ export class AgentWorkflowEngine {
                 if (!stepResult.result.success) {
                     success = false;
                     error = stepResult.result.error;
-                    console.error(`Step ${currentStepIndex + 1} failed: ${error}`);
+                    console.error(`❌ [JOB ${jobId}] Step ${currentStepIndex + 1} failed: ${error}`);
+                    console.timeEnd(`⏱️ [JOB ${jobId}] Step ${currentStepIndex + 1} Execution Time`);
                     break;
                 }
 
+                console.timeEnd(`⏱️ [JOB ${jobId}] Step ${currentStepIndex + 1} Execution Time`);
+                console.log(`✅ [JOB ${jobId}] Step ${currentStepIndex + 1} completed successfully`);
+
                 // Move to the next step
+                const previousStepIndex = currentStepIndex;
                 currentStepIndex = stepResult.nextStepIndex;
+
+                // Log if we're jumping to a different step
+                if (currentStepIndex !== previousStepIndex + 1) {
+                    if (currentStepIndex >= workflow.steps.length) {
+                        console.log(`🏁 [JOB ${jobId}] Workflow execution completed (end of workflow)`);
+                    } else {
+                        console.log(`↪️ [JOB ${jobId}] Jumping from step ${previousStepIndex + 1} to step ${currentStepIndex + 1}`);
+                    }
+                }
 
                 // Check if we've reached the end of the workflow
                 if (currentStepIndex >= workflow.steps.length) {
-                    console.log('Workflow execution completed successfully');
+                    console.log(`🏁 [JOB ${jobId}] Workflow execution completed successfully`);
                     break;
                 }
             }
 
             // Extract outputs from the final workflow state
+            console.log(`📤 [JOB ${jobId}] Collecting workflow outputs`);
             const outputs: Record<string, any> = {};
             for (const variable of updatedState) {
                 if (variable.io_type === 'output' && variable.value !== undefined) {
                     outputs[variable.name] = variable.value;
+                    console.log(`📤 [JOB ${jobId}] Output: ${variable.name}`);
                 }
             }
 
@@ -139,6 +161,9 @@ export class AgentWorkflowEngine {
                 status: success ? 'completed' : 'failed'
             });
 
+            console.timeEnd(`⏱️ Job ${jobId} Execution Time`);
+            console.log(`${success ? '🎉' : '❌'} [JOB ${jobId}] Workflow job ${success ? 'completed successfully' : 'failed'}`);
+
             // Return result
             return {
                 jobId,
@@ -147,13 +172,15 @@ export class AgentWorkflowEngine {
                 error: success ? undefined : error
             };
         } catch (error) {
-            console.error('Error executing workflow:', error);
+            console.error(`❌ [JOB ${jobId}] Error executing workflow:`, error);
 
             // Update job status
             this.activeJobs.set(jobId, {
                 job,
                 status: 'failed'
             });
+
+            console.timeEnd(`⏱️ Job ${jobId} Execution Time`);
 
             // Return error result
             return {

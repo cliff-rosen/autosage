@@ -177,9 +177,13 @@ export type AgentWorkflowEventUnion =
  * Interface for the agent workflow orchestrator
  */
 export interface AgentWorkflowOrchestratorInterface {
-    executeFullWorkflow(question: string, config?: AgentWorkflowConfig): Promise<string>;
-    getStatus(sessionId: string): OrchestrationStatus;
-    cancelExecution(sessionId: string): Promise<boolean>;
+    executeWorkflowChain(
+        question: string,
+        config?: AgentWorkflowConfig,
+        workflowChain?: AgentWorkflowChain
+    ): Promise<string>;
+    getStatus(sessionId?: string): OrchestrationStatus;
+    cancelExecution(sessionId?: string): Promise<boolean>;
     onStatusChange(callback: (event: StatusChangeEvent) => void): void;
     onPhaseComplete(callback: (event: PhaseCompleteEvent) => void): void;
     onWorkflowComplete(callback: (event: WorkflowCompleteEvent) => void): void;
@@ -251,4 +255,92 @@ export const WORKFLOW_VARIABLES = {
     ANSWER_CONFIDENCE: 'answer_confidence' as WorkflowVariableName,
     ANSWER_ITERATIONS: 'answer_iterations' as WorkflowVariableName,
     ANSWER_SOURCES: 'answer_sources' as WorkflowVariableName
+};
+
+/**
+ * Interface for a workflow phase in a chain
+ */
+export interface WorkflowPhase {
+    id: string;
+    type: AgentWorkflowType;
+    label: string;
+    description: string;
+    createWorkflow: () => Promise<AgentWorkflow> | AgentWorkflow;
+    inputs: Record<string, {
+        source: 'previous' | 'original' | 'constant';
+        sourcePhaseId?: string;
+        sourceVariable?: WorkflowVariableName;
+        value?: any;
+    }>;
+    outputs: WorkflowVariableName[];
+}
+
+/**
+ * Interface for a collection of workflows to be executed in sequence
+ */
+export interface AgentWorkflowChain {
+    id: string;
+    name: string;
+    description: string;
+    phases: WorkflowPhase[];
+}
+
+/**
+ * Default agent workflow chain with the standard three phases
+ */
+export const DEFAULT_AGENT_WORKFLOW_CHAIN: AgentWorkflowChain = {
+    id: 'default_agent_workflow_chain',
+    name: 'Default Agent Workflow Chain',
+    description: 'Standard three-phase agent workflow: question development, knowledge base development, and answer generation',
+    phases: [
+        {
+            id: 'question_development',
+            type: AgentWorkflowType.QUESTION_DEVELOPMENT,
+            label: 'Question Development',
+            description: 'Improve and refine the original question',
+            createWorkflow: () => import('../lib/workflow/agent/definitions/questionDevelopmentWorkflow').then(m => m.createQuestionDevelopmentWorkflow()),
+            inputs: {
+                [WORKFLOW_VARIABLES.ORIGINAL_QUESTION]: {
+                    source: 'original',
+                    value: null
+                }
+            },
+            outputs: [WORKFLOW_VARIABLES.IMPROVED_QUESTION]
+        },
+        {
+            id: 'kb_development',
+            type: AgentWorkflowType.KNOWLEDGE_BASE_DEVELOPMENT,
+            label: 'Knowledge Base Development',
+            description: 'Build a comprehensive knowledge base for the question',
+            createWorkflow: () => import('../lib/workflow/agent/definitions/knowledgeBaseDevelopmentWorkflow').then(m => m.createKnowledgeBaseDevelopmentWorkflow()),
+            inputs: {
+                [WORKFLOW_VARIABLES.KB_INPUT_QUESTION]: {
+                    source: 'previous',
+                    sourcePhaseId: 'question_development',
+                    sourceVariable: WORKFLOW_VARIABLES.IMPROVED_QUESTION
+                }
+            },
+            outputs: [WORKFLOW_VARIABLES.KNOWLEDGE_BASE]
+        },
+        {
+            id: 'answer_generation',
+            type: AgentWorkflowType.ANSWER_GENERATION,
+            label: 'Answer Generation',
+            description: 'Generate a comprehensive answer based on the knowledge base',
+            createWorkflow: () => import('../lib/workflow/agent/definitions/answerGenerationWorkflow').then(m => m.createAnswerGenerationWorkflow()),
+            inputs: {
+                [WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION]: {
+                    source: 'previous',
+                    sourcePhaseId: 'question_development',
+                    sourceVariable: WORKFLOW_VARIABLES.IMPROVED_QUESTION
+                },
+                [WORKFLOW_VARIABLES.ANSWER_INPUT_KB]: {
+                    source: 'previous',
+                    sourcePhaseId: 'kb_development',
+                    sourceVariable: WORKFLOW_VARIABLES.KNOWLEDGE_BASE
+                }
+            },
+            outputs: [WORKFLOW_VARIABLES.FINAL_ANSWER]
+        }
+    ]
 }; 

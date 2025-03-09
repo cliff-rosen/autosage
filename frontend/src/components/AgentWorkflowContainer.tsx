@@ -138,7 +138,7 @@ const AgentWorkflowContainer: React.FC<AgentWorkflowContainerProps> = ({
         setIsRunning(true);
 
         try {
-            await service.executeFullWorkflow(question, config);
+            await service.executeWorkflowChain(question, config);
         } catch (error) {
             console.error('Workflow execution failed:', error);
             setError(error instanceof Error ? error.message : 'An unknown error occurred');

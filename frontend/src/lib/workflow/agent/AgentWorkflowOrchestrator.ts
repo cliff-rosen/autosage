@@ -10,16 +10,18 @@ import {
     OrchestrationStatus,
     PhaseCompleteEvent,
     StatusChangeEvent,
+    WORKFLOW_VARIABLES,
     WorkflowCompleteEvent,
-    WORKFLOW_VARIABLES
+    AgentWorkflowChain,
+    DEFAULT_AGENT_WORKFLOW_CHAIN,
+    WorkflowPhase
 } from '../../../types/agent-workflows';
 import { AgentWorkflowEngine } from './AgentWorkflowEngine';
-import { createQuestionDevelopmentWorkflow } from './definitions/questionDevelopmentWorkflow';
-import { createKnowledgeBaseDevelopmentWorkflow } from './definitions/knowledgeBaseDevelopmentWorkflow';
-import { createAnswerGenerationWorkflow } from './definitions/answerGenerationWorkflow';
 
 /**
  * AgentWorkflowOrchestrator coordinates the execution of the three agent workflows
+ * that make up the complete agent workflow: question development, knowledge base
+ * development, and answer generation.
  */
 export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInterface {
     private sessionId: string;
@@ -27,14 +29,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     private eventEmitter: EventEmitter;
     private workflowEngine: AgentWorkflowEngine;
     private config: AgentWorkflowConfig;
+    private phaseResults: Record<string, any> = {};
 
     constructor(workflowEngine?: AgentWorkflowEngine) {
         this.sessionId = uuidv4();
         this.eventEmitter = new EventEmitter();
         this.workflowEngine = workflowEngine || new AgentWorkflowEngine();
         this.config = {};
-
-        // Initialize status
         this.status = {
             sessionId: this.sessionId,
             currentPhase: 'question_development',
@@ -46,11 +47,27 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
     /**
      * Execute the full agent workflow
+     * @param question The question to process
+     * @param config Optional configuration for the workflow
+     * @param workflowChain Optional workflow chain to execute (defaults to DEFAULT_AGENT_WORKFLOW_CHAIN)
+     * @returns Promise resolving to the final answer
      */
-    async executeFullWorkflow(question: string, config?: AgentWorkflowConfig): Promise<string> {
+    async executeWorkflowChain(
+        question: string,
+        config?: AgentWorkflowConfig,
+        workflowChain: AgentWorkflowChain = DEFAULT_AGENT_WORKFLOW_CHAIN
+    ): Promise<string> {
         try {
+            console.log('🚀 [WORKFLOW] Starting full workflow execution');
+            console.time('⏱️ Full Workflow Execution Time');
+
             // Store config
             this.config = config || {};
+
+            // Initialize phase results with the original question
+            this.phaseResults = {
+                original_question: question
+            };
 
             // Update status
             this.updateStatus({
@@ -59,70 +76,76 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 results: {}
             });
 
-            // Execute Question Development workflow
-            const questionDevResult = await this.executeQuestionDevelopment(question);
+            // Calculate progress increment per phase
+            const progressIncrement = 100 / workflowChain.phases.length;
 
-            // Update status with improved question
-            this.updateStatus({
-                currentPhase: 'kb_development',
-                progress: 33,
-                results: {
-                    ...this.status.results,
-                    improvedQuestion: questionDevResult.improvedQuestion
+            // Execute each phase in the workflow chain
+            for (let i = 0; i < workflowChain.phases.length; i++) {
+                const phase = workflowChain.phases[i];
+                const phaseId = phase.id;
+                const phaseType = phase.type;
+
+                console.log(`🔄 [WORKFLOW] Starting ${phase.label} phase (${i + 1}/${workflowChain.phases.length})`);
+                console.time(`⏱️ ${phase.label} Phase`);
+
+                // Update status to current phase
+                this.updateStatus({
+                    currentPhase: phaseId as OrchestrationPhase,
+                    progress: i * progressIncrement
+                });
+
+                // Execute the phase
+                const phaseResult = await this.executeWorkflowPhase(phase, question);
+
+                // Store the phase results
+                this.phaseResults = {
+                    ...this.phaseResults,
+                    ...phaseResult
+                };
+
+                // Update status with phase results
+                const updatedResults = { ...this.status.results };
+
+                // Map phase outputs to status results
+                if (phaseId === 'question_development') {
+                    updatedResults.improvedQuestion = phaseResult[WORKFLOW_VARIABLES.IMPROVED_QUESTION];
+                } else if (phaseId === 'kb_development') {
+                    updatedResults.knowledgeBase = phaseResult[WORKFLOW_VARIABLES.KNOWLEDGE_BASE];
+                } else if (phaseId === 'answer_generation') {
+                    updatedResults.finalAnswer = phaseResult[WORKFLOW_VARIABLES.FINAL_ANSWER];
                 }
-            });
 
-            // Emit phase complete event
-            this.emitPhaseComplete('question_development', {
-                improvedQuestion: questionDevResult.improvedQuestion
-            });
+                this.updateStatus({
+                    progress: (i + 1) * progressIncrement,
+                    results: updatedResults
+                });
 
-            // Execute Knowledge Base Development workflow
-            const kbDevResult = await this.executeKnowledgeBaseDevelopment(questionDevResult.improvedQuestion);
+                // Emit phase complete event
+                this.emitPhaseComplete(phaseId as OrchestrationPhase, phaseResult);
 
-            // Update status with knowledge base
-            this.updateStatus({
-                currentPhase: 'answer_generation',
-                progress: 66,
-                results: {
-                    ...this.status.results,
-                    knowledgeBase: kbDevResult.knowledgeBase
-                }
-            });
+                console.timeEnd(`⏱️ ${phase.label} Phase`);
+                console.log(`✅ [WORKFLOW] ${phase.label} phase completed`);
+            }
 
-            // Emit phase complete event
-            this.emitPhaseComplete('kb_development', {
-                knowledgeBase: kbDevResult.knowledgeBase
-            });
+            // Get the final answer from the last phase
+            const finalAnswer = this.phaseResults[WORKFLOW_VARIABLES.FINAL_ANSWER];
 
-            // Execute Answer Generation workflow
-            const answerGenResult = await this.executeAnswerGeneration(
-                questionDevResult.improvedQuestion,
-                kbDevResult.knowledgeBase
-            );
-
-            // Update status with final answer
+            // Update status to completed
             this.updateStatus({
                 currentPhase: 'completed',
                 progress: 100,
-                endTime: new Date().toISOString(),
-                results: {
-                    ...this.status.results,
-                    finalAnswer: answerGenResult.finalAnswer
-                }
-            });
-
-            // Emit phase complete event
-            this.emitPhaseComplete('answer_generation', {
-                finalAnswer: answerGenResult.finalAnswer
+                endTime: new Date().toISOString()
             });
 
             // Emit workflow complete event
-            this.emitWorkflowComplete(answerGenResult.finalAnswer);
+            this.emitWorkflowComplete(finalAnswer);
 
-            return answerGenResult.finalAnswer;
+            console.timeEnd('⏱️ Full Workflow Execution Time');
+            console.log('🎉 [WORKFLOW] Full workflow execution completed successfully');
+
+            return finalAnswer;
         } catch (error) {
-            console.error('Error executing agent workflow:', error);
+            console.error('❌ [WORKFLOW] Error executing agent workflow:', error);
 
             // Update status with error
             this.updateStatus({
@@ -196,138 +219,66 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     }
 
     /**
-     * Execute the Question Development workflow
+     * Execute a single workflow phase
+     * @param phase The workflow phase to execute
+     * @param originalQuestion The original question (for reference)
+     * @returns Promise resolving to the phase results
      */
-    private async executeQuestionDevelopment(question: string): Promise<{
-        improvedQuestion: string;
-    }> {
-        // Create Question Development workflow
-        const workflow = createQuestionDevelopmentWorkflow();
+    private async executeWorkflowPhase(
+        phase: WorkflowPhase,
+        originalQuestion: string
+    ): Promise<Record<string, any>> {
+        console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
 
-        // Apply configuration
+        // Create the workflow
+        const workflowPromise = phase.createWorkflow();
+        const workflow = workflowPromise instanceof Promise
+            ? await workflowPromise
+            : workflowPromise;
+
+        console.log(`🔄 [PHASE ${phase.id}] Created workflow with ${workflow.steps.length} steps`);
+
+        // Apply any configuration
         this.applyWorkflowConfig(workflow);
 
-        // Execute workflow
-        const result = await this.workflowEngine.runJob({
-            workflow,
-            inputs: {
-                [WORKFLOW_VARIABLES.ORIGINAL_QUESTION]: question
+        // Prepare inputs for the workflow
+        const inputs: Record<string, any> = {};
+
+        for (const [inputName, inputConfig] of Object.entries(phase.inputs)) {
+            if (inputConfig.source === 'original') {
+                inputs[inputName] = originalQuestion;
+            } else if (inputConfig.source === 'previous' && inputConfig.sourcePhaseId && inputConfig.sourceVariable) {
+                inputs[inputName] = this.phaseResults[inputConfig.sourceVariable];
+            } else if (inputConfig.source === 'constant') {
+                inputs[inputName] = inputConfig.value;
             }
+        }
+
+        console.log(`🔄 [PHASE ${phase.id}] Running workflow with inputs:`, Object.keys(inputs));
+
+        // Run the workflow
+        const jobResult = await this.workflowEngine.runJob({
+            workflow,
+            inputs
         });
 
         // Check for errors
-        if (!result.success) {
-            throw new Error(`Question Development failed: ${result.error}`);
+        if (!jobResult.success || !jobResult.outputs) {
+            const errorMessage = jobResult.error || `Unknown error in ${phase.label} workflow`;
+            console.error(`❌ [PHASE ${phase.id}] Workflow job failed:`, errorMessage);
+            throw new Error(errorMessage);
         }
 
-        // Extract improved question from the result
-        // The LLM returns a JSON object with improvedQuestion and explanation
-        let improvedQuestion = '';
+        // Extract outputs
+        const outputs: Record<string, any> = {};
 
-        if (result.outputs?.[WORKFLOW_VARIABLES.IMPROVED_QUESTION]) {
-            const output = result.outputs[WORKFLOW_VARIABLES.IMPROVED_QUESTION];
-
-            // Check if the output is already parsed as an object
-            if (typeof output === 'object' && output !== null && 'improvedQuestion' in output) {
-                improvedQuestion = output.improvedQuestion as string;
-            }
-            // Check if it's a string that needs to be parsed as JSON
-            else if (typeof output === 'string') {
-                try {
-                    const parsedOutput = JSON.parse(output);
-                    improvedQuestion = parsedOutput.improvedQuestion;
-                } catch (error) {
-                    // If parsing fails, use the output as is
-                    console.error('Failed to parse improved question output as JSON:', error);
-                    improvedQuestion = output;
-                }
-            } else {
-                // Fallback to using the output as is
-                improvedQuestion = String(output);
-            }
+        for (const outputName of phase.outputs) {
+            outputs[outputName] = jobResult.outputs[outputName];
         }
 
-        if (!improvedQuestion) {
-            // If we couldn't extract an improved question, use the original
-            console.warn('Could not extract improved question, using original');
-            improvedQuestion = question;
-        }
+        console.log(`✅ [PHASE ${phase.id}] Workflow completed successfully with outputs:`, Object.keys(outputs));
 
-        return { improvedQuestion };
-    }
-
-    /**
-     * Execute the Knowledge Base Development workflow
-     */
-    private async executeKnowledgeBaseDevelopment(question: string): Promise<{
-        knowledgeBase: any;
-    }> {
-        // Create Knowledge Base Development workflow
-        const workflow = createKnowledgeBaseDevelopmentWorkflow();
-
-        // Apply configuration
-        this.applyWorkflowConfig(workflow);
-
-        // Execute workflow
-        const result = await this.workflowEngine.runJob({
-            workflow,
-            inputs: {
-                [WORKFLOW_VARIABLES.KB_INPUT_QUESTION]: question
-            }
-        });
-
-        // Check for errors
-        if (!result.success) {
-            throw new Error(`Knowledge Base Development failed: ${result.error}`);
-        }
-
-        // Extract knowledge base
-        const knowledgeBase = result.outputs?.[WORKFLOW_VARIABLES.KNOWLEDGE_BASE];
-
-        if (!knowledgeBase) {
-            throw new Error('Knowledge Base Development did not produce a knowledge base');
-        }
-
-        return { knowledgeBase };
-    }
-
-    /**
-     * Execute the Answer Generation workflow
-     */
-    private async executeAnswerGeneration(
-        question: string,
-        knowledgeBase: any
-    ): Promise<{
-        finalAnswer: string;
-    }> {
-        // Create Answer Generation workflow
-        const workflow = createAnswerGenerationWorkflow();
-
-        // Apply configuration
-        this.applyWorkflowConfig(workflow);
-
-        // Execute workflow
-        const result = await this.workflowEngine.runJob({
-            workflow,
-            inputs: {
-                [WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION]: question,
-                [WORKFLOW_VARIABLES.ANSWER_INPUT_KB]: knowledgeBase
-            }
-        });
-
-        // Check for errors
-        if (!result.success) {
-            throw new Error(`Answer Generation failed: ${result.error}`);
-        }
-
-        // Extract final answer
-        const finalAnswer = result.outputs?.[WORKFLOW_VARIABLES.FINAL_ANSWER] as string;
-
-        if (!finalAnswer) {
-            throw new Error('Answer Generation did not produce a final answer');
-        }
-
-        return { finalAnswer };
+        return outputs;
     }
 
     /**

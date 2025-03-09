@@ -72,7 +72,7 @@ const AgentWorkflowDemo: React.FC = () => {
             setSelectedPhase('question_development');
 
             // Start the workflow
-            await service.executeFullWorkflow(question);
+            await service.executeWorkflowChain(question);
         } catch (error) {
             console.error('Error starting workflow:', error);
             setError('Failed to start workflow');

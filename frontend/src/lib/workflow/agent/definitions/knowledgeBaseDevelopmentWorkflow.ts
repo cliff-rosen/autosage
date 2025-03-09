@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AgentWorkflow, AgentWorkflowType, WORKFLOW_VARIABLES } from '../../../../types/agent-workflows';
 import { WorkflowStatus, WorkflowStepId, WorkflowStepType, WorkflowVariableName } from '../../../../types/workflows';
 import { createArraySchema, createBasicSchema, createWorkflowVariable } from '../../../../utils/workflowUtils';
+import { ToolOutputName, ToolParameterName } from '../../../../types/tools';
 
 /**
  * Creates a Knowledge Base Development workflow
@@ -63,145 +64,75 @@ export const createKnowledgeBaseDevelopmentWorkflow = (): AgentWorkflow => {
 
         // Define workflow steps
         steps: [
-            // Step 1: Create KB Plan (LLM)
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
-                label: 'Create Knowledge Base Plan',
-                description: 'Create a plan for building the knowledge base',
+                label: 'Search for Information',
+                description: 'Search for relevant information to answer the question',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_tool_id',
+                tool_id: 'information_search_tool',
                 parameter_mappings: {
-                    prompt: WORKFLOW_VARIABLES.KB_INPUT_QUESTION,
-                } as any,
+                    ['query' as ToolParameterName]: WORKFLOW_VARIABLES.KB_INPUT_QUESTION
+                },
                 output_mappings: {
-                    kb_plan: 'kb_plan' as WorkflowVariableName,
-                } as any,
+                    ['search_results' as ToolOutputName]: 'search_results' as WorkflowVariableName
+                },
                 sequence_number: 1,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             },
-
-            // Step 2: Generate Search Queries (LLM)
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
-                label: 'Generate Search Queries',
-                description: 'Generate search queries based on the KB plan and identified gaps',
+                label: 'Build Knowledge Base',
+                description: 'Compile search results into a structured knowledge base',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_tool_id',
+                tool_id: 'knowledge_base_builder_tool',
                 parameter_mappings: {
-                    question: WORKFLOW_VARIABLES.KB_INPUT_QUESTION,
-                    kb_plan: 'kb_plan' as WorkflowVariableName,
-                    kb_gaps: WORKFLOW_VARIABLES.KB_GAPS,
-                } as any,
+                    ['question' as ToolParameterName]: WORKFLOW_VARIABLES.KB_INPUT_QUESTION,
+                    ['search_results' as ToolParameterName]: 'search_results' as WorkflowVariableName
+                },
                 output_mappings: {
-                    search_queries: 'search_queries' as WorkflowVariableName,
-                } as any,
+                    ['knowledge_base' as ToolOutputName]: WORKFLOW_VARIABLES.KNOWLEDGE_BASE,
+                    ['sources' as ToolOutputName]: WORKFLOW_VARIABLES.KB_SOURCES
+                },
                 sequence_number: 2,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             },
-
-            // Step 3: Execute Search (Search Tool)
-            {
-                step_id: uuidv4() as WorkflowStepId,
-                workflow_id: workflowId,
-                label: 'Execute Search',
-                description: 'Search for information using the generated queries',
-                step_type: WorkflowStepType.ACTION,
-                tool_id: 'search_tool_id',
-                parameter_mappings: {
-                    queries: 'search_queries' as WorkflowVariableName,
-                } as any,
-                output_mappings: {
-                    search_results: 'search_results' as WorkflowVariableName,
-                } as any,
-                sequence_number: 3,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            },
-
-            // Step 4: Extract Information (LLM)
-            {
-                step_id: uuidv4() as WorkflowStepId,
-                workflow_id: workflowId,
-                label: 'Extract Information',
-                description: 'Extract relevant information from search results',
-                step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_tool_id',
-                parameter_mappings: {
-                    search_results: 'search_results' as WorkflowVariableName,
-                    kb_plan: 'kb_plan' as WorkflowVariableName,
-                } as any,
-                output_mappings: {
-                    extracted_info: 'extracted_info' as WorkflowVariableName,
-                    sources: WORKFLOW_VARIABLES.KB_SOURCES,
-                } as any,
-                sequence_number: 4,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            },
-
-            // Step 5: Update Knowledge Base (LLM)
-            {
-                step_id: uuidv4() as WorkflowStepId,
-                workflow_id: workflowId,
-                label: 'Update Knowledge Base',
-                description: 'Update the knowledge base with extracted information',
-                step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_tool_id',
-                parameter_mappings: {
-                    current_kb: WORKFLOW_VARIABLES.KNOWLEDGE_BASE,
-                    extracted_info: 'extracted_info' as WorkflowVariableName,
-                    kb_plan: 'kb_plan' as WorkflowVariableName,
-                } as any,
-                output_mappings: {
-                    updated_kb: WORKFLOW_VARIABLES.KNOWLEDGE_BASE,
-                    identified_gaps: WORKFLOW_VARIABLES.KB_GAPS,
-                } as any,
-                sequence_number: 5,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            },
-
-            // Step 6: Evaluate Knowledge Base (LLM)
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
                 label: 'Evaluate Knowledge Base',
                 description: 'Evaluate the completeness of the knowledge base',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'llm_evaluation_tool_id',
+                tool_id: 'knowledge_base_evaluator_tool',
                 parameter_mappings: {
-                    knowledge_base: WORKFLOW_VARIABLES.KNOWLEDGE_BASE,
-                    question: WORKFLOW_VARIABLES.KB_INPUT_QUESTION,
-                    kb_plan: 'kb_plan' as WorkflowVariableName,
-                } as any,
+                    ['question' as ToolParameterName]: WORKFLOW_VARIABLES.KB_INPUT_QUESTION,
+                    ['knowledge_base' as ToolParameterName]: WORKFLOW_VARIABLES.KNOWLEDGE_BASE
+                },
                 output_mappings: {
-                    kb_completeness: WORKFLOW_VARIABLES.KB_COMPLETENESS_SCORE,
-                    kb_gaps: WORKFLOW_VARIABLES.KB_GAPS,
-                } as any,
-                sequence_number: 6,
+                    ['completeness_score' as ToolOutputName]: WORKFLOW_VARIABLES.KB_COMPLETENESS_SCORE,
+                    ['gaps' as ToolOutputName]: WORKFLOW_VARIABLES.KB_GAPS
+                },
+                sequence_number: 3,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             },
-
-            // Step 7: Update Iteration Count
             {
                 step_id: uuidv4() as WorkflowStepId,
                 workflow_id: workflowId,
-                label: 'Update Iteration Count',
-                description: 'Increment the iteration counter',
+                label: 'Track Iterations',
+                description: 'Track the number of iterations performed',
                 step_type: WorkflowStepType.ACTION,
-                tool_id: 'counter_tool_id',
-                parameter_mappings: {} as any,
+                tool_id: 'iteration_tracker_tool',
+                parameter_mappings: {},
                 output_mappings: {
-                    count: 'kb_iterations' as WorkflowVariableName,
-                } as any,
-                sequence_number: 7,
+                    ['iterations' as ToolOutputName]: 'kb_iterations' as WorkflowVariableName
+                },
+                sequence_number: 4,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             }
         ]
     };

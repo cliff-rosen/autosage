@@ -760,9 +760,11 @@ export class WorkflowEngine {
         try {
             // Get the step from workflow
             const step = workflow.steps[stepIndex];
-            console.log('executeStepSimple called for step:', step);
+            console.log(`🔍 [STEP ${step.step_id}] Executing step: ${step.label} (${step.step_type})`);
+            console.time(`⏱️ Step ${step.step_id} Execution Time`);
 
             if (!step) {
+                console.error('❌ [STEP] Invalid step index:', stepIndex);
                 return {
                     updatedState: workflow.state || [],
                     result: {
@@ -777,6 +779,7 @@ export class WorkflowEngine {
             const workflowStateCopy = [...(workflow.state || [])];
 
             // Clear any existing outputs for this step
+            console.log(`🧹 [STEP ${step.step_id}] Clearing previous outputs`);
             const clearedState = this.clearStepOutputs(step, { ...workflow, state: workflowStateCopy });
 
             // Execute based on step type
@@ -785,17 +788,22 @@ export class WorkflowEngine {
             let nextStepIndex = stepIndex + 1; // Default to next step
 
             if (step.step_type === WorkflowStepType.EVALUATION) {
+                console.log(`⚖️ [STEP ${step.step_id}] Evaluating conditions`);
+
                 // For evaluation, we need the workflow context to evaluate conditions
                 const workflowCopy = { ...workflow, state: clearedState };
                 result = this.evaluateConditions(step, workflowCopy);
 
                 // Update workflow state with evaluation results
                 if (result.success && result.outputs) {
+                    console.log(`✅ [STEP ${step.step_id}] Evaluation successful, updating state`);
                     updatedState = this.getUpdatedWorkflowStateFromResults(
                         step,
                         result.outputs,
                         workflowCopy
                     );
+                } else {
+                    console.error(`❌ [STEP ${step.step_id}] Evaluation failed:`, result.error);
                 }
 
                 // Handle jump logic
@@ -805,6 +813,8 @@ export class WorkflowEngine {
 
                     const targetStepIndex = Number(result.outputs['target_step_index' as WorkflowVariableName]);
                     const jumpReason = result.outputs['reason' as WorkflowVariableName] as string;
+
+                    console.log(`↪️ [STEP ${step.step_id}] Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`);
 
                     // Use shared jump count management and increment counter if we can jump
                     const jumpResult = this.manageJumpCount(
@@ -827,18 +837,18 @@ export class WorkflowEngine {
                         ['_jump_info' as WorkflowVariableName]: JSON.stringify(jumpResult.jumpInfo) as SchemaValueType
                     };
 
-                    console.log('Jump decision in executeStepSimple:', {
-                        canJump: jumpResult.canJump,
-                        fromStep: stepIndex,
-                        toStep: nextStepIndex,
-                        reason: jumpResult.jumpInfo.reason
-                    });
+                    console.log(`${jumpResult.canJump ? '↪️' : '⛔'} [STEP ${step.step_id}] Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}, next step: ${nextStepIndex}`);
                 } else if (result.outputs && result.outputs['next_action' as WorkflowVariableName] === 'end') {
                     nextStepIndex = workflow.steps.length; // End workflow
+                    console.log(`🏁 [STEP ${step.step_id}] End workflow condition met`);
+                } else {
+                    console.log(`➡️ [STEP ${step.step_id}] Continuing to next step: ${nextStepIndex}`);
                 }
             } else {
                 // Execute tool step
                 if (!step.tool) {
+                    console.error(`❌ [STEP ${step.step_id}] No tool configured for this step`);
+                    console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
                     return {
                         updatedState: clearedState,
                         result: {
@@ -853,24 +863,31 @@ export class WorkflowEngine {
                 const workflowCopy = { ...workflow, state: clearedState };
                 const parameters = this.getResolvedParameters(step, workflowCopy);
 
-                console.log('parameters', parameters);
+                console.log(`🔧 [STEP ${step.step_id}] Executing tool: ${step.tool.name} (${step.tool.tool_type})`);
+                console.log(`📥 [STEP ${step.step_id}] Tool parameters:`, Object.keys(parameters).length);
 
                 // Add prompt template ID for LLM tools
                 if (step.tool.tool_type === 'llm' && step.prompt_template_id) {
                     parameters['prompt_template_id' as ToolParameterName] = step.prompt_template_id as SchemaValueType;
+                    console.log(`📝 [STEP ${step.step_id}] Using prompt template: ${step.prompt_template_id}`);
                 }
 
                 // Execute the tool
                 try {
+                    console.time(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
                     const toolResult = await ToolEngine.executeTool(step.tool, parameters);
+                    console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
 
                     // Update workflow state with tool results
                     if (toolResult) {
+                        console.log(`📤 [STEP ${step.step_id}] Tool execution successful, updating state with outputs:`, Object.keys(toolResult).length);
                         updatedState = this.getUpdatedWorkflowStateFromResults(
                             step,
                             toolResult,
                             workflowCopy
                         );
+                    } else {
+                        console.warn(`⚠️ [STEP ${step.step_id}] Tool execution returned no results`);
                     }
 
                     result = {
@@ -878,7 +895,8 @@ export class WorkflowEngine {
                         outputs: toolResult
                     };
                 } catch (toolError) {
-                    console.error(`Tool execution error for step ${step.step_id}:`, toolError);
+                    console.error(`❌ [STEP ${step.step_id}] Tool execution error:`, toolError);
+                    console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
 
                     // Create a proper error result
                     result = {
@@ -889,12 +907,16 @@ export class WorkflowEngine {
                 }
             }
 
+            console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
+            console.log(`${result.success ? '✅' : '❌'} [STEP ${step.step_id}] Step execution ${result.success ? 'successful' : 'failed'}`);
+
             return {
                 updatedState,
                 result,
                 nextStepIndex
             };
         } catch (error) {
+            console.error('❌ [STEP] Unexpected error during step execution:', error);
             return {
                 updatedState: workflow.state || [],
                 result: {
@@ -1198,13 +1220,15 @@ export class WorkflowEngine {
         updateWorkflowByAction: (action: WorkflowStateAction) => void
     ): Promise<StepExecutionResult> {
         try {
-            console.log('executeStep called (deprecated) - consider using executeStepSimple instead');
+            console.log(`🔄 [EXECUTE STEP] Executing step ${stepIndex + 1} of workflow ${workflow.workflow_id}`);
+            console.time(`⏱️ Execute Step ${stepIndex + 1} Time`);
 
             // Use the new simplified implementation
             const { updatedState, result, nextStepIndex } = await this.executeStepSimple(workflow, stepIndex);
 
             // Update the workflow using the provided action handler
             if (updatedState !== workflow.state) {
+                console.log(`📤 [EXECUTE STEP] Updating workflow state after step ${stepIndex + 1}`);
                 updateWorkflowByAction({
                     type: 'UPDATE_WORKFLOW',
                     payload: {
@@ -1216,8 +1240,12 @@ export class WorkflowEngine {
                 });
             }
 
+            console.timeEnd(`⏱️ Execute Step ${stepIndex + 1} Time`);
+            console.log(`${result.success ? '✅' : '❌'} [EXECUTE STEP] Step ${stepIndex + 1} ${result.success ? 'succeeded' : 'failed'}, next step: ${nextStepIndex}`);
+
             return result;
         } catch (error) {
+            console.error(`❌ [EXECUTE STEP] Error executing step ${stepIndex + 1}:`, error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error occurred'

@@ -7,7 +7,9 @@ import {
     OrchestrationStatus,
     PhaseCompleteEvent,
     StatusChangeEvent,
-    WorkflowCompleteEvent
+    WorkflowCompleteEvent,
+    AgentWorkflowChain,
+    DEFAULT_AGENT_WORKFLOW_CHAIN
 } from '../../../types/agent-workflows';
 import { AgentWorkflowOrchestrator } from './AgentWorkflowOrchestrator';
 
@@ -27,9 +29,14 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * Start a new agent workflow with the given question
      * @param question The question to process
      * @param config Optional configuration for the workflow
+     * @param workflowChain Optional workflow chain to execute (defaults to DEFAULT_AGENT_WORKFLOW_CHAIN)
      * @returns Promise resolving to the final answer
      */
-    async executeFullWorkflow(question: string, config?: AgentWorkflowConfig): Promise<string> {
+    async executeWorkflowChain(
+        question: string,
+        config?: AgentWorkflowConfig,
+        workflowChain: AgentWorkflowChain = DEFAULT_AGENT_WORKFLOW_CHAIN
+    ): Promise<string> {
         try {
             // Create a new orchestrator
             const orchestrator = new AgentWorkflowOrchestrator();
@@ -45,7 +52,7 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
             this.activeOrchestrators.set(sessionId, orchestrator);
 
             // Execute the workflow
-            const result = await orchestrator.executeFullWorkflow(question, config);
+            const result = await orchestrator.executeWorkflowChain(question, config, workflowChain);
 
             // Clean up the orchestrator after a delay
             setTimeout(() => {
