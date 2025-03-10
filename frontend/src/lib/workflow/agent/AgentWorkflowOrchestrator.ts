@@ -10,12 +10,11 @@ import {
     OrchestrationStatus,
     PhaseCompleteEvent,
     StatusChangeEvent,
-    WORKFLOW_VARIABLES,
     WorkflowCompleteEvent,
     AgentWorkflowChain,
-    DEFAULT_AGENT_WORKFLOW_CHAIN,
     WorkflowPhase
 } from '../../../types/agent-workflows';
+import { WorkflowVariable, WorkflowVariableName } from '../../../types/workflows';
 import { AgentWorkflowEngine } from './AgentWorkflowEngine';
 
 /**
@@ -30,19 +29,37 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     private workflowEngine: AgentWorkflowEngine;
     private config: AgentWorkflowConfig;
     private phaseResults: Record<string, any> = {};
+    private currentPhase: WorkflowPhase | null = null;
+    private stepStatusCallback: ((status: any) => void) | null = null;
 
     constructor(workflowEngine?: AgentWorkflowEngine) {
         this.sessionId = uuidv4();
-        this.eventEmitter = new EventEmitter();
-        this.workflowEngine = workflowEngine || new AgentWorkflowEngine();
-        this.config = {};
         this.status = {
             sessionId: this.sessionId,
             currentPhase: 'question_development',
             progress: 0,
             startTime: new Date().toISOString(),
-            results: {}
+            error: undefined
         };
+        this.eventEmitter = new EventEmitter();
+        this.workflowEngine = workflowEngine || new AgentWorkflowEngine();
+        this.config = {};
+    }
+
+    /**
+     * Set a callback to receive step status updates
+     * @param callback The callback to call when a step status update is received
+     */
+    setStepStatusCallback(callback: (status: {
+        jobId: string;
+        stepId: string;
+        stepIndex: number;
+        status: 'running' | 'completed' | 'failed';
+        message?: string;
+        progress?: number;
+        result?: any;
+    }) => void): void {
+        this.stepStatusCallback = callback;
     }
 
     /**
@@ -53,7 +70,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
      * @returns Promise resolving to the final answer
      */
     async executeWorkflowChain(
-        inputValues: Record<string, any>,
+        inputValues: WorkflowVariable[],
         workflowChain: AgentWorkflowChain,
         config?: AgentWorkflowConfig
     ): Promise<string> {
@@ -64,15 +81,21 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Store config
             this.config = config || {};
 
-            // Initialize chain state with the input values
+            // Convert input variables array to a record for easier access
+            const inputValuesRecord: Record<string, any> = {};
+            for (const variable of inputValues) {
+                inputValuesRecord[variable.name as string] = variable.value;
+            }
+
+            // Initialize chain state with the input values and existing chain state
             const chainState = {
-                ...inputValues,
+                ...inputValuesRecord,
                 ...workflowChain.state
             };
 
             // Initialize phase results with the original input values
             this.phaseResults = {
-                ...inputValues
+                ...inputValuesRecord
             };
 
             // Update status
@@ -106,26 +129,40 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 for (const [inputKey, inputConfig] of Object.entries(phase.inputs)) {
                     if (inputConfig.source === 'previous' && inputConfig.sourcePhaseId && inputConfig.sourceVariable) {
                         // Get from a previous phase's output in the chain state
-                        phaseInputs[inputKey] = chainState[inputConfig.sourceVariable];
+                        phaseInputs[inputKey] = chainState[inputConfig.sourceVariable as string];
                     } else if (inputConfig.source === 'original') {
                         // Get from the original input values
-                        phaseInputs[inputKey] = inputValues[inputConfig.sourceVariable || inputKey];
+                        phaseInputs[inputKey] = inputValuesRecord[inputConfig.sourceVariable as string || inputKey];
                     } else if (inputConfig.source === 'constant') {
                         // Use a constant value
                         phaseInputs[inputKey] = inputConfig.value;
                     }
                 }
 
+                // Convert phase inputs to WorkflowVariable array
+                const phaseInputVariables: WorkflowVariable[] = Object.entries(phaseInputs).map(([name, value]) => ({
+                    variable_id: `${phase.id}-input-${name}`,
+                    name: name as WorkflowVariableName,
+                    value: value,
+                    schema: {
+                        type: typeof value as any,
+                        description: `Input ${name} for phase ${phase.id}`,
+                        is_array: Array.isArray(value)
+                    },
+                    io_type: 'input' as const,
+                    required: true
+                }));
+
                 // Execute the workflow for this phase
-                const result = await this.executeWorkflowPhase(phase, phaseInputs);
+                const result = await this.executeWorkflowPhase(phase, phaseInputVariables);
 
                 // Store the results in the phase results
                 this.phaseResults[phase.id] = result;
 
                 // Update the chain state with the outputs from this phase
                 for (const outputVar of phase.outputs) {
-                    if (result[outputVar] !== undefined) {
-                        chainState[outputVar] = result[outputVar];
+                    if (result[outputVar as string] !== undefined) {
+                        chainState[outputVar as string] = result[outputVar as string];
                     }
                 }
 
@@ -244,9 +281,26 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
      */
     private async executeWorkflowPhase(
         phase: WorkflowPhase,
-        inputValues: Record<string, any>
+        inputValues: WorkflowVariable[]
     ): Promise<Record<string, any>> {
         console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
+
+        // Store the current phase
+        this.currentPhase = phase;
+
+        // Update status to reflect the current phase
+        this.updateStatus({
+            currentPhase: 'question_development', // This should be mapped from phase.type
+            progress: 0,
+            currentWorkflowStatus: {
+                id: phase.id,
+                status: 'running',
+                progress: 0,
+                state: {
+                    steps: []
+                }
+            }
+        });
 
         // Create the workflow
         const workflowPromise = phase.createWorkflow();
@@ -259,14 +313,20 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         // Apply any configuration
         this.applyWorkflowConfig(workflow);
 
+        // Convert input variables to a record for easier access
+        const inputValuesRecord: Record<string, any> = {};
+        for (const variable of inputValues) {
+            inputValuesRecord[variable.name as string] = variable.value;
+        }
+
         // Prepare inputs for the workflow
         const inputs: Record<string, any> = {};
 
         for (const [inputName, inputConfig] of Object.entries(phase.inputs)) {
             if (inputConfig.source === 'original') {
-                inputs[inputName] = inputValues[inputName];
+                inputs[inputName] = inputValuesRecord[inputName];
             } else if (inputConfig.source === 'previous' && inputConfig.sourcePhaseId && inputConfig.sourceVariable) {
-                inputs[inputName] = this.phaseResults[inputConfig.sourceVariable];
+                inputs[inputName] = this.phaseResults[inputConfig.sourceVariable as string];
             } else if (inputConfig.source === 'constant') {
                 inputs[inputName] = inputConfig.value;
             }
@@ -274,10 +334,88 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
         console.log(`🔄 [PHASE ${phase.id}] Running workflow with inputs:`, Object.keys(inputs));
 
+        // Convert inputs to WorkflowVariable array for the job
+        const workflowVariables: WorkflowVariable[] = Object.entries(inputs).map(([name, value]) => ({
+            variable_id: `${phase.id}-input-${name}`,
+            name: name as WorkflowVariableName,
+            value: value,
+            schema: {
+                type: typeof value as any,
+                description: `Input ${name} for phase ${phase.id}`,
+                is_array: Array.isArray(value)
+            },
+            io_type: 'input' as const,
+            required: true
+        }));
+
+        // Create a status callback for the job
+        const statusCallback = (status: {
+            jobId: string;
+            stepId: string;
+            stepIndex: number;
+            status: 'running' | 'completed' | 'failed';
+            message?: string;
+            progress?: number;
+            result?: any;
+        }) => {
+            // Calculate overall phase progress based on step progress
+            // For simplicity, we'll assume each step contributes equally to the phase progress
+            const stepCount = workflow.steps.length;
+            const stepWeight = 1 / stepCount;
+            const stepProgress = status.progress || 0;
+
+            // Calculate the phase progress as: 
+            // (completed steps * 100% + current step progress * step weight)
+            const phaseProgress = Math.min(
+                100,
+                Math.round((status.stepIndex * stepWeight * 100) + (stepProgress * stepWeight))
+            );
+
+            // Update the orchestration status with the step information
+            this.updateStatus({
+                progress: phaseProgress,
+                currentWorkflowStatus: {
+                    id: phase.id,
+                    status: 'running',
+                    progress: phaseProgress,
+                    state: {
+                        steps: [{
+                            id: status.stepId,
+                            name: workflow.steps[status.stepIndex]?.label || `Step ${status.stepIndex + 1}`,
+                            status: status.status,
+                            result: status.result
+                        }]
+                    }
+                }
+            });
+
+            // Forward the status update to the step status callback if set
+            if (this.stepStatusCallback) {
+                this.stepStatusCallback(status);
+            }
+        };
+
         // Run the workflow
         const jobResult = await this.workflowEngine.runJob({
             workflow,
-            inputs
+            inputs: workflowVariables,
+            statusCallback
+        });
+
+        // Update status to reflect phase completion
+        const phaseStatus = jobResult.success ? 'completed' : 'failed';
+        this.updateStatus({
+            currentPhase: phaseStatus as OrchestrationPhase,
+            progress: jobResult.success ? 100 : this.status.progress,
+            error: jobResult.error,
+            currentWorkflowStatus: {
+                id: phase.id,
+                status: phaseStatus,
+                progress: jobResult.success ? 100 : this.status.progress,
+                state: {
+                    steps: []
+                }
+            }
         });
 
         // Check for errors
@@ -295,6 +433,9 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         }
 
         console.log(`✅ [PHASE ${phase.id}] Workflow completed successfully with outputs:`, Object.keys(outputs));
+
+        // Emit phase complete event
+        this.emitPhaseComplete(phase.id as OrchestrationPhase, outputs);
 
         return outputs;
     }

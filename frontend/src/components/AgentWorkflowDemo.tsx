@@ -9,6 +9,8 @@ import {
     PhaseCompleteEvent
 } from '../types/agent-workflows';
 import './AgentWorkflowDemo.css';
+import { WorkflowVariableName } from '@/types/workflows';
+import { ValueType } from '@/types/schema';
 
 // Define a type that includes both OrchestrationPhase and our custom phases
 type DisplayPhase = OrchestrationPhase | 'input' | 'output';
@@ -73,8 +75,6 @@ const AgentWorkflowDemo: React.FC = () => {
 
     // Set up event listeners when the component mounts
     useEffect(() => {
-        service.onStatusChange(handleStatusChange);
-        service.onPhaseComplete(handlePhaseComplete);
 
         // Clean up event listeners when the component unmounts
         return () => {
@@ -98,8 +98,22 @@ const AgentWorkflowDemo: React.FC = () => {
             setSelectedPhase('question_development');
             setPhaseResults({});
 
-            // Start the workflow with the input values
-            await service.executeWorkflowChain(inputValues, activeWorkflowChain);
+            // Convert input values to WorkflowVariable array
+            const workflowVariables = Object.entries(inputValues).map(([name, value]) => ({
+                variable_id: `input-${name}`,
+                name: name as WorkflowVariableName,
+                value: value,
+                schema: {
+                    type: 'string' as ValueType,
+                    description: `Input ${name}`,
+                    is_array: false
+                },
+                io_type: 'input' as const,
+                required: true
+            }));
+
+            // Start the workflow with the input values as WorkflowVariable array
+            await service.executeWorkflowChain(workflowVariables, activeWorkflowChain);
         } catch (error) {
             console.error('Error starting workflow:', error);
             setError('Failed to start workflow');

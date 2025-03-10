@@ -8,9 +8,9 @@ import {
     PhaseCompleteEvent,
     StatusChangeEvent,
     WorkflowCompleteEvent,
-    AgentWorkflowChain,
-    DEFAULT_AGENT_WORKFLOW_CHAIN
+    AgentWorkflowChain
 } from '../../../types/agent-workflows';
+import { WorkflowVariable } from '../../../types/workflows';
 import { AgentWorkflowOrchestrator } from './AgentWorkflowOrchestrator';
 
 /**
@@ -19,10 +19,43 @@ import { AgentWorkflowOrchestrator } from './AgentWorkflowOrchestrator';
 export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface {
     private readonly eventEmitter: EventEmitter;
     private readonly activeOrchestrators: Map<string, AgentWorkflowOrchestrator>;
+    private readonly stepStatusListeners: Map<string, Set<(status: any) => void>> = new Map();
 
     constructor() {
         this.eventEmitter = new EventEmitter();
         this.activeOrchestrators = new Map();
+    }
+
+    /**
+     * Register a listener for step status updates
+     * @param sessionId The session ID to listen for updates on
+     * @param callback The callback to call when a step status update is received
+     */
+    onStepStatusUpdate(sessionId: string, callback: (status: {
+        jobId: string;
+        stepId: string;
+        stepIndex: number;
+        status: 'running' | 'completed' | 'failed';
+        message?: string;
+        progress?: number;
+        result?: any;
+    }) => void): void {
+        if (!this.stepStatusListeners.has(sessionId)) {
+            this.stepStatusListeners.set(sessionId, new Set());
+        }
+        this.stepStatusListeners.get(sessionId)?.add(callback);
+    }
+
+    /**
+     * Unregister a listener for step status updates
+     * @param sessionId The session ID to stop listening for updates on
+     * @param callback The callback to remove
+     */
+    offStepStatusUpdate(sessionId: string, callback: (status: any) => void): void {
+        this.stepStatusListeners.get(sessionId)?.delete(callback);
+        if (this.stepStatusListeners.get(sessionId)?.size === 0) {
+            this.stepStatusListeners.delete(sessionId);
+        }
     }
 
     /**
@@ -33,7 +66,7 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @returns Promise resolving to the final answer
      */
     async executeWorkflowChain(
-        inputValues: Record<string, any>,
+        inputValues: WorkflowVariable[],
         workflowChain: AgentWorkflowChain,
         config?: AgentWorkflowConfig
     ): Promise<string> {
@@ -173,27 +206,41 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
 
     /**
      * Set up event listeners for an orchestrator
-     * @param orchestrator The orchestrator to listen to
+     * @param orchestrator The orchestrator to set up listeners for
      */
     private setupOrchestratorListeners(orchestrator: AgentWorkflowOrchestrator): void {
-        // Status change events
+        // Set up status change listener
         orchestrator.onStatusChange((event) => {
             this.eventEmitter.emit(AgentWorkflowEventType.STATUS_CHANGE, event);
         });
 
-        // Phase complete events
+        // Set up phase complete listener
         orchestrator.onPhaseComplete((event) => {
             this.eventEmitter.emit(AgentWorkflowEventType.PHASE_COMPLETE, event);
         });
 
-        // Workflow complete events
+        // Set up workflow complete listener
         orchestrator.onWorkflowComplete((event) => {
             this.eventEmitter.emit(AgentWorkflowEventType.WORKFLOW_COMPLETE, event);
         });
 
-        // Error events
+        // Set up error listener
         orchestrator.onError((event) => {
             this.eventEmitter.emit(AgentWorkflowEventType.ERROR, event);
         });
+
+        // Set up step status update listener
+        const sessionId = orchestrator.getStatus().sessionId;
+        const stepStatusCallback = (status: any) => {
+            // Forward the step status update to all registered listeners
+            this.stepStatusListeners.get(sessionId)?.forEach(callback => {
+                callback(status);
+            });
+        };
+
+        // Pass the step status callback to the orchestrator
+        // We need to modify the AgentWorkflowOrchestrator to accept this callback
+        // and pass it to the workflowEngine.runJob method
+        (orchestrator as any).setStepStatusCallback?.(stepStatusCallback);
     }
 } 

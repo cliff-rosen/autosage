@@ -1,4 +1,4 @@
-import { Workflow, WorkflowStatus, WorkflowStepId, WorkflowVariableName } from './workflows';
+import { Workflow, WorkflowStatus, WorkflowStepId, WorkflowVariableName, WorkflowVariable } from './workflows';
 
 /**
  * Enum defining the types of agent workflows
@@ -191,7 +191,7 @@ export type AgentWorkflowEventUnion =
  */
 export interface AgentWorkflowOrchestratorInterface {
     executeWorkflowChain(
-        inputValues: Record<string, any>,
+        inputValues: WorkflowVariable[],
         workflowChain: AgentWorkflowChain,
         config?: AgentWorkflowConfig
     ): Promise<string>;
@@ -217,7 +217,7 @@ export interface WorkflowEngineInterface {
  */
 export interface WorkflowJob {
     workflow: Workflow;
-    inputs: Record<WorkflowVariableName, any>;
+    inputs: WorkflowVariable[];
     jobId?: string;
 }
 
@@ -296,7 +296,7 @@ export interface AgentWorkflowChain {
     name: string;
     description: string;
     phases: WorkflowPhase[];
-    state?: Record<string, any>; // State maintained across the entire chain execution
+    state?: Record<string, any>; // For now, keeping as Record for backward compatibility
 }
 
 /**

@@ -751,7 +751,15 @@ export class WorkflowEngine {
      */
     static async executeStepSimple(
         workflow: Workflow,
-        stepIndex: number
+        stepIndex: number,
+        statusCallback?: (status: {
+            stepId: string;
+            stepIndex: number;
+            status: 'running' | 'completed' | 'failed';
+            message?: string;
+            progress?: number;
+            result?: Partial<StepExecutionResult>;
+        }) => void
     ): Promise<{
         updatedState: WorkflowVariable[],
         result: StepExecutionResult,
@@ -763,8 +771,30 @@ export class WorkflowEngine {
             console.log(`🔍 [STEP ${step.step_id}] Executing step: ${step.label} (${step.step_type})`);
             console.time(`⏱️ Step ${step.step_id} Execution Time`);
 
+            // Notify status: running
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex,
+                    status: 'running',
+                    message: `Executing step: ${step.label}`,
+                    progress: 0
+                });
+            }
+
             if (!step) {
                 console.error('❌ [STEP] Invalid step index:', stepIndex);
+
+                // Notify status: failed
+                if (statusCallback) {
+                    statusCallback({
+                        stepId: 'unknown',
+                        stepIndex,
+                        status: 'failed',
+                        message: 'Invalid step index',
+                    });
+                }
+
                 return {
                     updatedState: workflow.state || [],
                     result: {
@@ -782,13 +812,35 @@ export class WorkflowEngine {
             console.log(`🧹 [STEP ${step.step_id}] Clearing previous outputs`);
             const clearedState = this.clearStepOutputs(step, { ...workflow, state: workflowStateCopy });
 
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex,
+                    status: 'running',
+                    message: `Preparing step execution`,
+                    progress: 10
+                });
+            }
+
             // Execute based on step type
             let result: StepExecutionResult;
             let updatedState = clearedState;
-            let nextStepIndex = stepIndex + 1; // Default to next step
+            let nextStepIndex = stepIndex + 1;
 
             if (step.step_type === WorkflowStepType.EVALUATION) {
                 console.log(`⚖️ [STEP ${step.step_id}] Evaluating conditions`);
+
+                // Notify status: running with progress
+                if (statusCallback) {
+                    statusCallback({
+                        stepId: step.step_id,
+                        stepIndex,
+                        status: 'running',
+                        message: `Evaluating conditions`,
+                        progress: 30
+                    });
+                }
 
                 // For evaluation, we need the workflow context to evaluate conditions
                 const workflowCopy = { ...workflow, state: clearedState };
@@ -802,8 +854,31 @@ export class WorkflowEngine {
                         result.outputs,
                         workflowCopy
                     );
+
+                    // Notify status: running with progress
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'running',
+                            message: `Evaluation successful, updating state`,
+                            progress: 70,
+                            result: { success: true }
+                        });
+                    }
                 } else {
                     console.error(`❌ [STEP ${step.step_id}] Evaluation failed:`, result.error);
+
+                    // Notify status: failed
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'failed',
+                            message: `Evaluation failed: ${result.error}`,
+                            result: { success: false, error: result.error }
+                        });
+                    }
                 }
 
                 // Handle jump logic
@@ -815,6 +890,17 @@ export class WorkflowEngine {
                     const jumpReason = result.outputs['reason' as WorkflowVariableName] as string;
 
                     console.log(`↪️ [STEP ${step.step_id}] Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`);
+
+                    // Notify status: running with progress
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'running',
+                            message: `Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`,
+                            progress: 80
+                        });
+                    }
 
                     // Use shared jump count management and increment counter if we can jump
                     const jumpResult = this.manageJumpCount(
@@ -838,17 +924,62 @@ export class WorkflowEngine {
                     };
 
                     console.log(`${jumpResult.canJump ? '↪️' : '⛔'} [STEP ${step.step_id}] Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}, next step: ${nextStepIndex}`);
+
+                    // Notify status: running with progress
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'running',
+                            message: `Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}, next step: ${nextStepIndex}`,
+                            progress: 90
+                        });
+                    }
                 } else if (result.outputs && result.outputs['next_action' as WorkflowVariableName] === 'end') {
                     nextStepIndex = workflow.steps.length; // End workflow
                     console.log(`🏁 [STEP ${step.step_id}] End workflow condition met`);
+
+                    // Notify status: running with progress
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'running',
+                            message: `End workflow condition met`,
+                            progress: 90
+                        });
+                    }
                 } else {
                     console.log(`➡️ [STEP ${step.step_id}] Continuing to next step: ${nextStepIndex}`);
+
+                    // Notify status: running with progress
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'running',
+                            message: `Continuing to next step: ${nextStepIndex}`,
+                            progress: 90
+                        });
+                    }
                 }
             } else {
                 // Execute tool step
                 if (!step.tool) {
                     console.error(`❌ [STEP ${step.step_id}] No tool configured for this step`);
                     console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
+
+                    // Notify status: failed
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'failed',
+                            message: `No tool configured for this step`,
+                            result: { success: false, error: 'No tool configured for this step' }
+                        });
+                    }
+
                     return {
                         updatedState: clearedState,
                         result: {
@@ -866,15 +997,38 @@ export class WorkflowEngine {
                 console.log(`🔧 [STEP ${step.step_id}] Executing tool: ${step.tool.name} (${step.tool.tool_type})`);
                 console.log(`📥 [STEP ${step.step_id}] Tool parameters:`, Object.keys(parameters).length);
 
+                // Notify status: running with progress
+                if (statusCallback) {
+                    statusCallback({
+                        stepId: step.step_id,
+                        stepIndex,
+                        status: 'running',
+                        message: `Executing tool: ${step.tool.name}`,
+                        progress: 30
+                    });
+                }
+
                 // Add prompt template ID for LLM tools
                 if (step.tool.tool_type === 'llm' && step.prompt_template_id) {
                     parameters['prompt_template_id' as ToolParameterName] = step.prompt_template_id as SchemaValueType;
-                    console.log(`📝 [STEP ${step.step_id}] Using prompt template: ${step.prompt_template_id}`);
+                    console.log(`🔄 [STEP ${step.step_id}] Using prompt template: ${step.prompt_template_id}`);
                 }
 
                 // Execute the tool
                 try {
                     console.time(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
+
+                    // Notify status: running with progress
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'running',
+                            message: `Tool execution in progress`,
+                            progress: 50
+                        });
+                    }
+
                     const toolResult = await ToolEngine.executeTool(step.tool, parameters);
                     console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
 
@@ -886,8 +1040,31 @@ export class WorkflowEngine {
                             toolResult,
                             workflowCopy
                         );
+
+                        // Notify status: running with progress
+                        if (statusCallback) {
+                            statusCallback({
+                                stepId: step.step_id,
+                                stepIndex,
+                                status: 'running',
+                                message: `Tool execution successful, updating state`,
+                                progress: 80,
+                                result: { success: true, outputs: toolResult }
+                            });
+                        }
                     } else {
                         console.warn(`⚠️ [STEP ${step.step_id}] Tool execution returned no results`);
+
+                        // Notify status: running with progress
+                        if (statusCallback) {
+                            statusCallback({
+                                stepId: step.step_id,
+                                stepIndex,
+                                status: 'running',
+                                message: `Tool execution returned no results`,
+                                progress: 80
+                            });
+                        }
                     }
 
                     result = {
@@ -897,6 +1074,20 @@ export class WorkflowEngine {
                 } catch (toolError) {
                     console.error(`❌ [STEP ${step.step_id}] Tool execution error:`, toolError);
                     console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
+
+                    // Notify status: failed
+                    if (statusCallback) {
+                        statusCallback({
+                            stepId: step.step_id,
+                            stepIndex,
+                            status: 'failed',
+                            message: `Tool execution error: ${toolError instanceof Error ? toolError.message : String(toolError)}`,
+                            result: {
+                                success: false,
+                                error: toolError instanceof Error ? toolError.message : String(toolError)
+                            }
+                        });
+                    }
 
                     // Create a proper error result
                     result = {
@@ -910,6 +1101,18 @@ export class WorkflowEngine {
             console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
             console.log(`${result.success ? '✅' : '❌'} [STEP ${step.step_id}] Step execution ${result.success ? 'successful' : 'failed'}`);
 
+            // Notify status: completed or failed
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex,
+                    status: result.success ? 'completed' : 'failed',
+                    message: `Step execution ${result.success ? 'successful' : 'failed'}`,
+                    progress: 100,
+                    result
+                });
+            }
+
             return {
                 updatedState,
                 result,
@@ -917,6 +1120,21 @@ export class WorkflowEngine {
             };
         } catch (error) {
             console.error('❌ [STEP] Unexpected error during step execution:', error);
+
+            // Notify status: failed
+            if (statusCallback) {
+                statusCallback({
+                    stepId: 'unknown',
+                    stepIndex,
+                    status: 'failed',
+                    message: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+                    result: {
+                        success: false,
+                        error: error instanceof Error ? error.message : 'Unknown error occurred'
+                    }
+                });
+            }
+
             return {
                 updatedState: workflow.state || [],
                 result: {
@@ -1217,14 +1435,26 @@ export class WorkflowEngine {
     static async executeStep(
         workflow: Workflow,
         stepIndex: number,
-        updateWorkflowByAction: (action: WorkflowStateAction) => void
+        updateWorkflowByAction: (action: WorkflowStateAction) => void,
+        statusCallback?: (status: {
+            stepId: string;
+            stepIndex: number;
+            status: 'running' | 'completed' | 'failed';
+            message?: string;
+            progress?: number;
+            result?: Partial<StepExecutionResult>;
+        }) => void
     ): Promise<StepExecutionResult> {
         try {
             console.log(`🔄 [EXECUTE STEP] Executing step ${stepIndex + 1} of workflow ${workflow.workflow_id}`);
             console.time(`⏱️ Execute Step ${stepIndex + 1} Time`);
 
             // Use the new simplified implementation
-            const { updatedState, result, nextStepIndex } = await this.executeStepSimple(workflow, stepIndex);
+            const { updatedState, result, nextStepIndex } = await this.executeStepSimple(
+                workflow,
+                stepIndex,
+                statusCallback
+            );
 
             // Update the workflow using the provided action handler
             if (updatedState !== workflow.state) {
@@ -1252,49 +1482,4 @@ export class WorkflowEngine {
             };
         }
     }
-
-    /**
-     * Updates a variable value with support for property paths
-     */
-    static updateVariableValue(
-        variables: WorkflowVariable[],
-        variablePath: string,
-        value: SchemaValueType
-    ): WorkflowVariable[] {
-        const { rootName, propPath } = parseVariablePath(variablePath);
-
-        // Create a copy of the variables array to avoid mutating the original
-        const updatedVariables = [...variables];
-
-        // Find the target variable
-        const targetIndex = updatedVariables.findIndex(v => v.name === rootName);
-
-        // If target variable doesn't exist, we can't update it
-        if (targetIndex < 0) return variables;
-
-        // Get a copy of the target variable
-        const targetVariable = { ...updatedVariables[targetIndex] };
-
-        // If there's no property path, just update the whole value
-        if (propPath.length === 0) {
-            targetVariable.value = value;
-        } else {
-            // If there's a property path, update that specific path in the object
-            // First create a default value if none exists
-            const currentValue = targetVariable.value !== undefined
-                ? targetVariable.value
-                : (targetVariable.schema.type === 'object' ? {} : undefined);
-
-            // If we have a valid object to update
-            if (currentValue !== undefined && typeof currentValue === 'object' && !Array.isArray(currentValue)) {
-                // Use utility to set value at property path
-                targetVariable.value = setValueAtPath(currentValue, propPath, value);
-            }
-        }
-
-        // Update the variable in the array
-        updatedVariables[targetIndex] = targetVariable;
-
-        return updatedVariables;
-    }
-} 
+}
