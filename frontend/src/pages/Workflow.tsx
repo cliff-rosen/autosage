@@ -256,6 +256,20 @@ const Workflow: React.FC = () => {
         );
     }
 
+    useEffect(() => {
+        // Add event listener for closing the WorkflowVariables overlay
+        const handleCloseWorkflowVariables = () => {
+            setShowConfig(false);
+        };
+
+        window.addEventListener('closeWorkflowVariables', handleCloseWorkflowVariables);
+
+        // Clean up the event listener when the component unmounts
+        return () => {
+            window.removeEventListener('closeWorkflowVariables', handleCloseWorkflowVariables);
+        };
+    }, []);
+
     return (
         <div className="flex flex-col h-full">
             <WorkflowMenuBar

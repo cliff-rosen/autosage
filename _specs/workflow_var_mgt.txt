@@ -1,0 +1,29 @@
+Workflow Variable Management
+aka WorkflowIOEditor, Workflow Variables, Workflow I/O Configuration, Workflow Config, State Management
+
+We need to update the Workflow I/O Configuration Screen in the WorkflowIOEditor as follows:
+
+1. The button that activates the screen is called Workflow Variables
+2. The screen currently comes up in the main content area, but let's have it come up across the whole width of the page as a sort of overlay.
+
+- left Navigation
+- content area header
+
+
+Instead of doing this as 3 tabs, lets list the variables as follows:
+
+1. list them all in one screen as a table with these columns:
+- type (input, output, eval)
+- name
+- description
+- type
+- value
+2. list them one per row by default
+3. allow the row to expand if either the type is an object or an array or a long string.
+4. the type and value should be editable with our best libraries for the respective type
+
+
+tell me where the display and editing code for 
+
+for this screen we need renderers to show various various types and schema data as appropriate for the type and size of the data with support for objects, arrays, markdown, etc. we already have some code for this elsewhere like in the actionstepeditor and for the templates. lets make a list of where we currently have such code.
+

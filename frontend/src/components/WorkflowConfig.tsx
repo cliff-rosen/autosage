@@ -185,368 +185,421 @@ const SchemaField: React.FC<SchemaFieldProps> = ({ value, onChange, onRemove, in
     );
 };
 
-interface VariableEditorProps {
-    variables: WorkflowVariable[];
-    onChange: (variables: WorkflowVariable[]) => void;
-    title: string;
-    description: string;
-    onFileSelect?: (file: FileInfo, value: Schema) => void;
-    isReadOnly?: boolean;
-}
+// Helper function to format value for display
+const formatValueForDisplay = (value: any): string => {
+    if (value === undefined || value === null) {
+        return 'No value';
+    }
 
-const VariableEditor: React.FC<VariableEditorProps> = ({
-    variables = [],
-    onChange,
-    title,
-    description,
-    onFileSelect,
-    isReadOnly = false
-}) => {
-    const [newVarName, setNewVarName] = useState('');
-    const [selectedVar, setSelectedVar] = useState<string | null>(null);
+    if (typeof value === 'string') {
+        return value.length > 50 ? `${value.substring(0, 50)}...` : value;
+    }
 
-    const handleAddVariable = () => {
-        if (isReadOnly) return;
-        if (newVarName) {
-            const newVar: WorkflowVariable = {
-                variable_id: `var-${Date.now()}`,
-                name: newVarName as WorkflowVariableName,
-                schema: createBasicSchema('string'),
-                io_type: title.toLowerCase().includes('input') ? 'input' : 'output'
-            };
-            onChange([...variables, newVar]);
-            setSelectedVar(newVar.variable_id);
-            setNewVarName('');
+    if (typeof value === 'object') {
+        try {
+            const stringified = JSON.stringify(value, null, 2);
+            return stringified.length > 50 ? `${stringified.substring(0, 50)}...` : stringified;
+        } catch (e) {
+            return 'Complex object';
         }
-    };
+    }
 
-    const handleRemoveVariable = (variable_id: string) => {
-        if (isReadOnly) return;
-        onChange(variables.filter(v => v.variable_id !== variable_id));
-        if (selectedVar === variable_id) {
-            setSelectedVar(null);
-        }
-    };
+    return String(value);
+};
 
-    const handleVariableChange = (variable_id: string, updates: Partial<WorkflowVariable>) => {
-        if (isReadOnly) return;
-        onChange(variables.map(v => {
-            if (v.variable_id !== variable_id) return v;
-            return { ...v, ...updates };
-        }));
+// Helper function to determine if a value should be expandable
+const isExpandable = (variable: WorkflowVariable): boolean => {
+    if (!variable.value) return false;
+
+    // Check if it's an array or object
+    if (Array.isArray(variable.value) || (typeof variable.value === 'object' && variable.value !== null)) {
+        return true;
+    }
+
+    // Check if it's a long string
+    if (typeof variable.value === 'string' && variable.value.length > 50) {
+        return true;
+    }
+
+    return false;
+};
+
+// Badge component for variable type
+const TypeBadge: React.FC<{ type: 'input' | 'output' | 'evaluation' }> = ({ type }) => {
+    const colors = {
+        input: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+        output: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+        evaluation: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
     };
 
     return (
-        <div className="space-y-6">
-            {/* Variable Management UI */}
-            {!isReadOnly && (
-                <div className="flex gap-4 items-end">
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            New Variable
-                        </label>
-                        <input
-                            type="text"
-                            value={newVarName}
-                            onChange={(e) => setNewVarName(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
-                            placeholder="Enter variable name"
-                        />
-                    </div>
-                    <button
-                        onClick={handleAddVariable}
-                        disabled={!newVarName}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                    >
-                        Add Variable
-                    </button>
-                </div>
-            )}
-
-            {/* Variables List */}
-            <div className="grid grid-cols-3 gap-6">
-                <div className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 rounded-md p-4">
-                    <h3 className="font-medium mb-4 text-gray-900 dark:text-gray-100">
-                        {title}
-                    </h3>
-                    <div className="space-y-2">
-                        {variables.map((variable) => (
-                            <div
-                                key={variable.variable_id}
-                                className="flex justify-between items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded"
-                            >
-                                <button
-                                    onClick={() => setSelectedVar(variable.variable_id)}
-                                    className={`flex-1 text-left ${selectedVar === variable.variable_id
-                                        ? 'text-blue-600 dark:text-blue-400'
-                                        : 'text-gray-700 dark:text-gray-300'
-                                        }`}
-                                >
-                                    {variable.name}
-                                </button>
-                                {!isReadOnly && (
-                                    <button
-                                        onClick={() => handleRemoveVariable(variable.variable_id)}
-                                        className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                                    >
-                                        ×
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Variable Editor */}
-                {selectedVar && (
-                    <div className="col-span-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 rounded-md p-4">
-                        {variables.map(variable => {
-                            if (variable.variable_id !== selectedVar) return null;
-                            return (
-                                <div key={variable.variable_id} className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Variable Name
-                                        </label>
-                                        {isReadOnly ? (
-                                            <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-100">
-                                                {variable.name}
-                                            </div>
-                                        ) : (
-                                            <input
-                                                value={variable.name}
-                                                onChange={e => handleVariableChange(variable.variable_id, {
-                                                    name: e.target.value as WorkflowVariableName
-                                                })}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
-                                            />
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Description
-                                        </label>
-                                        {isReadOnly ? (
-                                            <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-100">
-                                                {variable.schema.description || 'No description'}
-                                            </div>
-                                        ) : (
-                                            <textarea
-                                                value={variable.schema.description || ''}
-                                                onChange={e => handleVariableChange(variable.variable_id, {
-                                                    schema: { ...variable.schema, description: e.target.value }
-                                                })}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
-                                                rows={2}
-                                            />
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Current Value
-                                        </label>
-                                        <div className="px-3 py-2 border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-md text-gray-900 dark:text-gray-100">
-                                            {variable.value !== undefined ? (
-                                                <pre className="whitespace-pre-wrap text-sm">
-                                                    {JSON.stringify(variable.value, null, 2)}
-                                                </pre>
-                                            ) : (
-                                                <span className="text-gray-500 dark:text-gray-400 text-sm">No value set</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {!isReadOnly && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Schema
-                                            </label>
-                                            <SchemaField
-                                                value={variable.schema}
-                                                onChange={schema => handleVariableChange(variable.variable_id, { schema })}
-                                                onRemove={() => { }}
-                                                onFileSelect={onFileSelect}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${colors[type]}`}>
+            {type}
+        </span>
     );
 };
 
 const WorkflowIOEditor: React.FC = () => {
     const { workflow, updateWorkflowByAction } = useWorkflows();
-    const inputs = workflow?.state?.filter(v => v.io_type === 'input') || [];
-    const outputs = workflow?.state?.filter(v => v.io_type === 'output') || [];
-    const evaluations = workflow?.state?.filter(v => v.io_type === 'evaluation') || [];
+    const [variables, setVariables] = useState<WorkflowVariable[]>([]);
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [editingVariable, setEditingVariable] = useState<string | null>(null);
+    const [newVariableName, setNewVariableName] = useState('');
+    const [newVariableType, setNewVariableType] = useState<'input' | 'output'>('input');
+    const [showFileSelector, setShowFileSelector] = useState(false);
+    const [selectedSchema, setSelectedSchema] = useState<Schema | null>(null);
 
-    const [activeTab, setActiveTab] = useState<'inputs' | 'outputs' | 'evaluations'>('inputs');
+    useEffect(() => {
+        if (workflow?.state) {
+            setVariables(workflow.state);
+        }
+    }, [workflow]);
 
-    const handleInputChange = (newInputs: WorkflowVariable[]) => {
-        if (!workflow) return;
-        // Get existing outputs
-        const outputs = workflow.state?.filter(v => v.io_type === 'output') || [];
-        // Combine with new inputs
+    const handleVariableChange = (variable_id: string, updates: Partial<WorkflowVariable>) => {
+        const updatedVariables = variables.map(v =>
+            v.variable_id === variable_id ? { ...v, ...updates } : v
+        );
+
         updateWorkflowByAction({
             type: 'UPDATE_STATE',
             payload: {
-                state: [...newInputs, ...outputs]
+                state: updatedVariables
             }
         });
     };
 
-    const handleOutputChange = (newOutputs: WorkflowVariable[]) => {
-        if (!workflow) return;
-        // Get existing inputs
-        const inputs = workflow.state?.filter(v => v.io_type === 'input') || [];
-        // Combine with new outputs
+    const handleAddVariable = () => {
+        if (!newVariableName.trim()) return;
+
+        const newVariable: WorkflowVariable = {
+            variable_id: `var-${Date.now()}`,
+            name: newVariableName as WorkflowVariableName,
+            schema: createBasicSchema('string'),
+            io_type: newVariableType
+        };
+
+        const updatedVariables = [...variables, newVariable];
+
         updateWorkflowByAction({
             type: 'UPDATE_STATE',
             payload: {
-                state: [...inputs, ...newOutputs]
+                state: updatedVariables
             }
         });
+
+        setNewVariableName('');
     };
 
-    const handleFileSelect = (file: FileInfo, schema: Schema) => {
-        // Create updated schema while preserving array type
-        const updatedSchema = createBasicSchema('file', file.description);
-        updatedSchema.is_array = schema.is_array;
+    const handleRemoveVariable = (variable_id: string) => {
+        const updatedVariables = variables.filter(v => v.variable_id !== variable_id);
 
-        // Find and update the variable that contains this schema
-        const updatedVariables = (activeTab === 'inputs' ? inputs : outputs).map(variable => {
-            // Deep clone the variable to avoid mutating state
-            const newVariable = { ...variable };
-
-            // Check if this variable's schema is the one being updated
-            if (newVariable.schema === schema) {
-                newVariable.schema = updatedSchema;
+        updateWorkflowByAction({
+            type: 'UPDATE_STATE',
+            payload: {
+                state: updatedVariables
             }
-            return newVariable;
         });
 
-        // Update the workflow with the new variables
-        if (activeTab === 'inputs') {
-            handleInputChange(updatedVariables);
-        } else if (activeTab === 'outputs') {
-            handleOutputChange(updatedVariables);
+        if (editingVariable === variable_id) {
+            setEditingVariable(null);
+        }
+    };
+
+    const toggleRowExpansion = (variable_id: string) => {
+        const newExpandedRows = new Set(expandedRows);
+        if (newExpandedRows.has(variable_id)) {
+            newExpandedRows.delete(variable_id);
+        } else {
+            newExpandedRows.add(variable_id);
+        }
+        setExpandedRows(newExpandedRows);
+    };
+
+    const handleFileSelect = (file: FileInfo) => {
+        if (selectedSchema && editingVariable) {
+            // Create updated schema while preserving array type
+            const updatedSchema = createBasicSchema('file', file.description);
+            updatedSchema.is_array = selectedSchema.is_array;
+
+            handleVariableChange(editingVariable, { schema: updatedSchema });
+            setShowFileSelector(false);
+            setSelectedSchema(null);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            {/* Header */}
-            <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-                <div className="px-6 py-4">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                        Workflow I/O Configuration
-                    </h1>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Configure the inputs and outputs for your workflow. Define what data your workflow needs and what it produces.
-                    </p>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 flex items-start justify-center">
+            <div className="w-full bg-white dark:bg-gray-900 shadow-xl border-b border-gray-200 dark:border-gray-700 mt-0">
+                {/* Header */}
+                <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+                    <div className="px-6 py-4 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                Workflow Variables
+                            </h1>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                Configure the inputs and outputs for your workflow. Define what data your workflow needs and what it produces.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                // This will be handled by the parent component
+                                const event = new CustomEvent('closeWorkflowVariables');
+                                window.dispatchEvent(event);
+                            }}
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            <svg className="w-6 h-6 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
-                {/* Tab Navigation */}
-                <div className="px-6 flex gap-4">
-                    <button
-                        onClick={() => setActiveTab('inputs')}
-                        className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors flex items-center gap-2
-                            ${activeTab === 'inputs'
-                                ? 'border-blue-500 text-blue-700 dark:text-blue-300'
-                                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                            }`}
-                    >
-                        Input Variables
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 
-                                       text-blue-600 dark:text-blue-400">
-                            {inputs.length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('outputs')}
-                        className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors flex items-center gap-2
-                            ${activeTab === 'outputs'
-                                ? 'border-blue-500 text-blue-700 dark:text-blue-300'
-                                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                            }`}
-                    >
-                        Output Variables
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 
-                                       text-blue-600 dark:text-blue-400">
-                            {outputs.length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('evaluations')}
-                        className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors flex items-center gap-2
-                            ${activeTab === 'evaluations'
-                                ? 'border-blue-500 text-blue-700 dark:text-blue-300'
-                                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                            }`}
-                    >
-                        Evaluation Variables
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 
-                                       text-blue-600 dark:text-blue-400">
-                            {evaluations.length}
-                        </span>
-                    </button>
+                {/* Add Variable Form */}
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex flex-wrap gap-4 items-end">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Variable Type
+                            </label>
+                            <select
+                                value={newVariableType}
+                                onChange={(e) => setNewVariableType(e.target.value as 'input' | 'output')}
+                                className="px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                            >
+                                <option value="input">Input</option>
+                                <option value="output">Output</option>
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Variable Name
+                            </label>
+                            <input
+                                type="text"
+                                value={newVariableName}
+                                onChange={(e) => setNewVariableName(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                placeholder="Enter variable name"
+                            />
+                        </div>
+                        <button
+                            onClick={handleAddVariable}
+                            disabled={!newVariableName.trim()}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                        >
+                            Add Variable
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            {/* Tab Content */}
-            <div className="p-6">
-                {activeTab === 'inputs' ? (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Define the variables that will be used as input throughout your workflow steps.
-                                You can use files, primitive types, arrays, and objects.
-                            </p>
-                        </div>
-                        <VariableEditor
-                            variables={inputs}
-                            onChange={handleInputChange}
-                            title="Input Variables"
-                            description="Variables that must be provided before running the workflow"
-                            onFileSelect={handleFileSelect}
-                        />
+                {/* Variables Table */}
+                <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Type
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Name
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Description
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Data Type
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Value
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                                {variables.map((variable) => (
+                                    <React.Fragment key={variable.variable_id}>
+                                        <tr
+                                            className={`${isExpandable(variable) ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}`}
+                                            onClick={() => isExpandable(variable) && toggleRowExpansion(variable.variable_id)}
+                                        >
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <TypeBadge type={variable.io_type} />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {editingVariable === variable.variable_id ? (
+                                                    <input
+                                                        type="text"
+                                                        value={variable.name}
+                                                        onChange={(e) => handleVariableChange(variable.variable_id, {
+                                                            name: e.target.value as WorkflowVariableName
+                                                        })}
+                                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                                        onBlur={() => setEditingVariable(null)}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="font-medium text-gray-900 dark:text-gray-100"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingVariable(variable.variable_id);
+                                                        }}
+                                                    >
+                                                        {variable.name}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {editingVariable === variable.variable_id ? (
+                                                    <textarea
+                                                        value={variable.schema.description || ''}
+                                                        onChange={(e) => handleVariableChange(variable.variable_id, {
+                                                            schema: { ...variable.schema, description: e.target.value }
+                                                        })}
+                                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                                        rows={2}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="text-sm text-gray-700 dark:text-gray-300"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingVariable(variable.variable_id);
+                                                        }}
+                                                    >
+                                                        {variable.schema.description || 'No description'}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {editingVariable === variable.variable_id ? (
+                                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                        <select
+                                                            value={variable.schema.type}
+                                                            onChange={(e) => handleVariableChange(variable.variable_id, {
+                                                                schema: { ...variable.schema, type: e.target.value as ValueType }
+                                                            })}
+                                                            className="px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                                        >
+                                                            {VALUE_TYPES.map(type => (
+                                                                <option key={type} value={type}>{type}</option>
+                                                            ))}
+                                                        </select>
+                                                        <label className="flex items-center gap-1 text-sm">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={variable.schema.is_array}
+                                                                onChange={(e) => handleVariableChange(variable.variable_id, {
+                                                                    schema: { ...variable.schema, is_array: e.target.checked }
+                                                                })}
+                                                                className="rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                                            />
+                                                            Array
+                                                        </label>
+                                                        {variable.schema.type === 'file' && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedSchema(variable.schema);
+                                                                    setEditingVariable(variable.variable_id);
+                                                                    setShowFileSelector(true);
+                                                                }}
+                                                                className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800"
+                                                            >
+                                                                Select File
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        className="text-sm text-gray-700 dark:text-gray-300"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingVariable(variable.variable_id);
+                                                        }}
+                                                    >
+                                                        {variable.schema.type}{variable.schema.is_array ? '[]' : ''}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm text-gray-700 dark:text-gray-300">
+                                                    {formatValueForDisplay(variable.value)}
+                                                    {isExpandable(variable) && (
+                                                        <span className="ml-2 text-blue-600 dark:text-blue-400">
+                                                            {expandedRows.has(variable.variable_id) ? '▼' : '▶'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                {variable.io_type !== 'evaluation' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemoveVariable(variable.variable_id);
+                                                        }}
+                                                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                        {expandedRows.has(variable.variable_id) && (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
+                                                    <div className="text-sm text-gray-800 dark:text-gray-200">
+                                                        {typeof variable.value === 'object' ? (
+                                                            <pre className="whitespace-pre-wrap overflow-x-auto">
+                                                                {JSON.stringify(variable.value, null, 2)}
+                                                            </pre>
+                                                        ) : (
+                                                            <div className="whitespace-pre-wrap">
+                                                                {String(variable.value)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                                {variables.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                            No variables defined. Add a variable to get started.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
-                ) : activeTab === 'outputs' ? (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Define the variables that will store the results produced by your workflow steps.
-                                You can output files, primitive types, arrays, and objects.
-                            </p>
-                        </div>
-                        <VariableEditor
-                            variables={outputs}
-                            onChange={handleOutputChange}
-                            title="Output Variables"
-                            description="Variables that will store workflow results"
-                            onFileSelect={handleFileSelect}
+                </div>
+
+                {/* File Selector Dialog */}
+                {showFileSelector && (
+                    <Dialog
+                        isOpen={showFileSelector}
+                        onClose={() => setShowFileSelector(false)}
+                        title="Select File"
+                        maxWidth="2xl"
+                    >
+                        <FileLibrary
+                            onFileSelect={async (fileId) => {
+                                try {
+                                    const file = await fileApi.getFile(fileId);
+                                    handleFileSelect(file);
+                                } catch (err) {
+                                    console.error('Error fetching file:', err);
+                                }
+                            }}
                         />
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                View variables created by evaluation steps in your workflow.
-                                These variables store evaluation results and control workflow branching.
-                            </p>
-                        </div>
-                        <VariableEditor
-                            variables={evaluations}
-                            onChange={() => { }} // No-op since evaluations are read-only
-                            title="Evaluation Variables"
-                            description="Variables created by evaluation steps"
-                            isReadOnly={true}
-                        />
-                    </div>
+                    </Dialog>
                 )}
             </div>
         </div>
