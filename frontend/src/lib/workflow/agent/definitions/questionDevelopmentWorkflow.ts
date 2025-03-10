@@ -16,7 +16,7 @@ import { Tool, ToolOutputName, ToolParameterName, ToolParameter, ToolOutput } fr
  * Creates a Question Development workflow
  */
 export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
-    const workflowId = uuidv4();
+    const workflowId = 'question-development';
 
     // Define variable names
     const questionVar = 'question' as WorkflowVariableName;

@@ -142,12 +142,14 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const loadWorkflow = useCallback(async (id: string) => {
         console.log('loadWorkflow', id);
 
-        // const workflow = workflows[0];
-        // setWorkflow(workflow);
-        // setOriginalWorkflow(workflow);
-        // setHasUnsavedChanges(false);
-        // setActiveStep(0);
-        // return;
+        if (id === 'question-development') {
+            const questionDevelopmentWorkflow = createQuestionDevelopmentWorkflow();
+            setWorkflow(questionDevelopmentWorkflow);
+            setOriginalWorkflow(questionDevelopmentWorkflow);
+            setHasUnsavedChanges(false);
+            setActiveStep(0);
+            return;
+        }
 
         if (id === 'new') {
             createWorkflow();
