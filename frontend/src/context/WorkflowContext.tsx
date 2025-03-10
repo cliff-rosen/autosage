@@ -64,6 +64,8 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [error, setError] = useState<string | null>(null);
     // Add state to track original workflow
     const [originalWorkflow, setOriginalWorkflow] = useState<Workflow | null>(null);
+    // Track workflow IDs that have failed to load to prevent infinite retry loops
+    const [failedWorkflowIds] = useState<Set<string>>(new Set());
 
     // Persist workflow state in sessionStorage
     useEffect(() => {
@@ -164,6 +166,13 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             return;
         }
 
+        // Check if this workflow ID has already failed to load
+        if (failedWorkflowIds.has(id)) {
+            console.log('Workflow already failed to load, not retrying:', id);
+            setError('Failed to load workflow');
+            throw new Error('Workflow not found or access denied');
+        }
+
         try {
             setIsLoading(true);
             setError(null);
@@ -182,10 +191,14 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } catch (err) {
             setError('Failed to load workflow');
             console.error('Error loading workflow:', err);
+            // Add this workflow ID to the failed set to prevent retries
+            failedWorkflowIds.add(id);
+            // Make sure to throw the error so it can be caught by the component
+            throw err;
         } finally {
             setIsLoading(false);
         }
-    }, [createWorkflow, isLoading, workflow?.workflow_id]);
+    }, [createWorkflow, isLoading, workflow?.workflow_id, failedWorkflowIds]);
 
     const updateWorkflowByAction = useCallback((action: WorkflowStateAction) => {
         setWorkflow(currentWorkflow => {

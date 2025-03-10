@@ -170,7 +170,8 @@ const Workflow: React.FC = () => {
                 } catch (err) {
                     console.error('Error loading workflow:', err);
                     setError('Failed to load workflow');
-                    navigate('/workflows');
+                    // Redirect to workflows list and replace the history entry to prevent back navigation to this error
+                    navigate('/workflows', { replace: true });
                 }
             };
 
