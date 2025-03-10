@@ -47,15 +47,15 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
     /**
      * Execute the full agent workflow
-     * @param question The question to process
+     * @param inputValues The input values to initialize the workflow chain state
+     * @param workflowChain The workflow chain to execute
      * @param config Optional configuration for the workflow
-     * @param workflowChain Optional workflow chain to execute (defaults to DEFAULT_AGENT_WORKFLOW_CHAIN)
      * @returns Promise resolving to the final answer
      */
     async executeWorkflowChain(
-        question: string,
-        config?: AgentWorkflowConfig,
-        workflowChain: AgentWorkflowChain = DEFAULT_AGENT_WORKFLOW_CHAIN
+        inputValues: Record<string, any>,
+        workflowChain: AgentWorkflowChain,
+        config?: AgentWorkflowConfig
     ): Promise<string> {
         try {
             console.log('🚀 [WORKFLOW] Starting full workflow execution');
@@ -64,9 +64,15 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Store config
             this.config = config || {};
 
-            // Initialize phase results with the original question
+            // Initialize chain state with the input values
+            const chainState = {
+                ...inputValues,
+                ...workflowChain.state
+            };
+
+            // Initialize phase results with the original input values
             this.phaseResults = {
-                original_question: question
+                ...inputValues
             };
 
             // Update status
@@ -76,82 +82,94 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 results: {}
             });
 
-            // Calculate progress increment per phase
-            const progressIncrement = 100 / workflowChain.phases.length;
+            // Execute each phase in sequence
+            let finalAnswer = '';
+            for (const phase of workflowChain.phases) {
+                console.log(`🔄 [WORKFLOW] Starting phase: ${phase.id}`);
+                console.time(`⏱️ Phase Execution Time: ${phase.id}`);
 
-            // Execute each phase in the workflow chain
-            for (let i = 0; i < workflowChain.phases.length; i++) {
-                const phase = workflowChain.phases[i];
-                const phaseId = phase.id;
-                const phaseType = phase.type;
-
-                console.log(`🔄 [WORKFLOW] Starting ${phase.label} phase (${i + 1}/${workflowChain.phases.length})`);
-                console.time(`⏱️ ${phase.label} Phase`);
-
-                // Update status to current phase
+                // Update status to the current phase
                 this.updateStatus({
-                    currentPhase: phaseId as OrchestrationPhase,
-                    progress: i * progressIncrement
+                    currentPhase: phase.id as OrchestrationPhase,
+                    currentWorkflowId: phase.id
                 });
 
-                // Execute the phase
-                const phaseResult = await this.executeWorkflowPhase(phase, question);
+                // Create the workflow for this phase
+                const workflow = await phase.createWorkflow();
 
-                // Store the phase results
-                this.phaseResults = {
-                    ...this.phaseResults,
-                    ...phaseResult
-                };
+                // Apply workflow configuration
+                this.applyWorkflowConfig(workflow);
 
-                // Update status with phase results
-                const updatedResults = { ...this.status.results };
+                // Prepare inputs for this phase from the chain state
+                const phaseInputs: Record<string, any> = {};
 
-                // Map phase outputs to status results
-                if (phaseId === 'question_development') {
-                    updatedResults.improvedQuestion = phaseResult[WORKFLOW_VARIABLES.IMPROVED_QUESTION];
-                } else if (phaseId === 'kb_development') {
-                    updatedResults.knowledgeBase = phaseResult[WORKFLOW_VARIABLES.KNOWLEDGE_BASE];
-                } else if (phaseId === 'answer_generation') {
-                    updatedResults.finalAnswer = phaseResult[WORKFLOW_VARIABLES.FINAL_ANSWER];
+                for (const [inputKey, inputConfig] of Object.entries(phase.inputs)) {
+                    if (inputConfig.source === 'previous' && inputConfig.sourcePhaseId && inputConfig.sourceVariable) {
+                        // Get from a previous phase's output in the chain state
+                        phaseInputs[inputKey] = chainState[inputConfig.sourceVariable];
+                    } else if (inputConfig.source === 'original') {
+                        // Get from the original input values
+                        phaseInputs[inputKey] = inputValues[inputConfig.sourceVariable || inputKey];
+                    } else if (inputConfig.source === 'constant') {
+                        // Use a constant value
+                        phaseInputs[inputKey] = inputConfig.value;
+                    }
                 }
 
-                this.updateStatus({
-                    progress: (i + 1) * progressIncrement,
-                    results: updatedResults
-                });
+                // Execute the workflow for this phase
+                const result = await this.executeWorkflowPhase(phase, phaseInputs);
+
+                // Store the results in the phase results
+                this.phaseResults[phase.id] = result;
+
+                // Update the chain state with the outputs from this phase
+                for (const outputVar of phase.outputs) {
+                    if (result[outputVar] !== undefined) {
+                        chainState[outputVar] = result[outputVar];
+                    }
+                }
+
+                // Update the workflow chain state
+                workflowChain.state = chainState;
+
+                // If this is the final phase, get the final answer
+                if (phase.id === workflowChain.phases[workflowChain.phases.length - 1].id) {
+                    // Assuming the final phase has a 'finalAnswer' output
+                    finalAnswer = result.finalAnswer || '';
+                }
+
+                console.timeEnd(`⏱️ Phase Execution Time: ${phase.id}`);
+                console.log(`✅ [WORKFLOW] Completed phase: ${phase.id}`);
 
                 // Emit phase complete event
-                this.emitPhaseComplete(phaseId as OrchestrationPhase, phaseResult);
-
-                console.timeEnd(`⏱️ ${phase.label} Phase`);
-                console.log(`✅ [WORKFLOW] ${phase.label} phase completed`);
+                this.emitPhaseComplete(phase.id as OrchestrationPhase, result);
             }
-
-            // Get the final answer from the last phase
-            const finalAnswer = this.phaseResults[WORKFLOW_VARIABLES.FINAL_ANSWER];
 
             // Update status to completed
             this.updateStatus({
                 currentPhase: 'completed',
                 progress: 100,
-                endTime: new Date().toISOString()
+                endTime: new Date().toISOString(),
+                results: {
+                    ...this.status.results,
+                    finalAnswer
+                }
             });
 
             // Emit workflow complete event
             this.emitWorkflowComplete(finalAnswer);
 
             console.timeEnd('⏱️ Full Workflow Execution Time');
-            console.log('🎉 [WORKFLOW] Full workflow execution completed successfully');
+            console.log('✅ [WORKFLOW] Workflow execution completed');
 
             return finalAnswer;
         } catch (error) {
-            console.error('❌ [WORKFLOW] Error executing agent workflow:', error);
+            console.error('❌ [WORKFLOW] Error executing workflow:', error);
 
-            // Update status with error
+            // Update status to failed
             this.updateStatus({
                 currentPhase: 'failed',
-                error: error instanceof Error ? error.message : String(error),
-                endTime: new Date().toISOString()
+                error: error instanceof Error ? error.message : String(error)
             });
 
             // Emit error event
@@ -221,12 +239,12 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     /**
      * Execute a single workflow phase
      * @param phase The workflow phase to execute
-     * @param originalQuestion The original question (for reference)
+     * @param inputValues The input values for this phase
      * @returns Promise resolving to the phase results
      */
     private async executeWorkflowPhase(
         phase: WorkflowPhase,
-        originalQuestion: string
+        inputValues: Record<string, any>
     ): Promise<Record<string, any>> {
         console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
 
@@ -246,7 +264,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
         for (const [inputName, inputConfig] of Object.entries(phase.inputs)) {
             if (inputConfig.source === 'original') {
-                inputs[inputName] = originalQuestion;
+                inputs[inputName] = inputValues[inputName];
             } else if (inputConfig.source === 'previous' && inputConfig.sourcePhaseId && inputConfig.sourceVariable) {
                 inputs[inputName] = this.phaseResults[inputConfig.sourceVariable];
             } else if (inputConfig.source === 'constant') {

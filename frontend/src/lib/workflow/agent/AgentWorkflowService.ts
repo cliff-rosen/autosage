@@ -26,16 +26,16 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
     }
 
     /**
-     * Start a new agent workflow with the given question
-     * @param question The question to process
+     * Start a new agent workflow with the given input values
+     * @param inputValues The input values to initialize the workflow chain state
+     * @param workflowChain The workflow chain to execute
      * @param config Optional configuration for the workflow
-     * @param workflowChain Optional workflow chain to execute (defaults to DEFAULT_AGENT_WORKFLOW_CHAIN)
      * @returns Promise resolving to the final answer
      */
     async executeWorkflowChain(
-        question: string,
-        config?: AgentWorkflowConfig,
-        workflowChain: AgentWorkflowChain = DEFAULT_AGENT_WORKFLOW_CHAIN
+        inputValues: Record<string, any>,
+        workflowChain: AgentWorkflowChain,
+        config?: AgentWorkflowConfig
     ): Promise<string> {
         try {
             // Create a new orchestrator
@@ -52,7 +52,7 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
             this.activeOrchestrators.set(sessionId, orchestrator);
 
             // Execute the workflow
-            const result = await orchestrator.executeWorkflowChain(question, config, workflowChain);
+            const result = await orchestrator.executeWorkflowChain(inputValues, workflowChain, config);
 
             // Clean up the orchestrator after a delay
             setTimeout(() => {

@@ -45,7 +45,20 @@ export interface OrchestrationStatus {
         finalAnswer?: string;
     };
     currentWorkflowId?: string;
-    currentWorkflowStatus?: WorkflowStatus;
+    currentWorkflowStatus?: {
+        id: string;
+        status: string;
+        progress: number;
+        state: {
+            steps?: Array<{
+                id: string;
+                name: string;
+                status: string;
+                result?: any;
+            }>;
+            variables?: Array<any>;
+        };
+    };
 }
 
 /**
@@ -178,9 +191,9 @@ export type AgentWorkflowEventUnion =
  */
 export interface AgentWorkflowOrchestratorInterface {
     executeWorkflowChain(
-        question: string,
-        config?: AgentWorkflowConfig,
-        workflowChain?: AgentWorkflowChain
+        inputValues: Record<string, any>,
+        workflowChain: AgentWorkflowChain,
+        config?: AgentWorkflowConfig
     ): Promise<string>;
     getStatus(sessionId?: string): OrchestrationStatus;
     cancelExecution(sessionId?: string): Promise<boolean>;
@@ -283,6 +296,7 @@ export interface AgentWorkflowChain {
     name: string;
     description: string;
     phases: WorkflowPhase[];
+    state?: Record<string, any>; // State maintained across the entire chain execution
 }
 
 /**
