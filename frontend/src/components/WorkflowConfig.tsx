@@ -6,6 +6,9 @@ import { FileInfo } from '../lib/api/fileApi';
 import Dialog from './common/Dialog';
 import FileLibrary from './FileLibrary';
 import { fileApi } from '../lib/api/fileApi';
+import SchemaEditor from './common/SchemaEditor';
+import VariableRenderer from './common/VariableRenderer';
+import { useValueFormatter } from '../hooks/useValueFormatter';
 
 const VALUE_TYPES: ValueType[] = ['string', 'number', 'boolean', 'file', 'object'];
 
@@ -185,28 +188,6 @@ const SchemaField: React.FC<SchemaFieldProps> = ({ value, onChange, onRemove, in
     );
 };
 
-// Helper function to format value for display
-const formatValueForDisplay = (value: any): string => {
-    if (value === undefined || value === null) {
-        return 'No value';
-    }
-
-    if (typeof value === 'string') {
-        return value.length > 50 ? `${value.substring(0, 50)}...` : value;
-    }
-
-    if (typeof value === 'object') {
-        try {
-            const stringified = JSON.stringify(value, null, 2);
-            return stringified.length > 50 ? `${stringified.substring(0, 50)}...` : stringified;
-        } catch (e) {
-            return 'Complex object';
-        }
-    }
-
-    return String(value);
-};
-
 // Helper function to determine if a value should be expandable
 const isExpandable = (variable: WorkflowVariable): boolean => {
     if (!variable.value) return false;
@@ -244,10 +225,12 @@ const WorkflowIOEditor: React.FC = () => {
     const [variables, setVariables] = useState<WorkflowVariable[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [editingVariable, setEditingVariable] = useState<string | null>(null);
+    const [editingSchema, setEditingSchema] = useState<string | null>(null);
     const [newVariableName, setNewVariableName] = useState('');
     const [newVariableType, setNewVariableType] = useState<'input' | 'output'>('input');
     const [showFileSelector, setShowFileSelector] = useState(false);
     const [selectedSchema, setSelectedSchema] = useState<Schema | null>(null);
+    const { formatValue } = useValueFormatter();
 
     useEffect(() => {
         if (workflow?.state) {
@@ -302,6 +285,9 @@ const WorkflowIOEditor: React.FC = () => {
 
         if (editingVariable === variable_id) {
             setEditingVariable(null);
+        }
+        if (editingSchema === variable_id) {
+            setEditingSchema(null);
         }
     };
 
@@ -440,6 +426,7 @@ const WorkflowIOEditor: React.FC = () => {
                                                         })}
                                                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
                                                         onBlur={() => setEditingVariable(null)}
+                                                        onClick={(e) => e.stopPropagation()}
                                                     />
                                                 ) : (
                                                     <div
@@ -477,49 +464,35 @@ const WorkflowIOEditor: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                {editingVariable === variable.variable_id ? (
-                                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                                        <select
-                                                            value={variable.schema.type}
-                                                            onChange={(e) => handleVariableChange(variable.variable_id, {
-                                                                schema: { ...variable.schema, type: e.target.value as ValueType }
-                                                            })}
-                                                            className="px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
-                                                        >
-                                                            {VALUE_TYPES.map(type => (
-                                                                <option key={type} value={type}>{type}</option>
-                                                            ))}
-                                                        </select>
-                                                        <label className="flex items-center gap-1 text-sm">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={variable.schema.is_array}
-                                                                onChange={(e) => handleVariableChange(variable.variable_id, {
-                                                                    schema: { ...variable.schema, is_array: e.target.checked }
-                                                                })}
-                                                                className="rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                                {editingSchema === variable.variable_id ? (
+                                                    <div onClick={(e) => e.stopPropagation()} className="relative">
+                                                        <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 rounded-lg p-4 w-96">
+                                                            <SchemaEditor
+                                                                schema={variable.schema}
+                                                                onChange={(schema) => handleVariableChange(variable.variable_id, { schema })}
+                                                                compact={true}
                                                             />
-                                                            Array
-                                                        </label>
-                                                        {variable.schema.type === 'file' && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedSchema(variable.schema);
-                                                                    setEditingVariable(variable.variable_id);
-                                                                    setShowFileSelector(true);
-                                                                }}
-                                                                className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800"
-                                                            >
-                                                                Select File
-                                                            </button>
-                                                        )}
+                                                            <div className="mt-4 flex justify-end">
+                                                                <button
+                                                                    onClick={() => setEditingSchema(null)}
+                                                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                                                >
+                                                                    Done
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div
+                                                            className="text-sm text-blue-600 dark:text-blue-400 cursor-pointer"
+                                                        >
+                                                            {variable.schema.type}{variable.schema.is_array ? '[]' : ''}
+                                                        </div>
                                                     </div>
                                                 ) : (
                                                     <div
-                                                        className="text-sm text-gray-700 dark:text-gray-300"
+                                                        className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setEditingVariable(variable.variable_id);
+                                                            setEditingSchema(variable.variable_id);
                                                         }}
                                                     >
                                                         {variable.schema.type}{variable.schema.is_array ? '[]' : ''}
@@ -528,11 +501,21 @@ const WorkflowIOEditor: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="text-sm text-gray-700 dark:text-gray-300">
-                                                    {formatValueForDisplay(variable.value)}
-                                                    {isExpandable(variable) && (
-                                                        <span className="ml-2 text-blue-600 dark:text-blue-400">
-                                                            {expandedRows.has(variable.variable_id) ? '▼' : '▶'}
-                                                        </span>
+                                                    {isExpandable(variable) ? (
+                                                        <div className="flex items-center">
+                                                            <span className="truncate max-w-xs">
+                                                                {typeof variable.value === 'object'
+                                                                    ? (Array.isArray(variable.value)
+                                                                        ? `Array(${variable.value.length})`
+                                                                        : `Object(${Object.keys(variable.value || {}).length})`)
+                                                                    : String(variable.value).substring(0, 50) + (String(variable.value).length > 50 ? '...' : '')}
+                                                            </span>
+                                                            <span className="ml-2 text-blue-600 dark:text-blue-400">
+                                                                {expandedRows.has(variable.variable_id) ? '▼' : '▶'}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        formatValue(variable.value)
                                                     )}
                                                 </div>
                                             </td>
@@ -554,15 +537,12 @@ const WorkflowIOEditor: React.FC = () => {
                                             <tr>
                                                 <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
                                                     <div className="text-sm text-gray-800 dark:text-gray-200">
-                                                        {typeof variable.value === 'object' ? (
-                                                            <pre className="whitespace-pre-wrap overflow-x-auto">
-                                                                {JSON.stringify(variable.value, null, 2)}
-                                                            </pre>
-                                                        ) : (
-                                                            <div className="whitespace-pre-wrap">
-                                                                {String(variable.value)}
-                                                            </div>
-                                                        )}
+                                                        <VariableRenderer
+                                                            value={variable.value}
+                                                            schema={variable.schema}
+                                                            maxTextLength={500}
+                                                            maxArrayItems={10}
+                                                        />
                                                     </div>
                                                 </td>
                                             </tr>

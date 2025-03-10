@@ -48,216 +48,149 @@ const Workflow: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isEditMode, setIsEditMode] = useState(true);
     const [isCollapsed, setIsCollapsed] = useState(() => {
-        // Initialize from localStorage, default to false if not set
-        const saved = localStorage.getItem('workflowNavCollapsed');
-        return saved ? JSON.parse(saved) : false;
+        const savedState = localStorage.getItem('workflowNavCollapsed');
+        return savedState ? JSON.parse(savedState) : false;
     });
-    // State for input modal
-    const [showInputModal, setShowInputModal] = useState(false);
+    const [showInputModal, setShowInputModal] = useState(true);
 
-    // Initialize workflow based on URL parameter
-    useEffect(() => {
-        console.log('Workflow.tsx useEffect', workflowId);
-        if (!workflowId) {
-            navigate('/');
-            return;
+    // Derived state
+    const workflowSteps = useMemo(() => workflow?.steps || [], [workflow]);
+
+    const currentStep = useMemo(() => {
+        if (!workflow || !workflowSteps.length) return null;
+
+        // Find the step with the index matching activeStep
+        if (typeof activeStep === 'number' && activeStep >= 0 && activeStep < workflowSteps.length) {
+            return workflowSteps[activeStep];
         }
 
-        // Only load if we don't have this workflow or it's a different one
-        if (!workflow || (workflow.workflow_id !== workflowId && workflowId !== 'new')) {
-            const loadWorkflowData = async () => {
-                try {
-                    await loadWorkflow(workflowId);
-                } catch (err) {
-                    console.error('Error loading workflow:', err);
-                    setError('Failed to load workflow');
-                    navigate('/');
-                }
-            };
-            loadWorkflowData();
-        }
-    }, [workflowId, navigate, loadWorkflow]);
+        return null;
+    }, [workflow, workflowSteps, activeStep]);
 
-    // Prompt user before leaving if there are unsaved changes
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (hasUnsavedChanges) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [hasUnsavedChanges]);
-
-    // Save collapse state to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('workflowNavCollapsed', JSON.stringify(isCollapsed));
+    // Event handlers
+    const handleToggleCollapse = useCallback(() => {
+        const newState = !isCollapsed;
+        setIsCollapsed(newState);
+        localStorage.setItem('workflowNavCollapsed', JSON.stringify(newState));
     }, [isCollapsed]);
 
-    // When input is requested, show the input modal
-    useEffect(() => {
-        if (stepRequestsInput) {
-            setShowInputModal(true);
+    const handleBack = useCallback(() => {
+        moveToPreviousStep();
+    }, [moveToPreviousStep]);
+
+    const handleNext = useCallback(async (): Promise<void> => {
+        moveToNextStep();
+    }, [moveToNextStep]);
+
+    const handleStepClick = useCallback((index: number) => {
+        if (index >= 0 && index < workflowSteps.length) {
+            setActiveStep(index);
         }
-    }, [stepRequestsInput]);
+    }, [workflowSteps, setActiveStep]);
 
-    // Memoize the workflow steps
-    const workflowSteps = useMemo(() => {
-        if (!workflow) return [];
+    const handleToggleEditMode = useCallback(() => {
+        setIsEditMode(!isEditMode);
+    }, [isEditMode]);
 
-        // Just return the raw workflow steps - runtime operations are now handled by utility functions
-        return workflow.steps;
-    }, [workflow]);
+    const handleNewQuestion = useCallback(async (): Promise<void> => {
+        resetWorkflow();
+    }, [resetWorkflow]);
 
-    // Memoize current step
-    const currentStep = useMemo(() => {
-        return workflowSteps[activeStep];
-    }, [workflowSteps, activeStep]);
+    const handleExecute = useCallback(() => {
+        executeCurrentStep();
+    }, [executeCurrentStep]);
 
-    // Effect to handle invalid active step
-    useEffect(() => {
-        if (!currentStep && workflowSteps?.length && workflowSteps?.length > 0) {
-            setActiveStep(0);
-        }
-    }, [currentStep, workflowSteps?.length, setActiveStep]);
+    const handleInputSubmit = useCallback(() => {
+        setShowInputModal(false);
+        setStepRequestsInput(false);
+        executeCurrentStep();
+    }, [executeCurrentStep, setStepRequestsInput]);
 
-    // Effect to log step changes
-    // useEffect(() => {
-    //     console.log('All prepared steps:', workflowSteps.map(step => ({
-    //         step_id: step.step_id,
-    //         tool: step.tool,
-    //         parameter_mappings: step.parameter_mappings
-    //     })));
+    const handleInputCancel = useCallback(() => {
+        setShowInputModal(false);
+    }, []);
 
-    //     console.log('Current step being passed to StepDetail:', currentStep && {
-    //         step_id: currentStep.step_id,
-    //         tool: currentStep.tool,
-    //         parameter_mappings: currentStep.parameter_mappings
-    //     });
-    // }, [workflowSteps, currentStep]);
-
-    //////////////////////// Handlers ////////////////////////
-
-    const handleStepReorder = (reorderedSteps: WorkflowStep[]) => {
-        if (!workflow) return;
-
+    const handleStepReorder = useCallback((reorderedSteps: WorkflowStep[]) => {
         updateWorkflowByAction({
             type: 'REORDER_STEPS',
             payload: {
                 reorder: {
-                    reorderedSteps: reorderedSteps
+                    reorderedSteps
                 }
             }
         });
-    };
+    }, [updateWorkflowByAction]);
 
-    const handleAddStep = () => {
+    const handleAddStep = useCallback(() => {
         if (!workflow) return;
 
         updateWorkflowByAction({
             type: 'ADD_STEP',
             payload: {}
         });
-    };
+    }, [workflow, updateWorkflowByAction]);
 
-    const handleStepUpdate = (step: WorkflowStep) => {
-        console.log('handleStepUpdate called with step:', step);
+    const handleStepUpdate = useCallback((step: WorkflowStep) => {
         updateWorkflowStep(step);
-    };
+    }, [updateWorkflowStep]);
 
-    const handleStepDelete = (stepId: string) => {
-        if (!workflow) return;
-
+    const handleStepDelete = useCallback((stepId: string) => {
         updateWorkflowByAction({
             type: 'DELETE_STEP',
             payload: {
                 stepId
             }
         });
-    };
+    }, [updateWorkflowByAction]);
 
-    const handleNext = async (): Promise<void> => {
-        moveToNextStep();
-    };
+    // Effects
+    useEffect(() => {
+        const loadWorkflowData = async () => {
+            try {
+                if (workflowId) {
+                    await loadWorkflow(workflowId);
+                } else {
+                    setError('No workflow ID provided');
+                }
+            } catch (err) {
+                console.error('Error loading workflow:', err);
+                setError('Failed to load workflow');
+            }
+        };
 
-    const handleBack = () => {
-        moveToPreviousStep();
-    };
-
-    const handleStepClick = (index: number) => {
-        if (isEditMode) {
-            setActiveStep(index);
-        }
-    };
-
-    const handleToggleEditMode = () => {
-        if (isEditMode) {
-            // When switching to run mode, show the input modal
-            // Reset workflow state but keep the active step
-            resetWorkflowState();
-            setShowInputModal(true);
-            setStepRequestsInput(true);
-        } else {
-            setStepRequestsInput(false);
-        }
-
-        setIsEditMode(!isEditMode);
-        setStepExecuted(false);
-    }
-
-    const handleNewQuestion = async (): Promise<void> => {
-        resetWorkflow();
-        setStepRequestsInput(true);
-        setStepExecuted(false);
-    };
-
-    const handleExecute = () => {
-        setStepRequestsInput(false);
-        executeCurrentStep();
-    }
-
-    const handleInputSubmit = () => {
-        setShowInputModal(false);
-        setStepRequestsInput(false);
-    }
-
-    const handleInputCancel = () => {
-        console.log('Input modal canceled - switching back to edit mode');
-        setShowInputModal(false);
-        // Switch back to edit mode if canceling inputs
-        setIsEditMode(true);
-        setStepRequestsInput(false);
-
-    }
-
-    ///////////////////////// Workflow preparation /////////////////////////
-
-    if (!workflow) return null;
-    // console.log('currentWorkflow', currentWorkflow);
-
-    ///////////////////////// Render /////////////////////////
-
-    if (isLoading) {
-        return (
-            <div className="flex flex-col h-full">
-                <WorkflowMenuBar
-                    isEditMode={isEditMode}
-                    onToggleEditMode={handleToggleEditMode}
-                />
-                <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent dark:border-blue-400 dark:border-t-transparent mx-auto"></div>
-                        <p className="mt-4 text-gray-600 dark:text-gray-400">Loading workflow...</p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+        loadWorkflowData();
+    }, [workflowId, loadWorkflow]);
 
     useEffect(() => {
-        // Add event listener for closing the WorkflowVariables overlay
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [hasUnsavedChanges]);
+
+    useEffect(() => {
+        if (stepRequestsInput) {
+            setShowInputModal(true);
+        }
+    }, [stepRequestsInput]);
+
+    useEffect(() => {
+        if (workflowSteps.length > 0 && (activeStep < 0 || activeStep >= workflowSteps.length)) {
+            // If activeStep is out of bounds, set it to the first step
+            setActiveStep(0);
+        }
+    }, [workflowSteps, activeStep, setActiveStep]);
+
+    // Add event listener for closing the WorkflowVariables overlay
+    useEffect(() => {
         const handleCloseWorkflowVariables = () => {
             setShowConfig(false);
         };
@@ -270,36 +203,72 @@ const Workflow: React.FC = () => {
         };
     }, []);
 
+    // Render conditionally after all hooks have been called
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="max-w-md w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                    <div className="text-center">
+                        <div className="text-red-500 dark:text-red-400 text-5xl mb-4">⚠️</div>
+                        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Error Loading Workflow</h1>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+                        <button
+                            onClick={() => navigate('/workflows')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Back to Workflows
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isLoading || !workflow) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="max-w-md w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent dark:border-blue-400 dark:border-t-transparent mx-auto"></div>
+                        <p className="mt-4 text-gray-600 dark:text-gray-400">Loading workflow...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
             <WorkflowMenuBar
                 isEditMode={isEditMode}
                 onToggleEditMode={handleToggleEditMode}
             />
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex bg-gray-50 dark:bg-gray-900 min-h-0">
+            <div className="flex flex-1 overflow-hidden">
                 {/* Left Navigation */}
-                <div className={`${isCollapsed ? 'w-16' : 'w-80'} flex flex-col bg-white dark:bg-gray-800/50 transition-all duration-300 relative min-h-0`}>
-                    {/* Collapse Button */}
-                    <button
-                        onClick={() => setIsCollapsed(!isCollapsed)}
-                        className="absolute -right-3 top-14 p-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 z-10"
-                        title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    >
-                        <svg
-                            className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${isCollapsed ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
+                <div className={`border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col ${isCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 ease-in-out`}>
+                    {/* Header */}
+                    <div className="border-b border-gray-200 dark:border-gray-700">
+                        <div className="p-4 flex items-center justify-between">
+                            {!isCollapsed && (
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                                    {workflow.name}
+                                </h2>
+                            )}
+                            <button
+                                onClick={handleToggleCollapse}
+                                className="p-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                title={isCollapsed ? "Expand" : "Collapse"}
+                            >
+                                <svg className={`w-5 h-5 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
 
-                    {/* Config Section */}
-                    <div className={`${isCollapsed ? 'hidden' : ''} flex-none`}>
-                        <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                    {/* Workflow Config Button */}
+                    <div className="border-b border-gray-200 dark:border-gray-700">
+                        <div className="p-2">
                             <button
                                 onClick={() => setShowConfig(!showConfig)}
                                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
