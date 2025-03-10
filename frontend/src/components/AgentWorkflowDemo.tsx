@@ -277,7 +277,7 @@ const AgentWorkflowDemo: React.FC = () => {
 
                 return (
                     <div className="detail-panel">
-                        <h3>{phase.label}</h3>
+                        <h3>{getPhaseLabel(selectedPhase)}</h3>
                         <p>{phase.description}</p>
 
                         <div className="phase-progress">
@@ -323,7 +323,7 @@ const AgentWorkflowDemo: React.FC = () => {
                             onClick={() => !isRunning && setSelectedPhase(phase.id as DisplayPhase)}
                         >
                             <div className="phase-icon">{index + 1}</div>
-                            <div className="phase-label">{phase.label}</div>
+                            <div className="phase-label">{getPhaseLabel(phase.id)}</div>
                             <div className="phase-progress-bar">
                                 <div
                                     className="phase-progress"
