@@ -25,6 +25,10 @@ export const ArrayRenderer: React.FC<ArrayRendererProps> = ({
         return <span className="text-gray-500 dark:text-gray-400 italic">Empty array</span>;
     }
 
+    // Check if this is an array of objects (special case that needs enhanced handling)
+    const isArrayOfObjects = items.length > 0 &&
+        items.every(item => typeof item === 'object' && item !== null);
+
     const displayItems = isExpanded ? items : items.slice(0, maxInitialItems);
     const hasMore = items.length > maxInitialItems;
 
@@ -32,9 +36,9 @@ export const ArrayRenderer: React.FC<ArrayRendererProps> = ({
 
     // Helper function to render an individual item based on its type
     const renderItem = (item: any, index: number) => {
-        // For objects, use the ObjectRenderer
+        // For objects, use the ObjectRenderer with a smaller max properties setting
         if (typeof item === 'object' && item !== null) {
-            return <ObjectRenderer object={item} />;
+            return <ObjectRenderer object={item} maxInitialProperties={3} />;
         }
 
         // For strings, use TextRenderer to handle long text
@@ -54,6 +58,14 @@ export const ArrayRenderer: React.FC<ArrayRendererProps> = ({
 
     return (
         <div className={`space-y-2 rounded-md ${className}`}>
+            {isArrayOfObjects && (
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Array of {items.length} objects with properties:
+                    {Object.keys(items[0]).slice(0, 3).join(', ')}
+                    {Object.keys(items[0]).length > 3 ? '...' : ''}
+                </div>
+            )}
+
             <div className="space-y-2 pl-1 border-l-2 border-gray-200 dark:border-gray-700">
                 {displayItems.map((item, index) => (
                     <div

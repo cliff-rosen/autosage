@@ -276,7 +276,7 @@ export class WorkflowEngine {
     }
 
     /**
-     * Gets output values for a step formatted for UI display
+     * Gets the output values for a workflow step for UI display
      */
     static getStepOutputValuesForUI(
         step: WorkflowStep,
@@ -387,26 +387,50 @@ export class WorkflowEngine {
                 if (!variable.value) {
                     // No current value, initialize with output
                     if (Array.isArray(outputValue)) {
-                        return outputValue;
+                        // Convert each item in the array to match the variable's element type
+                        return outputValue.map(item =>
+                            WorkflowEngine.convertValueToMatchArrayElementType(variable.schema, item)
+                        );
                     } else {
-                        return [outputValue];
+                        // Convert the single item to match the variable's element type
+                        return [WorkflowEngine.convertValueToMatchArrayElementType(variable.schema, outputValue)];
                     }
                 }
                 else if (Array.isArray(variable.value)) {
                     // Append to existing array
                     if (Array.isArray(outputValue)) {
-                        return [...variable.value, ...outputValue];
+                        // Convert each new item to match the variable's element type
+                        const convertedItems = outputValue.map(item =>
+                            WorkflowEngine.convertValueToMatchArrayElementType(variable.schema, item)
+                        );
+                        return [...variable.value, ...convertedItems];
                     } else {
-                        // If outputValue is not an array, add it as a single element
-                        return [...variable.value, outputValue];
+                        // Convert the single item to match the variable's element type
+                        const convertedItem = WorkflowEngine.convertValueToMatchArrayElementType(
+                            variable.schema, outputValue
+                        );
+                        return [...variable.value, convertedItem];
                     }
                 } else {
-                    return [variable.value, outputValue];
+                    // Current value is not an array, convert both to array elements
+                    const convertedCurrentValue = WorkflowEngine.convertValueToMatchArrayElementType(
+                        variable.schema, variable.value
+                    );
+                    const convertedNewValue = WorkflowEngine.convertValueToMatchArrayElementType(
+                        variable.schema, outputValue
+                    );
+                    return [convertedCurrentValue, convertedNewValue];
                 }
             }
             else if (variable.schema.type === 'string' && typeof variable.value === 'string') {
-                // For strings, concatenate
-                return variable.value + APPEND_DELIMITER + String(outputValue);
+                // For strings, ensure objects are properly stringified
+                let stringValue;
+                if (typeof outputValue === 'object' && outputValue !== null) {
+                    stringValue = JSON.stringify(outputValue);
+                } else {
+                    stringValue = String(outputValue);
+                }
+                return variable.value + APPEND_DELIMITER + stringValue;
             }
             else {
                 // For other types, just assign (fallback)
@@ -498,6 +522,77 @@ export class WorkflowEngine {
                 }
             } else {
                 return {};
+            }
+        }
+
+        // Default: return the value as is
+        return value;
+    }
+
+    /**
+     * Converts a value to match the element type of an array schema
+     * @param schema The schema of the array variable
+     * @param value The value to convert
+     * @returns The converted value
+     */
+    private static convertValueToMatchArrayElementType(
+        schema: Schema,
+        value: any
+    ): any {
+        // If schema is not for an array or doesn't specify element type, return as is
+        if (!schema.is_array) {
+            return value;
+        }
+
+        // Handle conversion based on the element type
+        const elementType = schema.type;
+
+        // Handle object type
+        if (elementType === 'object') {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                return value; // Already an object
+            } else if (typeof value === 'string') {
+                try {
+                    // Try to parse string as JSON
+                    return JSON.parse(value);
+                } catch (e) {
+                    console.warn('Failed to parse string as object:', e);
+                    return {}; // Return empty object if parsing fails
+                }
+            } else {
+                return {}; // Default empty object
+            }
+        }
+
+        // Handle string type
+        if (elementType === 'string') {
+            if (typeof value === 'string') {
+                return value; // Already a string
+            } else if (typeof value === 'object' && value !== null) {
+                return JSON.stringify(value); // Convert object to JSON string
+            } else {
+                return String(value); // Convert other types to string
+            }
+        }
+
+        // Handle number type
+        if (elementType === 'number') {
+            if (typeof value === 'number') {
+                return value; // Already a number
+            } else {
+                const num = Number(value);
+                return isNaN(num) ? 0 : num; // Convert to number or default to 0
+            }
+        }
+
+        // Handle boolean type
+        if (elementType === 'boolean') {
+            if (typeof value === 'boolean') {
+                return value; // Already a boolean
+            } else if (typeof value === 'string') {
+                return value.toLowerCase() === 'true'; // Convert string to boolean
+            } else {
+                return Boolean(value); // Convert other types to boolean
             }
         }
 

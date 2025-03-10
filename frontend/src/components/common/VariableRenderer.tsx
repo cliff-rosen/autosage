@@ -3,6 +3,7 @@ import { ArrayRenderer } from './ArrayRenderer';
 import { TextRenderer } from './TextRenderer';
 import { ObjectRenderer } from './ObjectRenderer';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import JsonRenderer from './JsonRenderer';
 
 export interface VariableRendererProps {
     value: any;
@@ -12,6 +13,7 @@ export interface VariableRendererProps {
     maxArrayItems?: number;
     maxArrayItemLength?: number;
     className?: string;
+    useEnhancedJsonView?: boolean;
 }
 
 /**
@@ -25,7 +27,8 @@ export const VariableRenderer: React.FC<VariableRendererProps> = ({
     maxTextLength = 200,
     maxArrayItems = 5,
     maxArrayItemLength = 100,
-    className = ''
+    className = '',
+    useEnhancedJsonView = true
 }) => {
     // Handle undefined or null values
     if (value === undefined || value === null) {
@@ -36,8 +39,26 @@ export const VariableRenderer: React.FC<VariableRendererProps> = ({
         );
     }
 
+    // Check if this is an array of objects
+    const isArrayOfObjects = Array.isArray(value) &&
+        value.length > 0 &&
+        value.every(item => typeof item === 'object' && item !== null);
+
     // Handle arrays
     if (Array.isArray(value)) {
+        // Use JsonRenderer for arrays of objects or if enhanced JSON view is enabled
+        if (isArrayOfObjects || useEnhancedJsonView) {
+            return (
+                <JsonRenderer
+                    data={value}
+                    initialCollapsed={true}
+                    maxInitialDepth={1} // Only expand the first level by default
+                    className={className}
+                />
+            );
+        }
+
+        // Otherwise use the original ArrayRenderer
         return (
             <ArrayRenderer
                 items={value}
@@ -55,6 +76,18 @@ export const VariableRenderer: React.FC<VariableRendererProps> = ({
             return <span className={`text-blue-600 dark:text-blue-400 ${className}`}>File: {value.name || value.file_id}</span>;
         }
 
+        // Use the enhanced JSON view for objects if enabled
+        if (useEnhancedJsonView) {
+            return (
+                <JsonRenderer
+                    data={value}
+                    initialCollapsed={true}
+                    className={className}
+                />
+            );
+        }
+
+        // Otherwise use the original ObjectRenderer
         return <ObjectRenderer object={value} className={className} />;
     }
 

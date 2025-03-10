@@ -33,6 +33,59 @@ export const ObjectRenderer: React.FC<ObjectRendererProps> = ({
         return <span className="text-gray-500 dark:text-gray-400 italic">Empty object</span>;
     }
 
+    // Helper function to format a value for display
+    const formatValue = (value: any): string => {
+        if (value === null) return 'null';
+        if (value === undefined) return 'undefined';
+
+        if (typeof value === 'object') {
+            if (Array.isArray(value)) {
+                if (value.length === 0) return 'Empty array';
+
+                // Check if it's an array of objects
+                const isArrayOfObjects = value.length > 0 &&
+                    value.every(item => typeof item === 'object' && item !== null);
+
+                if (isArrayOfObjects) {
+                    return `Array of ${value.length} objects`;
+                }
+
+                // For small arrays of primitives, show the values
+                if (value.length <= 3 && value.every(item => typeof item !== 'object')) {
+                    return `[${value.map(item => formatValue(item)).join(', ')}]`;
+                }
+
+                return `Array(${value.length})`;
+            }
+
+            // For regular objects
+            const keys = Object.keys(value);
+            if (keys.length === 0) return 'Empty object';
+
+            // Show a preview of the first few keys
+            if (keys.length <= 3) {
+                return `{ ${keys.map(k => `${k}: ${formatSimpleValue(value[k])}`).join(', ')} }`;
+            }
+
+            return `Object(${keys.length} properties)`;
+        }
+
+        return String(value);
+    };
+
+    // Helper function for formatting simple values (used in object previews)
+    const formatSimpleValue = (value: any): string => {
+        if (value === null) return 'null';
+        if (value === undefined) return 'undefined';
+        if (typeof value === 'object') {
+            return Array.isArray(value) ? `Array(${value.length})` : 'Object';
+        }
+        if (typeof value === 'string') {
+            return value.length > 10 ? `"${value.substring(0, 10)}..."` : `"${value}"`;
+        }
+        return String(value);
+    };
+
     return (
         <div className={`space-y-2 ${className}`}>
             <div className="p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
@@ -43,12 +96,7 @@ export const ObjectRenderer: React.FC<ObjectRendererProps> = ({
                                 {key}:
                             </div>
                             <div className="col-span-8 text-gray-800 dark:text-gray-200 truncate">
-                                {typeof value === 'object' && value !== null
-                                    ? (Array.isArray(value)
-                                        ? `Array(${value.length})`
-                                        : `Object(${Object.keys(value).length})`)
-                                    : String(value)
-                                }
+                                {formatValue(value)}
                             </div>
                         </div>
                     ))}

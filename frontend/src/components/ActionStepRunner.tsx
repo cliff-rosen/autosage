@@ -11,6 +11,7 @@ import Dialog from './common/Dialog';
 import FileLibrary from './FileLibrary';
 import PromptTemplateEditor from './PromptTemplateEditor';
 import VariableRenderer from './common/VariableRenderer';
+import JsonEditor from './common/JsonEditor';
 import { WorkflowEngine } from '../lib/workflow/workflowEngine';
 
 interface ActionStepRunnerProps {
@@ -91,7 +92,14 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
 
     const handleStartEdit = (paramName: string, value: any) => {
         setEditingInput(paramName);
-        setEditValue(value === null || value === undefined ? '' : String(value));
+
+        // For complex objects and arrays, we'll keep the original value
+        // The JsonEditor component will handle the string conversion
+        if (typeof value === 'object' && value !== null) {
+            setEditValue(value);
+        } else {
+            setEditValue(value === null || value === undefined ? '' : String(value));
+        }
     };
 
     const handleSaveEdit = (paramName: string, varName: WorkflowVariableName) => {
@@ -199,11 +207,40 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
 
     const renderEditableValue = (paramName: string, varName: string, valueObj: ValueObject | undefined) => {
         if (editingInput === paramName) {
+            // For complex objects and arrays, use the JsonEditor
+            if (typeof editValue === 'object' && editValue !== null) {
+                return (
+                    <div className="space-y-3">
+                        <JsonEditor
+                            value={editValue}
+                            onChange={(newValue) => setEditValue(newValue)}
+                        />
+                        <div className="flex justify-end space-x-2">
+                            <button
+                                onClick={() => handleSaveEdit(paramName, varName as WorkflowVariableName)}
+                                className="px-3 py-2 text-sm font-medium text-white bg-blue-600 
+                                         hover:bg-blue-700 rounded-md"
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={handleCancelEdit}
+                                className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 
+                                         hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // For simple values, use a text input
             return (
                 <div className="flex items-center space-x-2">
                     <input
                         type="text"
-                        value={editValue}
+                        value={editValue as string}
                         onChange={(e) => setEditValue(e.target.value)}
                         className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 
                                  rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
@@ -236,7 +273,14 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
         return (
             <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                    <VariableRenderer value={valueObj?.value} schema={valueObj?.schema} />
+                    <VariableRenderer
+                        value={valueObj?.value}
+                        schema={valueObj?.schema}
+                        useEnhancedJsonView={true}
+                        maxTextLength={MAX_TEXT_LENGTH}
+                        maxArrayItems={MAX_ARRAY_LENGTH}
+                        maxArrayItemLength={MAX_ARRAY_ITEM_LENGTH}
+                    />
                 </div>
                 <button
                     onClick={() => handleStartEdit(paramName, valueObj?.value)}
@@ -408,6 +452,7 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
                                         maxTextLength={MAX_TEXT_LENGTH}
                                         maxArrayItems={MAX_ARRAY_LENGTH}
                                         maxArrayItemLength={MAX_ARRAY_ITEM_LENGTH}
+                                        useEnhancedJsonView={true}
                                     />
                                 </div>
                             </div>

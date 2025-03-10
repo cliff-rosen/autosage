@@ -19,6 +19,7 @@ import PromptTemplate from './pages/PromptTemplate';
 import JobsManager from './pages/JobsManager';
 import Job from './pages/Job';
 import AgentWorkflowPage from './pages/AgentWorkflow';
+import TestPage from './pages/TestPage';
 
 // Main app content when authenticated
 const AuthenticatedApp = () => {
@@ -113,6 +114,7 @@ const AuthenticatedApp = () => {
                   <Route path="/jobs" element={<JobsManager />} />
                   <Route path="/jobs/:jobId" element={<Job />} />
                   <Route path="/agent-workflow" element={<AgentWorkflowPage />} />
+                  <Route path="/test" element={<TestPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </div>

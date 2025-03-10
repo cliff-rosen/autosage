@@ -400,5 +400,18 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
         ]
     };
 
+    // Initialize the workflow state with default values
+    const initialState = workflow.state?.map(variable => {
+        if (variable.name === improvementHistoryVar) {
+            return {
+                ...variable,
+                value: [] // Initialize improvement_history as an empty array
+            };
+        }
+        return variable;
+    });
+
+    workflow.state = initialState as WorkflowVariable[];
+
     return workflow;
 }; 

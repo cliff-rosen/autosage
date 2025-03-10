@@ -68,9 +68,19 @@ const registerAllTools = () => {
 
     // Utility tools
     registerToolExecutor('echo', async (toolId: string, parameters: ResolvedParameters) => {
-        const input = (parameters as Record<string, string>)['input'];
+        const input = parameters['input'];
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return { ['output' as ToolOutputName]: `${input}` as SchemaValueType };
+
+        // Properly handle objects by JSON serializing/deserializing
+        let processedInput;
+        if (typeof input === 'object' && input !== null) {
+            // Serialize and deserialize to ensure clean object representation
+            processedInput = JSON.parse(JSON.stringify(input));
+        } else {
+            processedInput = input;
+        }
+
+        return { ['output' as ToolOutputName]: processedInput as SchemaValueType };
     });
 
     registerToolExecutor('concatenate', async (toolId: string, parameters: ResolvedParameters) => {
