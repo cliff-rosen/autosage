@@ -6,6 +6,7 @@ import {
     WorkflowStep,
     WorkflowStepType
 } from '../types/workflows';
+import type { Workflow } from '../types/workflows';
 
 // Context
 import { useWorkflows } from '../context/WorkflowContext';
@@ -39,6 +40,7 @@ const Workflow: React.FC = () => {
         updateWorkflowByAction,
         updateWorkflowStep,
         resetWorkflow,
+        saveWorkflow,
     } = useWorkflows();
 
     // State
@@ -141,23 +143,43 @@ const Workflow: React.FC = () => {
         });
     }, [updateWorkflowByAction]);
 
+    // Add a new handler for saving workflow
+    const handleSaveWorkflow = useCallback(async () => {
+        try {
+            await saveWorkflow();
+            // The URL will be updated by the effect if needed
+        } catch (err) {
+            console.error('Error saving workflow:', err);
+            setError('Failed to save workflow');
+        }
+    }, [saveWorkflow]);
+
     // Effects
     useEffect(() => {
-        const loadWorkflowData = async () => {
-            try {
-                if (workflowId) {
-                    await loadWorkflow(workflowId);
-                } else {
-                    setError('No workflow ID provided');
-                }
-            } catch (err) {
-                console.error('Error loading workflow:', err);
-                setError('Failed to load workflow');
-            }
-        };
+        // If we have a workflow in context but the URL doesn't match, update the URL
+        if (workflow && workflowId !== workflow.workflow_id) {
+            navigate(`/workflows/${workflow.workflow_id}`, { replace: true });
+            return;
+        }
 
-        loadWorkflowData();
-    }, [workflowId, loadWorkflow]);
+        // If we don't have a workflow in context, load it from the URL
+        if (!workflow && workflowId) {
+            const loadWorkflowData = async () => {
+                try {
+                    await loadWorkflow(workflowId);
+                } catch (err) {
+                    console.error('Error loading workflow:', err);
+                    setError('Failed to load workflow');
+                    navigate('/workflows');
+                }
+            };
+
+            loadWorkflowData();
+        } else if (!workflow && !workflowId) {
+            // No workflow in context and no ID in URL, redirect to workflows list
+            navigate('/workflows');
+        }
+    }, [workflow, workflowId, loadWorkflow, navigate]);
 
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -204,19 +226,15 @@ const Workflow: React.FC = () => {
     // Render conditionally after all hooks have been called
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                <div className="max-w-md w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                    <div className="text-center">
-                        <div className="text-red-500 dark:text-red-400 text-5xl mb-4">⚠️</div>
-                        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Error Loading Workflow</h1>
-                        <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-                        <button
-                            onClick={() => navigate('/workflows')}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Back to Workflows
-                        </button>
+            <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900">
+                <div className="text-center">
+                    <div className="text-red-500 text-5xl mb-4">
+                        <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                     </div>
+                    <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">{error}</h2>
+                    <p className="text-gray-500 dark:text-gray-400">Redirecting to workflows list...</p>
                 </div>
             </div>
         );
@@ -224,12 +242,10 @@ const Workflow: React.FC = () => {
 
     if (isLoading || !workflow) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                <div className="max-w-md w-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent dark:border-blue-400 dark:border-t-transparent mx-auto"></div>
-                        <p className="mt-4 text-gray-600 dark:text-gray-400">Loading workflow...</p>
-                    </div>
+            <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                    <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">Loading workflow...</h2>
                 </div>
             </div>
         );

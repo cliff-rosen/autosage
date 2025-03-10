@@ -28,7 +28,7 @@ interface WorkflowContextType {
     loadWorkflows(): Promise<void>
     loadWorkflow(id: string): Promise<void>
     createWorkflow(): void
-    saveWorkflow(): Promise<void>
+    saveWorkflow(): Promise<string | undefined>
     exitWorkflow(): void
     // New granular update method
     updateWorkflowByAction(action: WorkflowStateAction): void
@@ -313,6 +313,9 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     )
                 );
             }
+
+            // Return the saved workflow ID so the component can update the URL
+            return savedWorkflow.workflow_id;
         } catch (error) {
             setError('Failed to save workflow');
             console.error('Error saving workflow:', error);
