@@ -34,13 +34,11 @@ const Workflow: React.FC = () => {
         setActiveStep,
         setStepRequestsInput,
         executeCurrentStep,
-        setStepExecuted,
         moveToNextStep,
         moveToPreviousStep,
         updateWorkflowByAction,
         updateWorkflowStep,
         resetWorkflow,
-        resetWorkflowState,
     } = useWorkflows();
 
     // State
