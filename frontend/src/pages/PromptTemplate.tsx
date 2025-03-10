@@ -262,8 +262,8 @@ const PromptTemplate: React.FC = () => {
                 onTest={handleTest}
                 onBack={handleBack}
             />
-            <div className="flex-1 overflow-hidden pt-4">
-                <div className="mx-auto max-w-[1440px] px-4 w-full">
+            <div className="flex-1 overflow-auto">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
                     <div className="bg-white dark:bg-gray-800 rounded-md shadow-sm">
                         <div className="p-6">
                             {/* Basic Info */}

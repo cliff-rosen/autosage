@@ -20,8 +20,8 @@ const PromptMenuBar: React.FC<PromptMenuBarProps> = ({
     onBack
 }) => {
     return (
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 w-full shadow-sm">
-            <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+        <div className="bg-gray-50 dark:bg-gray-800/90 border-t border-gray-200 dark:border-gray-700 w-full">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
                     {/* Left Section - Back Button and Title */}
                     <div className="flex items-center">
@@ -39,7 +39,7 @@ const PromptMenuBar: React.FC<PromptMenuBarProps> = ({
                             </svg>
                         </button>
                         <div className="flex items-center">
-                            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                                 {name || 'Untitled Template'}
                                 {hasUnsavedChanges && ' *'}
                             </h1>
