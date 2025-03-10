@@ -370,13 +370,14 @@ export class WorkflowEngine {
     ): any {
         // Handle enhanced output mappings; first handle the case where the mapping is a simple variable name   
         if (typeof mapping !== 'object' || !('variable' in mapping) || !('operation' in mapping)) {
-            return outputValue;
+            // For simple mapping, convert the output value to match the variable type
+            return WorkflowEngine.convertValueToMatchVariableType(variable, outputValue);
         }
 
         // handle case of simple assignment
         if (mapping.operation === VariableOperationType.ASSIGN) {
-            // Simple assignment - replace the current value
-            return outputValue;
+            // Simple assignment - replace the current value, but convert to match the variable type
+            return WorkflowEngine.convertValueToMatchVariableType(variable, outputValue);
         }
 
         // handle case of append operation
@@ -393,7 +394,12 @@ export class WorkflowEngine {
                 }
                 else if (Array.isArray(variable.value)) {
                     // Append to existing array
-                    return [...variable.value, ...outputValue];
+                    if (Array.isArray(outputValue)) {
+                        return [...variable.value, ...outputValue];
+                    } else {
+                        // If outputValue is not an array, add it as a single element
+                        return [...variable.value, outputValue];
+                    }
                 } else {
                     return [variable.value, outputValue];
                 }
@@ -404,9 +410,99 @@ export class WorkflowEngine {
             }
             else {
                 // For other types, just assign (fallback)
-                return outputValue;
+                return WorkflowEngine.convertValueToMatchVariableType(variable, outputValue);
             }
         }
+    }
+
+    /**
+     * Converts a value to match the type of the target variable
+     * @param variable The target variable
+     * @param value The value to convert
+     * @returns The converted value
+     */
+    private static convertValueToMatchVariableType(
+        variable: WorkflowVariable,
+        value: any
+    ): any {
+        // If the value is already the correct type, return it as is
+        if (variable.schema.is_array && Array.isArray(value)) {
+            return value;
+        }
+
+        // Handle array conversions
+        if (variable.schema.is_array) {
+            // Convert non-array value to an array with a single element
+            return [value];
+        }
+
+        // Handle string conversions
+        if (variable.schema.type === 'string') {
+            if (typeof value === 'string') {
+                return value;
+            } else if (Array.isArray(value)) {
+                // Convert array to string by joining elements
+                return value.join(',');
+            } else if (typeof value === 'object' && value !== null) {
+                // Convert object to JSON string
+                return JSON.stringify(value);
+            } else {
+                // Convert other types to string
+                return String(value);
+            }
+        }
+
+        // Handle number conversions
+        if (variable.schema.type === 'number') {
+            if (typeof value === 'number') {
+                return value;
+            } else if (typeof value === 'string') {
+                // Try to convert string to number
+                const num = Number(value);
+                return isNaN(num) ? 0 : num;
+            } else if (Array.isArray(value) && value.length > 0) {
+                // Use the first element if it's a number
+                const num = Number(value[0]);
+                return isNaN(num) ? 0 : num;
+            } else {
+                return 0;
+            }
+        }
+
+        // Handle boolean conversions
+        if (variable.schema.type === 'boolean') {
+            if (typeof value === 'boolean') {
+                return value;
+            } else if (typeof value === 'string') {
+                return value.toLowerCase() === 'true';
+            } else if (Array.isArray(value)) {
+                // Array is true if it has elements
+                return value.length > 0;
+            } else if (typeof value === 'number') {
+                return value !== 0;
+            } else {
+                return Boolean(value);
+            }
+        }
+
+        // Handle object conversions
+        if (variable.schema.type === 'object') {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                return value;
+            } else if (typeof value === 'string') {
+                try {
+                    // Try to parse string as JSON
+                    return JSON.parse(value);
+                } catch (e) {
+                    return {};
+                }
+            } else {
+                return {};
+            }
+        }
+
+        // Default: return the value as is
+        return value;
     }
 
     /**
