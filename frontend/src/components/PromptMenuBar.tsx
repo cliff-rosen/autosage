@@ -20,56 +20,64 @@ const PromptMenuBar: React.FC<PromptMenuBarProps> = ({
     onBack
 }) => {
     return (
-        <div className="bg-white dark:bg-gray-800/50 px-4 py-3">
-            <div className="flex items-center justify-between max-w-7xl mx-auto">
-                {/* Left Section - Back Button and Title */}
-                <div className="flex items-center space-x-4">
-                    <button
-                        onClick={onBack}
-                        className="flex items-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 
-                                 text-sm font-medium transition-colors duration-150 rounded-md px-2 py-1
-                                 hover:bg-gray-100 dark:hover:bg-gray-700/50"
-                    >
-                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        Back
-                    </button>
-                    <div className="h-4 w-px bg-gray-200 dark:bg-gray-700"></div>
-                    <div className="flex items-center space-x-2">
-                        <span className="text-gray-600 dark:text-gray-300">
-                            {name || 'Untitled Template'}
-                            {hasUnsavedChanges && ' *'}
-                        </span>
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 w-full shadow-sm">
+            <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between h-14">
+                    {/* Left Section - Back Button and Title */}
+                    <div className="flex items-center">
+                        <button
+                            onClick={onBack}
+                            className="inline-flex items-center justify-center
+                                 px-1 py-1 text-sm font-medium
+                                 text-gray-600 hover:text-gray-800 hover:bg-gray-100
+                                 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-700
+                                 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                                 transition-colors rounded-md mr-3"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                        </button>
+                        <div className="flex items-center">
+                            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                {name || 'Untitled Template'}
+                                {hasUnsavedChanges && ' *'}
+                            </h1>
+                        </div>
                     </div>
-                </div>
 
-                {/* Right Section - Actions */}
-                <div className="flex items-center space-x-3">
-                    {/* Test Button */}
-                    <button
-                        onClick={onTest}
-                        disabled={isTesting}
-                        className="px-3 py-1.5 text-sm font-medium rounded-md text-green-600 dark:text-green-400 
-                                 border border-green-600 dark:border-green-400 
-                                 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors
-                                 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isTesting ? 'Testing...' : 'Test Template'}
-                    </button>
+                    {/* Right Section - Actions */}
+                    <div className="flex items-center space-x-4">
+                        {/* Test Button */}
+                        <button
+                            onClick={onTest}
+                            disabled={isTesting}
+                            className="inline-flex items-center justify-center rounded-md
+                                 px-3 py-1.5 text-sm font-medium
+                                 bg-emerald-50 text-emerald-700 hover:bg-emerald-100
+                                 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30
+                                 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500
+                                 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isTesting ? 'Testing...' : 'Test Template'}
+                        </button>
 
-                    {/* Save Button */}
-                    <button
-                        onClick={onSave}
-                        disabled={isSaving || !hasUnsavedChanges}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md text-white 
-                                 transition-colors ${hasUnsavedChanges
-                                ? 'bg-blue-600 hover:bg-blue-700'
-                                : 'bg-gray-400 cursor-not-allowed'
-                            }`}
-                    >
-                        {isSaving ? 'Saving...' : 'Save'}
-                    </button>
+                        {/* Save Button */}
+                        <button
+                            onClick={onSave}
+                            disabled={isSaving || !hasUnsavedChanges}
+                            className={`inline-flex items-center justify-center rounded-md
+                                 px-3 py-1.5 text-sm font-medium
+                                 ${hasUnsavedChanges
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                                    : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed'
+                                }
+                                 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                                 transition-colors`}
+                        >
+                            {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -11,6 +11,7 @@ interface SchemaEditorProps {
     onChange: (schema: Schema) => void;
     onCancel?: () => void;
     compact?: boolean;
+    isNested?: boolean;
 }
 
 interface EditingField {
@@ -18,7 +19,7 @@ interface EditingField {
     value: string;
 }
 
-const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, onCancel, compact = false }) => {
+const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, onCancel, compact = false, isNested = false }) => {
     const [editMode, setEditMode] = useState<'gui' | 'json'>('gui');
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [jsonText, setJsonText] = useState('{}');
@@ -455,6 +456,7 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, onCancel,
                                             });
                                         }}
                                         compact={true}
+                                        isNested={true}
                                     />
                                 </div>
                             )}
@@ -489,25 +491,27 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, onCancel,
                 </div>
             )}
 
-            <div className="flex justify-end space-x-2 mt-4">
-                {onCancel && (
+            {!isNested && (
+                <div className="flex justify-end space-x-2 mt-4">
+                    {onCancel && (
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} border border-gray-300 dark:border-gray-600 
+                                    text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800`}
+                        >
+                            Cancel
+                        </button>
+                    )}
                     <button
                         type="button"
-                        onClick={onCancel}
-                        className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} border border-gray-300 dark:border-gray-600 
-                                 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800`}
+                        onClick={handleDone}
+                        className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} bg-blue-600 text-white rounded-md hover:bg-blue-700`}
                     >
-                        Cancel
+                        Done
                     </button>
-                )}
-                <button
-                    type="button"
-                    onClick={handleDone}
-                    className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} bg-blue-600 text-white rounded-md hover:bg-blue-700`}
-                >
-                    Done
-                </button>
-            </div>
+                </div>
+            )}
         </div>
     );
 };

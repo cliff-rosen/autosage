@@ -101,19 +101,23 @@ const AuthenticatedApp = () => {
       <TopBar />
       <div className="flex-grow flex">
         <div className="flex-grow">
-          <div className="container mx-auto px-4 py-6">
-            <Routes>
-              <Route path="/" element={<WorkflowsManager />} />
-              <Route path="/workflow/:workflowId" element={<Workflow />} />
-              <Route path="/prompts" element={<PromptTemplateManager />} />
-              <Route path="/prompt/:templateId" element={<PromptTemplate />} />
-              <Route path="/files" element={<FilesManager />} />
-              <Route path="/jobs" element={<JobsManager />} />
-              <Route path="/jobs/:jobId" element={<Job />} />
-              <Route path="/agent-workflow" element={<AgentWorkflowPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
+          <Routes>
+            <Route path="/workflow/:workflowId" element={<Workflow />} />
+            <Route path="/prompt/:templateId" element={<PromptTemplate />} />
+            <Route path="*" element={
+              <div className="container mx-auto px-4 py-6">
+                <Routes>
+                  <Route path="/" element={<WorkflowsManager />} />
+                  <Route path="/prompts" element={<PromptTemplateManager />} />
+                  <Route path="/files" element={<FilesManager />} />
+                  <Route path="/jobs" element={<JobsManager />} />
+                  <Route path="/jobs/:jobId" element={<Job />} />
+                  <Route path="/agent-workflow" element={<AgentWorkflowPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </div>
+            } />
+          </Routes>
         </div>
       </div>
     </div>

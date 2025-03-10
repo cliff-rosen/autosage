@@ -11,7 +11,7 @@ import {
 import { useWorkflows } from '../context/WorkflowContext';
 
 // Page components
-import WorkflowConfig from '../components/WorkflowConfig';
+import WorkflowIOEditor from '../components/WorkflowConfig';
 import WorkflowStepsList from '../components/WorkflowStepsList';
 import StepDetail from '../components/StepDetail';
 import WorkflowNavigation from '../components/WorkflowNavigation';
@@ -243,158 +243,130 @@ const Workflow: React.FC = () => {
                 isEditMode={isEditMode}
                 onToggleEditMode={handleToggleEditMode}
             />
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Navigation */}
-                <div className={`border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col ${isCollapsed ? 'w-16' : 'w-80'} transition-all duration-300 ease-in-out`}>
-                    {/* Header */}
-                    <div className="border-b border-gray-200 dark:border-gray-700">
-                        <div className="p-4 flex items-center justify-between">
-                            {!isCollapsed && (
-                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                                    {workflow.name}
-                                </h2>
-                            )}
-                            <button
-                                onClick={handleToggleCollapse}
-                                className="p-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                title={isCollapsed ? "Expand" : "Collapse"}
-                            >
-                                <svg className={`w-5 h-5 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Workflow Config Button */}
-                    <div className="border-b border-gray-200 dark:border-gray-700">
-                        <div className="p-2">
-                            <button
-                                onClick={() => setShowConfig(!showConfig)}
-                                className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                                    ${showConfig
-                                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ring-1 ring-blue-700/10 dark:ring-blue-400/10'
-                                        : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400'
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h4" />
-                                </svg>
-                                <span>Workflow Variables</span>
-                                <svg
-                                    className={`w-4 h-4 ml-auto transition-transform ${showConfig ? 'rotate-180' : ''}`}
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Collapsed View */}
-                    {isCollapsed && (
-                        <div className="border-b border-gray-200 dark:border-gray-700">
-                            <div className="p-2">
-                                <button
-                                    onClick={() => setShowConfig(!showConfig)}
-                                    className={`w-full flex justify-center p-2 rounded-md transition-colors
-                                        ${showConfig
-                                            ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 ring-1 ring-blue-700/10 dark:ring-blue-400/10'
-                                            : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400'
-                                        }`}
-                                    title="Workflow Variables"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h4" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Show Steps List when not in config mode */}
-                    {!showConfig && (
-                        <WorkflowStepsList
-                            steps={workflowSteps}
-                            activeStep={activeStep}
-                            isEditMode={isEditMode}
-                            onStepClick={handleStepClick}
-                            onAddStep={handleAddStep}
-                            onReorder={handleStepReorder}
-                            onStepDelete={handleStepDelete}
-                            isCollapsed={isCollapsed}
-                        />
-                    )}
-                </div>
-
-                {/* Main Content */}
-                <div className="flex-1 overflow-y-auto">
-                    <div className="container mx-auto px-4 py-6">
-                        <div className="flex-1 space-y-6">
-                            {showConfig ? (
-                                <WorkflowConfig />
-                            ) : (
-                                <>
-                                    {/* Step Detail */}
-                                    <div>
-                                        {stepRequestsInput ? (
-                                            <InputStepRunner
-                                                isOpen={showInputModal}
-                                                onClose={handleInputCancel}
-                                                onInputSubmit={handleInputSubmit}
-                                            />
-                                        ) : (
-                                            currentStep ? (
-                                                <StepDetail
-                                                    step={currentStep}
-                                                    isEditMode={isEditMode}
-                                                    stepExecuted={stepExecuted}
-                                                    isExecuting={isExecuting}
-                                                    onStepUpdate={handleStepUpdate}
-                                                    onStepDelete={handleStepDelete}
-                                                />
-                                            ) : (
-                                                <div className="text-center py-8">
-                                                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                                                        No steps in this workflow yet. Click the "Add Step" button to get started.
-                                                    </p>
-                                                    <button
-                                                        onClick={handleAddStep}
-                                                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                    >
-                                                        Add First Step
-                                                    </button>
-                                                </div>
-                                            )
-                                        )}
-                                    </div>
-
-                                    {currentStep && (
-                                        <WorkflowNavigation
-                                            isEditMode={isEditMode}
-                                            activeStep={activeStep}
-                                            isInputRequired={stepRequestsInput}
-                                            totalSteps={workflowSteps.length}
-                                            step_type={currentStep?.step_type as WorkflowStepType || WorkflowStepType.ACTION}
-                                            isLoading={isLoading || isExecuting}
-                                            stepExecuted={stepExecuted}
-                                            onBack={handleBack}
-                                            onNext={handleNext}
-                                            onExecute={handleExecute}
-                                            onRestart={handleNewQuestion}
-                                            onInputSubmit={handleInputSubmit}
-                                        />
+            <div className="flex-1 overflow-hidden pt-4">
+                <div className="mx-auto max-w-[1440px] px-4 w-full">
+                    <div className="flex w-full">
+                        {/* Left Navigation */}
+                        <div className={`border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 flex flex-col ${isCollapsed ? 'w-16' : 'w-80'} transition-all duration-300 ease-in-out rounded-tl-md rounded-bl-md`}>
+                            {/* Header */}
+                            <div className="border-b border-gray-200 dark:border-gray-700">
+                                <div className="p-3 flex items-center justify-between">
+                                    {!isCollapsed && (
+                                        <h2 className="text-base font-medium text-gray-700 dark:text-gray-300 truncate">
+                                            Steps
+                                        </h2>
                                     )}
-                                </>
+                                    <button
+                                        onClick={handleToggleCollapse}
+                                        className={`p-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 ${isCollapsed ? 'mx-auto' : ''}`}
+                                        title={isCollapsed ? "Expand" : "Collapse"}
+                                    >
+                                        <svg className={`w-5 h-5 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Workflow Config Button - Simplified */}
+                            <div className="border-b border-gray-200 dark:border-gray-700">
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => setShowConfig(!showConfig)}
+                                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
+                                            ${showConfig
+                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                                            }`}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h4" />
+                                        </svg>
+                                        {!isCollapsed && <span>Variables</span>}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Show Steps List when not in config mode */}
+                            {!showConfig && (
+                                <WorkflowStepsList
+                                    steps={workflowSteps}
+                                    activeStep={activeStep}
+                                    isEditMode={isEditMode}
+                                    onStepClick={handleStepClick}
+                                    onAddStep={handleAddStep}
+                                    onReorder={handleStepReorder}
+                                    onStepDelete={handleStepDelete}
+                                    isCollapsed={isCollapsed}
+                                />
                             )}
+                        </div>
+
+                        {/* Main Content */}
+                        <div className="flex-1 overflow-y-auto ml-4 bg-white dark:bg-gray-800/50 rounded-tr-md rounded-br-md">
+                            <div className="p-6">
+                                <div className="flex-1 space-y-6">
+                                    {showConfig ? (
+                                        <WorkflowIOEditor />
+                                    ) : (
+                                        <>
+                                            {/* Step Detail */}
+                                            <div>
+                                                {stepRequestsInput ? (
+                                                    <InputStepRunner
+                                                        isOpen={showInputModal}
+                                                        onClose={handleInputCancel}
+                                                        onInputSubmit={handleInputSubmit}
+                                                    />
+                                                ) : (
+                                                    currentStep ? (
+                                                        <StepDetail
+                                                            step={currentStep}
+                                                            isEditMode={isEditMode}
+                                                            stepExecuted={stepExecuted}
+                                                            isExecuting={isExecuting}
+                                                            onStepUpdate={handleStepUpdate}
+                                                            onStepDelete={handleStepDelete}
+                                                        />
+                                                    ) : (
+                                                        <div className="text-center py-8">
+                                                            <p className="text-gray-600 dark:text-gray-400 mb-4">
+                                                                No steps in this workflow yet. Click the "Add Step" button to get started.
+                                                            </p>
+                                                            <button
+                                                                onClick={handleAddStep}
+                                                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                            >
+                                                                Add First Step
+                                                            </button>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+
+                                            {currentStep && (
+                                                <WorkflowNavigation
+                                                    isEditMode={isEditMode}
+                                                    activeStep={activeStep}
+                                                    isInputRequired={stepRequestsInput}
+                                                    totalSteps={workflowSteps.length}
+                                                    step_type={currentStep?.step_type as WorkflowStepType || WorkflowStepType.ACTION}
+                                                    isLoading={isLoading || isExecuting}
+                                                    stepExecuted={stepExecuted}
+                                                    onBack={handleBack}
+                                                    onNext={handleNext}
+                                                    onExecute={handleExecute}
+                                                    onRestart={handleNewQuestion}
+                                                    onInputSubmit={handleInputSubmit}
+                                                />
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

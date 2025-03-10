@@ -44,13 +44,13 @@ export const SortableStep: React.FC<SortableStepProps> = ({
             <div
                 ref={setNodeRef}
                 style={style}
-                className={`group flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isEditMode ? 'cursor-pointer' : ''}
+                className={`group flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isEditMode ? 'cursor-pointer' : ''}
                     ${isDragging ? 'opacity-50' : ''}
                     ${isActive
-                        ? 'bg-blue-50 border border-blue-500 text-blue-700 dark:bg-blue-900/30 dark:border-blue-400 dark:text-blue-200'
+                        ? 'bg-blue-50/70 border border-blue-300 text-blue-700 dark:bg-blue-900/20 dark:border-blue-500/40 dark:text-blue-300'
                         : isCompleted
-                            ? 'bg-emerald-50 border border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-500/30 dark:text-emerald-200'
-                            : 'bg-gray-50 border border-gray-200 text-gray-600 dark:bg-gray-800/50 dark:border-gray-700 dark:text-gray-400'
+                            ? 'bg-emerald-50/70 border border-emerald-200 text-emerald-700 dark:bg-emerald-900/10 dark:border-emerald-500/30 dark:text-emerald-300'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border border-gray-200 text-gray-600 dark:border-gray-700/50 dark:text-gray-400'
                     }`}
                 onClick={onClick}
             >
@@ -58,7 +58,7 @@ export const SortableStep: React.FC<SortableStepProps> = ({
                     <div
                         {...attributes}
                         {...listeners}
-                        className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                        className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                     >
                         <GripVertical className="w-4 h-4" />
                     </div>
@@ -75,9 +75,6 @@ export const SortableStep: React.FC<SortableStepProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm truncate">{step.label}</div>
-                    {step.description && (
-                        <div className="text-xs opacity-80 truncate">{step.description}</div>
-                    )}
                 </div>
                 {isEditMode && (
                     <button
@@ -85,7 +82,7 @@ export const SortableStep: React.FC<SortableStepProps> = ({
                             e.stopPropagation();
                             setShowDeleteConfirm(true);
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                         title="Delete Step"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -103,7 +100,7 @@ export const SortableStep: React.FC<SortableStepProps> = ({
                             Delete Step
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                            Are you sure you want to delete this step? This action cannot be undone.
+                            Are you sure you want to delete this step?
                         </p>
                         <div className="flex justify-end gap-3">
                             <button

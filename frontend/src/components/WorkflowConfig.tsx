@@ -7,8 +7,8 @@ import Dialog from './common/Dialog';
 import FileLibrary from './FileLibrary';
 import { fileApi } from '../lib/api/fileApi';
 import SchemaEditor from './common/SchemaEditor';
+import SchemaValueEditor from './common/SchemaValueEditor';
 import VariableRenderer from './common/VariableRenderer';
-import { useValueFormatter } from '../hooks/useValueFormatter';
 
 const VALUE_TYPES: ValueType[] = ['string', 'number', 'boolean', 'file', 'object'];
 
@@ -230,10 +230,11 @@ const WorkflowIOEditor: React.FC = () => {
     const [newVariableType, setNewVariableType] = useState<'input' | 'output'>('input');
     const [showFileSelector, setShowFileSelector] = useState(false);
     const [selectedSchema, setSelectedSchema] = useState<Schema | null>(null);
-    const { formatValue } = useValueFormatter();
     const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
     const [schemaDialogOpen, setSchemaDialogOpen] = useState(false);
     const [currentEditingSchema, setCurrentEditingSchema] = useState<{ variableId: string, schema: Schema } | null>(null);
+    const [valueEditorOpen, setValueEditorOpen] = useState(false);
+    const [currentEditingValue, setCurrentEditingValue] = useState<{ variableId: string, value: SchemaValueType | undefined, schema: Schema } | null>(null);
 
     useEffect(() => {
         if (workflow?.state) {
@@ -325,6 +326,19 @@ const WorkflowIOEditor: React.FC = () => {
     const handleSchemaChange = (schema: Schema) => {
         if (currentEditingSchema) {
             handleVariableChange(currentEditingSchema.variableId, { schema });
+        }
+    };
+
+    const openValueEditor = (variableId: string, value: SchemaValueType | undefined, schema: Schema) => {
+        console.log("Opening value editor for variable:", variableId, "with value:", value, "and schema:", schema);
+        setCurrentEditingValue({ variableId, value, schema });
+        setValueEditorOpen(true);
+    };
+
+    const handleValueChange = (value: SchemaValueType) => {
+        console.log("Handling value change:", value);
+        if (currentEditingValue) {
+            handleVariableChange(currentEditingValue.variableId, { value });
         }
     };
 
@@ -498,10 +512,10 @@ const WorkflowIOEditor: React.FC = () => {
                                                         className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            toggleRowExpansion(variable.variable_id);
+                                                            openValueEditor(variable.variable_id, variable.value, variable.schema);
                                                         }}
                                                     >
-                                                        {isExpandable(variable) ? (
+                                                        {variable.value !== undefined ? (
                                                             <div className="flex items-center">
                                                                 <span className="truncate max-w-xs">
                                                                     {typeof variable.value === 'object'
@@ -510,20 +524,11 @@ const WorkflowIOEditor: React.FC = () => {
                                                                             : `Object(${Object.keys(variable.value || {}).length})`)
                                                                         : String(variable.value).substring(0, 50) + (String(variable.value).length > 50 ? '...' : '')}
                                                                 </span>
-                                                                <span className="ml-2 text-blue-600 dark:text-blue-400">
-                                                                    {expandedRows.has(variable.variable_id) ? '▼' : '▶'}
-                                                                </span>
+                                                                <span className="ml-2 text-blue-600 dark:text-blue-400">(Edit)</span>
                                                             </div>
                                                         ) : (
-                                                            <div onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                toggleRowExpansion(variable.variable_id);
-                                                            }}>
-                                                                {formatValue(variable.value) || (
-                                                                    <span className="text-gray-400 dark:text-gray-500 italic cursor-pointer">
-                                                                        Click to edit
-                                                                    </span>
-                                                                )}
+                                                            <div className="text-gray-400 dark:text-gray-500 italic">
+                                                                Click to edit
                                                             </div>
                                                         )}
                                                     </div>
@@ -572,7 +577,7 @@ const WorkflowIOEditor: React.FC = () => {
                                                 <tr>
                                                     <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
                                                         <div className="text-sm text-gray-800 dark:text-gray-200">
-                                                            {variable.value !== undefined && variable.value !== null ? (
+                                                            {variable.value !== undefined ? (
                                                                 <VariableRenderer
                                                                     value={variable.value}
                                                                     schema={variable.schema}
@@ -586,22 +591,11 @@ const WorkflowIOEditor: React.FC = () => {
                                                                         <button
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                // Set a default value based on the schema type
-                                                                                let defaultValue: SchemaValueType | undefined;
-                                                                                if (variable.schema.type === 'string') defaultValue = '';
-                                                                                else if (variable.schema.type === 'number') defaultValue = 0;
-                                                                                else if (variable.schema.type === 'boolean') defaultValue = false;
-                                                                                else if (variable.schema.type === 'object') defaultValue = {};
-                                                                                else if (variable.schema.is_array) {
-                                                                                    // For arrays, initialize with an empty object that has string indexer
-                                                                                    defaultValue = {} as Record<string, any>;
-                                                                                }
-
-                                                                                handleVariableChange(variable.variable_id, { value: defaultValue });
+                                                                                openValueEditor(variable.variable_id, undefined, variable.schema);
                                                                             }}
                                                                             className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
                                                                         >
-                                                                            Initialize Value
+                                                                            Edit Value
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -639,6 +633,26 @@ const WorkflowIOEditor: React.FC = () => {
                                 onChange={handleSchemaChange}
                                 onCancel={() => setSchemaDialogOpen(false)}
                                 compact={false}
+                                isNested={false}
+                            />
+                        </div>
+                    </Dialog>
+                )}
+
+                {/* Value Editor Dialog */}
+                {valueEditorOpen && currentEditingValue && (
+                    <Dialog
+                        isOpen={valueEditorOpen}
+                        onClose={() => setValueEditorOpen(false)}
+                        title="Edit Value"
+                        maxWidth="3xl"
+                    >
+                        <div className="p-4">
+                            <SchemaValueEditor
+                                schema={currentEditingValue.schema}
+                                value={currentEditingValue.value}
+                                onChange={handleValueChange}
+                                onCancel={() => setValueEditorOpen(false)}
                             />
                         </div>
                     </Dialog>

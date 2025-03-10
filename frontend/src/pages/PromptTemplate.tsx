@@ -4,14 +4,15 @@ import { usePromptTemplates } from '../context/PromptTemplateContext';
 import SchemaEditor from '../components/common/SchemaEditor';
 import { extractTokens } from '../lib/utils';
 import PromptMenuBar from '../components/PromptMenuBar';
-import { PromptTemplateToken, PromptTemplateCreate, PromptTemplateUpdate, PromptTemplateTest, SchemaValue } from '../types/prompts';
+import { PromptTemplateToken, PromptTemplateCreate, PromptTemplateUpdate, PromptTemplateTest } from '../types/prompts';
+import { Schema, SchemaValueType } from '../types/schema';
 import FileLibrary from '../components/FileLibrary';
 import Dialog from '../components/common/Dialog';
 import { fileApi } from '../lib/api/fileApi';
 
-const defaultOutputSchema: SchemaValue = {
+const defaultOutputSchema: Schema = {
     type: 'string',
-    name: 'output',
+    is_array: false,
     description: 'Default output'
 };
 
@@ -34,7 +35,7 @@ const PromptTemplate: React.FC = () => {
     const [userMessageTemplate, setUserMessageTemplate] = useState(template?.user_message_template || '');
     const [systemMessageTemplate, setSystemMessageTemplate] = useState(template?.system_message_template || '');
     const [tokens, setTokens] = useState<PromptTemplateToken[]>(template?.tokens || []);
-    const [outputSchema, setOutputSchema] = useState<SchemaValue>(template?.output_schema || defaultOutputSchema);
+    const [outputSchema, setOutputSchema] = useState<Schema>(template?.output_schema || defaultOutputSchema);
     const [testParameters, setTestParameters] = useState<Record<string, string>>({});
     const [testResult, setTestResult] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -251,7 +252,7 @@ const PromptTemplate: React.FC = () => {
     if (!templateId) return null;
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
             <PromptMenuBar
                 name={name}
                 isSaving={saving}
@@ -261,254 +262,234 @@ const PromptTemplate: React.FC = () => {
                 onTest={handleTest}
                 onBack={handleBack}
             />
-
-            {/* Main Content */}
-            <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-                <div className="container mx-auto px-4 py-6">
-                    <div className="space-y-6">
-                        {/* Basic Info */}
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                                        Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                                 shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
-                                                 focus:border-blue-500 sm:text-sm dark:bg-gray-800
-                                                 text-gray-900 dark:text-gray-100"
-                                        placeholder="Enter template name"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                                        Description
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                                 shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
-                                                 focus:border-blue-500 sm:text-sm dark:bg-gray-800
-                                                 text-gray-900 dark:text-gray-100"
-                                        placeholder="Enter template description"
-                                    />
+            <div className="flex-1 overflow-hidden pt-4">
+                <div className="mx-auto max-w-[1440px] px-4 w-full">
+                    <div className="bg-white dark:bg-gray-800 rounded-md shadow-sm">
+                        <div className="p-6">
+                            {/* Basic Info */}
+                            <div className="mb-8">
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Basic Information</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Template Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            className="w-full rounded-md border border-gray-300 dark:border-gray-600 
+                                                    shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
+                                                    focus:border-blue-500 sm:text-sm dark:bg-gray-800
+                                                    text-gray-900 dark:text-gray-100"
+                                            placeholder="Enter template name"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Description
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            className="w-full rounded-md border border-gray-300 dark:border-gray-600 
+                                                    shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
+                                                    focus:border-blue-500 sm:text-sm dark:bg-gray-800
+                                                    text-gray-900 dark:text-gray-100"
+                                            placeholder="Enter template description"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* System Message Template */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                                System Message Template (Optional)
-                            </label>
-                            <textarea
-                                value={systemMessageTemplate}
-                                onChange={(e) => setSystemMessageTemplate(e.target.value)}
-                                rows={3}
-                                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                         shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
-                                         focus:border-blue-500 sm:text-sm dark:bg-gray-800
-                                         text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
-                                placeholder="Enter system message template. Use {{token}} for string tokens and <<file:token>> for file tokens."
-                            />
-                        </div>
+                            {/* Template Content */}
+                            <div className="mb-8">
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Template Content</h2>
 
-                        {/* User Message Template */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                                User Message Template
-                            </label>
-                            <textarea
-                                value={userMessageTemplate}
-                                onChange={(e) => setUserMessageTemplate(e.target.value)}
-                                rows={10}
-                                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                         shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
-                                         focus:border-blue-500 sm:text-sm dark:bg-gray-800
-                                         text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 font-mono"
-                                placeholder="Enter user message template. Use {{token}} for string tokens and <<file:token>> for file tokens."
-                            />
-                        </div>
+                                {/* System Message Template */}
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        System Message Template (Optional)
+                                    </label>
+                                    <textarea
+                                        value={systemMessageTemplate}
+                                        onChange={(e) => setSystemMessageTemplate(e.target.value)}
+                                        rows={3}
+                                        className="w-full rounded-md border border-gray-300 dark:border-gray-600 
+                                                shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
+                                                focus:border-blue-500 sm:text-sm dark:bg-gray-800
+                                                text-gray-900 dark:text-gray-100"
+                                        placeholder="Enter system message template. Use {{token}} for string tokens and <<file:token>> for file tokens."
+                                    />
+                                </div>
 
-                        {/* Tokens */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                                Template Tokens
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                                {tokens.map(token => (
-                                    <span
-                                        key={token.name}
-                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                  ${token.type === 'string'
-                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-                                                : 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'}`}
-                                    >
-                                        {token.name} ({token.type})
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
+                                {/* User Message Template */}
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        User Message Template
+                                    </label>
+                                    <textarea
+                                        value={userMessageTemplate}
+                                        onChange={(e) => setUserMessageTemplate(e.target.value)}
+                                        rows={10}
+                                        className="w-full rounded-md border border-gray-300 dark:border-gray-600 
+                                                shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
+                                                focus:border-blue-500 sm:text-sm dark:bg-gray-800
+                                                text-gray-900 dark:text-gray-100 font-mono"
+                                        placeholder="Enter user message template. Use {{token}} for string tokens and <<file:token>> for file tokens."
+                                    />
+                                </div>
 
-                        {/* Output Schema */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                                Output Schema
-                            </label>
-                            <SchemaEditor
-                                schema={outputSchema}
-                                onChange={setOutputSchema}
-                            />
-                        </div>
-
-                        {/* Test Section */}
-                        {tokens.length > 0 && (
-                            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                                    Test Template
-                                </h3>
-                                <div className="space-y-4">
-                                    {tokens.map(token => (
-                                        <div key={token.name}>
-                                            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {/* Tokens */}
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Template Tokens
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {tokens.map(token => (
+                                            <span
+                                                key={token.name}
+                                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                        ${token.type === 'string'
+                                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+                                                        : 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'}`}
+                                            >
                                                 {token.name} ({token.type})
-                                            </label>
-                                            {token.type === 'file' ? (
-                                                <div className="mt-1">
-                                                    {testParameters[token.name] ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex-1 p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                                                                <div className="flex items-center gap-2">
-                                                                    <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                                                    </svg>
-                                                                    <span className="text-sm text-gray-900 dark:text-gray-100">
-                                                                        {fileNames[testParameters[token.name]] || 'Loading...'}
-                                                                    </span>
+                                            </span>
+                                        ))}
+                                        {tokens.length === 0 && (
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                No tokens detected. Add tokens using &#123;&#123;token_name&#125;&#125; or &lt;&lt;file:token_name&gt;&gt; syntax in your templates.
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Output Schema */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Output Schema
+                                    </label>
+                                    <SchemaEditor
+                                        schema={outputSchema}
+                                        onChange={setOutputSchema}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Test Section */}
+                            {tokens.length > 0 && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Test Template</h2>
+                                    <div className="space-y-4">
+                                        {tokens.map(token => (
+                                            <div key={token.name}>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    {token.name} ({token.type})
+                                                </label>
+                                                {token.type === 'file' ? (
+                                                    <div className="mt-1">
+                                                        {testParameters[token.name] ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1 p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                                        </svg>
+                                                                        <span className="text-sm text-gray-900 dark:text-gray-100">
+                                                                            {fileNames[testParameters[token.name]] || 'Loading...'}
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedTokenName(token.name);
+                                                                        setShowFileSelector(true);
+                                                                    }}
+                                                                    className="px-3 py-1.5 text-sm font-medium rounded-md text-blue-600 dark:text-blue-400 
+                                                                            border border-blue-600 dark:border-blue-400 
+                                                                            hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                                                >
+                                                                    Change
+                                                                </button>
                                                             </div>
+                                                        ) : (
                                                             <button
                                                                 onClick={() => {
                                                                     setSelectedTokenName(token.name);
                                                                     setShowFileSelector(true);
                                                                 }}
-                                                                className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 
-                                                                         dark:text-blue-400 dark:hover:text-blue-300"
+                                                                className="mt-1 px-3 py-1.5 text-sm font-medium rounded-md text-blue-600 dark:text-blue-400 
+                                                                        border border-blue-600 dark:border-blue-400 
+                                                                        hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                                                             >
-                                                                Change
+                                                                Select File
                                                             </button>
-                                                        </div>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedTokenName(token.name);
-                                                                setShowFileSelector(true);
-                                                            }}
-                                                            className="mt-1 inline-flex items-center px-3 py-2 border border-gray-300 
-                                                                     dark:border-gray-600 shadow-sm text-sm font-medium rounded-md 
-                                                                     text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 
-                                                                     hover:bg-gray-50 dark:hover:bg-gray-700"
-                                                        >
-                                                            Select File
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <input
-                                                    type="text"
-                                                    value={testParameters[token.name] || ''}
-                                                    onChange={(e) => setTestParameters({
-                                                        ...testParameters,
-                                                        [token.name]: e.target.value
-                                                    })}
-                                                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                                             shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
-                                                             focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800
-                                                             text-gray-900 dark:text-gray-100"
-                                                    placeholder={`Enter value for ${token.name}`}
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
-                                    <button
-                                        onClick={handleTest}
-                                        disabled={testing}
-                                        className="mt-4 inline-flex items-center px-4 py-2 border border-transparent 
-                                                 text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 
-                                                 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 
-                                                 focus:ring-blue-500 disabled:opacity-50"
-                                    >
-                                        {testing ? 'Testing...' : 'Test Template'}
-                                    </button>
-                                </div>
-
-                                {testResult && (
-                                    <div className="mt-4">
-                                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                                            Test Result
-                                        </h4>
-                                        <pre className="bg-white dark:bg-gray-800 p-4 rounded-md overflow-auto max-h-96 
-                                                      text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
-                                            {JSON.stringify(testResult, null, 2)}
-                                        </pre>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={testParameters[token.name] || ''}
+                                                        onChange={(e) => setTestParameters({
+                                                            ...testParameters,
+                                                            [token.name]: e.target.value
+                                                        })}
+                                                        className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
+                                                                shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 
+                                                                focus:border-blue-500 sm:text-sm dark:bg-gray-800
+                                                                text-gray-900 dark:text-gray-100"
+                                                        placeholder={`Enter value for ${token.name}`}
+                                                    />
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                )}
-                            </div>
-                        )}
 
-                        {/* File Selector Dialog */}
-                        {showFileSelector && selectedTokenName && (
-                            <Dialog
-                                isOpen={showFileSelector}
-                                onClose={() => {
-                                    setShowFileSelector(false);
-                                    setSelectedTokenName(null);
-                                }}
-                                title="Select a File"
-                                maxWidth="2xl"
-                            >
-                                <div className="space-y-4">
-                                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        Please select a file from the library below or upload a new one.
-                                    </p>
-                                    <FileLibrary
-                                        selectedFileId={testParameters[selectedTokenName]}
-                                        onFileSelect={async (fileId) => {
-                                            try {
-                                                const file = await fileApi.getFile(fileId);
-                                                setTestParameters(prev => ({
-                                                    ...prev,
-                                                    [selectedTokenName]: fileId
-                                                }));
-                                                setFileNames(prev => ({
-                                                    ...prev,
-                                                    [fileId]: file.name
-                                                }));
-                                                setShowFileSelector(false);
-                                                setSelectedTokenName(null);
-                                            } catch (err) {
-                                                console.error('Error selecting file:', err);
-                                            }
-                                        }}
-                                    />
+                                    {/* Test Results */}
+                                    {testResult && (
+                                        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-md border border-gray-200 dark:border-gray-600">
+                                            <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-2">Test Results</h3>
+                                            <pre className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-3 rounded-md border border-gray-200 dark:border-gray-700">
+                                                {JSON.stringify(testResult, null, 2)}
+                                            </pre>
+                                        </div>
+                                    )}
                                 </div>
-                            </Dialog>
-                        )}
-
-                        {error && (
-                            <div className="text-red-600 dark:text-red-400 text-sm mt-2">
-                                {error}
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* File Selector Dialog */}
+            <Dialog
+                isOpen={showFileSelector}
+                onClose={() => setShowFileSelector(false)}
+                title="Select File"
+            >
+                <FileLibrary
+                    onFileSelect={(fileId) => {
+                        if (selectedTokenName) {
+                            // Get file name from the API
+                            fileApi.getFile(fileId).then(file => {
+                                setTestParameters({
+                                    ...testParameters,
+                                    [selectedTokenName]: fileId
+                                });
+                                setFileNames({
+                                    ...fileNames,
+                                    [fileId]: file.name
+                                });
+                                setShowFileSelector(false);
+                            }).catch(err => {
+                                console.error('Error selecting file:', err);
+                            });
+                        }
+                    }}
+                />
+            </Dialog>
         </div>
     );
 };
