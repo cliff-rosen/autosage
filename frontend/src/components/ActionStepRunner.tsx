@@ -97,19 +97,25 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
     const handleSaveEdit = (paramName: string, varName: WorkflowVariableName) => {
         if (!workflow) return;
 
-        // Use WorkflowEngine.updateVariableValue to properly handle nested paths
-        const updatedState = WorkflowEngine.updateVariableValue(
-            workflow.state || [],
-            varName.toString(),
-            editValue
-        );
+        // Update the variable value in the workflow state
+        const updatedState = workflow.state?.map(v => {
+            if (v.name === varName) {
+                return {
+                    ...v,
+                    value: editValue
+                };
+            }
+            return v;
+        }) || [];
 
+        // Update the workflow state
         updateWorkflowByAction({
-            type: 'UPDATE_WORKFLOW',
+            type: 'UPDATE_STATE',
             payload: {
-                workflowUpdates: { state: updatedState }
+                state: updatedState
             }
         });
+
         setEditingInput(null);
         setEditValue(null);
     };
@@ -292,7 +298,7 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
                 <div className="grid grid-cols-1 gap-4">
                     {Object.entries(inputValues).map(([paramName, valueObj]) => {
                         const param = actionStep.tool?.signature.parameters.find(p => p.name === paramName);
-                        const varName = actionStep.parameter_mappings[paramName as any];
+                        const varName = actionStep.parameter_mappings?.[paramName as any];
 
                         return (
                             <div key={paramName} className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -371,6 +377,12 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
                     {Object.entries(outputValues).map(([outputName, valueObj]) => {
                         const output = actionStep.tool?.signature.outputs.find(o => o.name === outputName);
 
+                        // Ensure schema has correct is_array property based on actual value
+                        let schema = valueObj?.schema || output?.schema;
+                        if (schema && Array.isArray(valueObj?.value)) {
+                            schema = { ...schema, is_array: true };
+                        }
+
                         return (
                             <div key={outputName} className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                                 <div className="flex items-center justify-between mb-2">
@@ -378,7 +390,7 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
                                         {outputName}
                                     </span>
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {output?.schema.type}{output?.schema.is_array ? '[]' : ''}
+                                        {schema?.type}{schema?.is_array ? '[]' : ''}
                                     </span>
                                 </div>
 
@@ -391,8 +403,11 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
                                 <div className="mt-2">
                                     <VariableRenderer
                                         value={valueObj?.value}
-                                        schema={valueObj?.schema}
+                                        schema={schema}
                                         isMarkdown={true}
+                                        maxTextLength={MAX_TEXT_LENGTH}
+                                        maxArrayItems={MAX_ARRAY_LENGTH}
+                                        maxArrayItemLength={MAX_ARRAY_ITEM_LENGTH}
                                     />
                                 </div>
                             </div>

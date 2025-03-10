@@ -13,8 +13,20 @@ export enum WorkflowStepType {
     EVALUATION = 'EVALUATION'
 }
 
+// Operation types for variable assignments
+export enum VariableOperationType {
+    ASSIGN = 'assign',
+    APPEND = 'append'
+}
+
 // Type-safe workflow variable references
 export type WorkflowVariableName = string & { readonly __brand: unique symbol };
+
+// Enhanced output mapping with operation type
+export interface EnhancedOutputMapping {
+    variable: WorkflowVariableName;
+    operation: VariableOperationType;
+}
 
 // Execution result for runtime steps
 export interface StepExecutionResult {
@@ -99,17 +111,13 @@ export interface WorkflowStep {
     step_type: WorkflowStepType;
     tool?: Tool;
     tool_id?: string;
-    // Only present for LLM tools
-    prompt_template_id?: string;
-    // Maps tool parameter names to workflow variable names
-    parameter_mappings: Record<ToolParameterName, WorkflowVariableName>;
-    // Maps tool output names to workflow variable names
-    output_mappings: Record<ToolOutputName, WorkflowVariableName>;
-    // Only for EVALUATION steps
+    parameter_mappings?: Record<ToolParameterName, WorkflowVariableName>;
+    output_mappings?: Record<ToolOutputName, WorkflowVariableName | EnhancedOutputMapping>;
     evaluation_config?: EvaluationConfig;
     sequence_number: number;
     created_at: string;
     updated_at: string;
+    prompt_template_id?: string;
 }
 
 // Helper functions to work with workflow state
@@ -529,5 +537,26 @@ export const EXAMPLE_WORKFLOW: Workflow = {
             updated_at: new Date().toISOString()
         }
     ]
+};
+
+// Helper function to check if a mapping is an enhanced mapping
+export const isEnhancedMapping = (mapping: WorkflowVariableName | EnhancedOutputMapping): mapping is EnhancedOutputMapping => {
+    return typeof mapping === 'object' && 'variable' in mapping && 'operation' in mapping;
+};
+
+// Helper function to get the variable name from a mapping
+export const getVariableNameFromMapping = (mapping: WorkflowVariableName | EnhancedOutputMapping): WorkflowVariableName => {
+    if (isEnhancedMapping(mapping)) {
+        return mapping.variable;
+    }
+    return mapping;
+};
+
+// Helper function to get the operation from a mapping
+export const getOperationFromMapping = (mapping: WorkflowVariableName | EnhancedOutputMapping): VariableOperationType => {
+    if (isEnhancedMapping(mapping)) {
+        return mapping.operation;
+    }
+    return VariableOperationType.ASSIGN; // Default to assign
 };
 

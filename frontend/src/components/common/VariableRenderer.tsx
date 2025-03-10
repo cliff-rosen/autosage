@@ -10,6 +10,7 @@ export interface VariableRendererProps {
     isMarkdown?: boolean;
     maxTextLength?: number;
     maxArrayItems?: number;
+    maxArrayItemLength?: number;
     className?: string;
 }
 
@@ -23,6 +24,7 @@ export const VariableRenderer: React.FC<VariableRendererProps> = ({
     isMarkdown = false,
     maxTextLength = 200,
     maxArrayItems = 5,
+    maxArrayItemLength = 100,
     className = ''
 }) => {
     // Handle undefined or null values
@@ -40,6 +42,7 @@ export const VariableRenderer: React.FC<VariableRendererProps> = ({
             <ArrayRenderer
                 items={value}
                 maxInitialItems={maxArrayItems}
+                maxItemLength={maxArrayItemLength}
                 className={className}
             />
         );

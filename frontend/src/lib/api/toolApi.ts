@@ -1,12 +1,17 @@
 import { Tool, ToolSignature, ToolOutputName, ToolParameterName } from '../../types/tools';
 import { PromptTemplate, PromptTemplateCreate, PromptTemplateUpdate, PromptTemplateTest } from '../../types/prompts';
 import { api, handleApiError } from './index';
-import { WorkflowStep } from '../../types/workflows';
+import { WorkflowStep, EnhancedOutputMapping } from '../../types/workflows';
 // Caches for tools and prompt templates    
 let toolsCache: Tool[] | null = null;
 let promptTemplatesCache: PromptTemplate[] | null = null;
 
 ////// Tool API functions //////
+
+// Helper function to check if a mapping is an enhanced mapping
+const isEnhancedMapping = (mapping: any): mapping is EnhancedOutputMapping => {
+    return typeof mapping === 'object' && 'variable' in mapping && 'operation' in mapping;
+};
 
 export const toolApi = {
     getTools: async (): Promise<Tool[]> => {

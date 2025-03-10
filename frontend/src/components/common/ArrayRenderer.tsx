@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { ObjectRenderer } from './ObjectRenderer';
+import { TextRenderer } from './TextRenderer';
 
 export interface ArrayRendererProps {
     items: any[];
     maxInitialItems?: number;
     className?: string;
+    maxItemLength?: number;
 }
 
 /**
@@ -14,7 +16,8 @@ export interface ArrayRendererProps {
 export const ArrayRenderer: React.FC<ArrayRendererProps> = ({
     items,
     maxInitialItems = 5,
-    className = ''
+    className = '',
+    maxItemLength = 100
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -26,6 +29,28 @@ export const ArrayRenderer: React.FC<ArrayRendererProps> = ({
     const hasMore = items.length > maxInitialItems;
 
     const toggleExpand = () => setIsExpanded(prev => !prev);
+
+    // Helper function to render an individual item based on its type
+    const renderItem = (item: any, index: number) => {
+        // For objects, use the ObjectRenderer
+        if (typeof item === 'object' && item !== null) {
+            return <ObjectRenderer object={item} />;
+        }
+
+        // For strings, use TextRenderer to handle long text
+        if (typeof item === 'string') {
+            return (
+                <TextRenderer text={item} maxLength={maxItemLength}>
+                    {(text: string) => (
+                        <span className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{text}</span>
+                    )}
+                </TextRenderer>
+            );
+        }
+
+        // For other primitive types, convert to string
+        return <span className="text-gray-800 dark:text-gray-200">{String(item)}</span>;
+    };
 
     return (
         <div className={`space-y-2 rounded-md ${className}`}>
@@ -39,11 +64,9 @@ export const ArrayRenderer: React.FC<ArrayRendererProps> = ({
                             <span className="inline-block px-1.5 py-0.5 mr-2 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded">
                                 {index + 1}
                             </span>
-                            {typeof item === 'object' && item !== null ? (
-                                <ObjectRenderer object={item} />
-                            ) : (
-                                <span className="text-gray-800 dark:text-gray-200">{String(item)}</span>
-                            )}
+                            <div className="flex-1 overflow-hidden">
+                                {renderItem(item, index)}
+                            </div>
                         </div>
                     </div>
                 ))}

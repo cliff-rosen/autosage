@@ -7,7 +7,9 @@ import {
     WorkflowStepType,
     Workflow,
     WorkflowStepId,
-    EvaluationResult
+    EvaluationResult,
+    EnhancedOutputMapping,
+    VariableOperationType
 } from '../../types/workflows';
 import { ToolParameterName, ToolOutputName, Tool } from '../../types/tools';
 import { SchemaValueType, Schema } from '../../types/schema';
@@ -40,7 +42,7 @@ export type WorkflowStateAction = {
     type: 'UPDATE_PARAMETER_MAPPINGS' | 'UPDATE_OUTPUT_MAPPINGS' | 'UPDATE_STEP_TOOL' | 'UPDATE_STEP_TYPE' | 'ADD_STEP' | 'REORDER_STEPS' | 'DELETE_STEP' | 'UPDATE_STATE' | 'RESET_EXECUTION' | 'UPDATE_WORKFLOW' | 'UPDATE_STEP' | 'RESET_WORKFLOW_STATE',
     payload: {
         stepId?: string,
-        mappings?: Record<ToolParameterName, WorkflowVariableName> | Record<ToolOutputName, WorkflowVariableName>,
+        mappings?: Record<ToolParameterName, WorkflowVariableName> | Record<ToolOutputName, WorkflowVariableName | EnhancedOutputMapping>,
         tool?: Tool,
         newStep?: WorkflowStep,
         reorder?: StepReorderPayload,
@@ -50,6 +52,8 @@ export type WorkflowStateAction = {
         keepJumpCounters?: boolean
     }
 };
+
+const APPEND_DELIMITER = '|';
 
 export class WorkflowEngine {
     /**
@@ -282,27 +286,40 @@ export class WorkflowEngine {
 
         const result: Record<string, { value: any, schema: any }> = {};
 
-        Object.entries(step.output_mappings).forEach(([outputName, varPath]) => {
+        Object.entries(step.output_mappings).forEach(([outputName, mapping]) => {
+            // Handle enhanced output mappings
+            const varPath = typeof mapping === 'object' && 'variable' in mapping
+                ? mapping.variable.toString()
+                : mapping.toString();
+
             // Use the resolveVariablePath utility to handle variable paths
-            const { value, validPath } = resolveVariablePath(workflow.state || [], varPath.toString());
+            const { value, validPath } = resolveVariablePath(workflow.state || [], varPath);
 
             // Get the variable and schema information
-            const { rootName, propPath } = parseVariablePath(varPath.toString());
+            const { rootName, propPath } = parseVariablePath(varPath);
             const variable = findVariableByRootName(workflow.state || [], rootName);
 
-            if (!variable || !validPath) {
-                result[outputName] = {
-                    value: null,
-                    schema: null
-                };
-                return;
+            // Try to get the schema from the variable
+            let schema: Schema | null = null;
+            if (variable && validPath) {
+                schema = variable.schema;
+                if (propPath.length > 0 && schema) {
+                    const schemaValidation = validatePropertyPathAgainstSchema(schema, propPath);
+                    schema = schemaValidation.schema || null;
+                }
             }
 
-            // Get the schema for the path
-            let schema: Schema | null = variable.schema;
-            if (propPath.length > 0 && schema) {
-                const schemaValidation = validatePropertyPathAgainstSchema(schema, propPath);
-                schema = schemaValidation.schema || null;
+            // If schema is still null, try to get it from the tool's signature
+            if (!schema && step.tool?.signature.outputs) {
+                const outputDef = step.tool.signature.outputs.find(o => o.name === outputName);
+                if (outputDef) {
+                    schema = { ...outputDef.schema }; // Clone to avoid modifying the original
+                }
+            }
+
+            // Ensure the schema's is_array property matches the actual value
+            if (schema && Array.isArray(value)) {
+                schema.is_array = true;
             }
 
             result[outputName] = {
@@ -340,54 +357,99 @@ export class WorkflowEngine {
     }
 
     /**
-     * Updates workflow state with tool results
+     * Applies the output value to a variable based on the mapping operation
+     * @param variable The workflow variable to update
+     * @param mapping The output mapping (simple variable name or enhanced mapping with operation)
+     * @param outputValue The output value to apply
+     * @returns The updated value for the variable
+     */
+    private static applyOutputToVariable(
+        variable: WorkflowVariable,
+        mapping: WorkflowVariableName | EnhancedOutputMapping,
+        outputValue: any
+    ): any {
+        // Handle enhanced output mappings; first handle the case where the mapping is a simple variable name   
+        if (typeof mapping !== 'object' || !('variable' in mapping) || !('operation' in mapping)) {
+            return outputValue;
+        }
+
+        // handle case of simple assignment
+        if (mapping.operation === VariableOperationType.ASSIGN) {
+            // Simple assignment - replace the current value
+            return outputValue;
+        }
+
+        // handle case of append operation
+        if (mapping.operation === VariableOperationType.APPEND) {
+            if (variable.schema.is_array) {
+                // For arrays, handle append based on current value
+                if (!variable.value) {
+                    // No current value, initialize with output
+                    if (Array.isArray(outputValue)) {
+                        return outputValue;
+                    } else {
+                        return [outputValue];
+                    }
+                }
+                else if (Array.isArray(variable.value)) {
+                    // Append to existing array
+                    return [...variable.value, ...outputValue];
+                } else {
+                    return [variable.value, outputValue];
+                }
+            }
+            else if (variable.schema.type === 'string' && typeof variable.value === 'string') {
+                // For strings, concatenate
+                return variable.value + APPEND_DELIMITER + String(outputValue);
+            }
+            else {
+                // For other types, just assign (fallback)
+                return outputValue;
+            }
+        }
+    }
+
+    /**
+     * Updates workflow state with tool outputs based on output mappings
      */
     private static getUpdatedWorkflowStateFromResults(
         step: WorkflowStep,
         outputs: Record<string, any>,
         workflow: Workflow
     ): WorkflowVariable[] {
-        if (!step.output_mappings) return workflow.state || [];
-
         const updatedState = [...(workflow.state || [])];
 
-        // If step is type tool, we need to update the outputs with the tool results
+        // If step is type ACTION, handle tool outputs with mappings
         if (step.step_type === WorkflowStepType.ACTION) {
-            for (const [outputPath, varName] of Object.entries(step.output_mappings)) {
-                // Parse the output path to extract a specific value from the tool output
-                const { rootName: rootOutputName, propPath: outputPropPath } = parseVariablePath(outputPath.toString());
+            if (!step.output_mappings || Object.keys(outputs).length === 0) {
+                return updatedState;
+            }
 
-                // Start with the root output value
-                let outputValue = outputs[rootOutputName as ToolOutputName];
-
-                // If we have a path within the output, resolve it to get the specific value
-                if (outputPropPath.length > 0 && outputValue !== undefined) {
-                    const { value, validPath, errorMessage } = resolvePropertyPath(outputValue, outputPropPath);
-
-                    if (validPath) {
-                        outputValue = value;
-                    } else {
-                        console.warn(`Invalid output property path: ${outputPath}. Using undefined value.`,
-                            errorMessage ? `Error: ${errorMessage}` : '');
-                        outputValue = undefined;
-                    }
+            for (const [outputName, mapping] of Object.entries(step.output_mappings)) {
+                if (!(outputName in outputs)) {
+                    continue;
                 }
 
-                // Find the variable to store the result in
-                const outputVarIndex = updatedState.findIndex(v => v.name === varName);
+                const outputValue = outputs[outputName];
 
-                if (outputVarIndex !== -1) {
-                    // Store the entire (possibly resolved) output value in the variable
-                    updatedState[outputVarIndex] = {
-                        ...updatedState[outputVarIndex],
-                        value: outputValue
-                    };
+                // Get the variable name from the mapping
+                const variableName = typeof mapping === 'object' && 'variable' in mapping
+                    ? mapping.variable
+                    : mapping as WorkflowVariableName;
+
+                // Find the variable in the state
+                const variableIndex = updatedState.findIndex(v => v.name === variableName);
+                if (variableIndex === -1) {
+                    continue;
                 }
+
+                // Apply the output value to the variable based on the mapping
+                const variable = updatedState[variableIndex];
+                variable.value = this.applyOutputToVariable(variable, mapping, outputValue);
             }
         }
-        // If step is type evaluation, we need to update the outputs with the evaluation result
+        // If step is type EVALUATION, handle evaluation outputs
         else if (step.step_type === WorkflowStepType.EVALUATION) {
-            console.log('Updating evaluation outputs:', workflow.state);
             // Generate a shorter variable ID using first 8 chars of step ID plus _eval
             const shortStepId = step.step_id.slice(0, 8);
             const outputVarName = `eval_${shortStepId}` as WorkflowVariableName;
@@ -418,7 +480,6 @@ export class WorkflowEngine {
             }
         }
 
-        console.log('Updated state:', updatedState);
         return updatedState;
     }
 

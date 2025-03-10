@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Tool, ToolParameterName, ToolOutputName } from '../types/tools';
 import { Schema, ValueType } from '../types/schema';
-import { WorkflowVariable, WorkflowVariableName, createWorkflowVariable } from '../types/workflows';
+import {
+    WorkflowVariable,
+    WorkflowVariableName,
+    EnhancedOutputMapping,
+    VariableOperationType,
+    isEnhancedMapping,
+    getVariableNameFromMapping,
+    getOperationFromMapping
+} from '../types/workflows';
 import { getTypeColor, isCompatibleType } from '../lib/utils/variableUIUtils';
 import VariablePathButton from './VariablePathButton';
 
@@ -20,11 +28,11 @@ interface DataFlowMapper2Props {
     // Original DataFlowMapper props
     tool: Tool;
     parameter_mappings: Record<ToolParameterName, WorkflowVariableName>;
-    output_mappings: Record<ToolOutputName, WorkflowVariableName>;
+    output_mappings: Record<ToolOutputName, WorkflowVariableName | EnhancedOutputMapping>;
     // Use a unified state array instead of separate inputs/outputs
     workflowState: WorkflowVariable[];
     onParameterMappingChange: (mappings: Record<ToolParameterName, WorkflowVariableName>) => void;
-    onOutputMappingChange: (mappings: Record<ToolOutputName, WorkflowVariableName>) => void;
+    onOutputMappingChange: (mappings: Record<ToolOutputName, WorkflowVariableName | EnhancedOutputMapping>) => void;
     // New prop for variable creation
     onVariableCreate?: (variable: WorkflowVariable) => void;
 }
@@ -158,67 +166,86 @@ const DataFlowMapper2: React.FC<DataFlowMapper2Props> = ({
     };
 
     const handleOutputMappingChange = (outputName: string, selectedWorkflowVariablePath: string) => {
+        const currentMapping = output_mappings[outputName as ToolOutputName];
+        let newMapping: WorkflowVariableName | EnhancedOutputMapping;
+
+        // Preserve the operation if it's an enhanced mapping
+        if (isEnhancedMapping(currentMapping)) {
+            newMapping = {
+                variable: selectedWorkflowVariablePath as WorkflowVariableName,
+                operation: currentMapping.operation
+            };
+        } else {
+            newMapping = selectedWorkflowVariablePath as WorkflowVariableName;
+        }
+
         const newMappings = {
             ...output_mappings,
-            [outputName as ToolOutputName]: selectedWorkflowVariablePath as WorkflowVariableName
+            [outputName as ToolOutputName]: newMapping
         };
+
         onOutputMappingChange(newMappings);
     };
 
+    const handleOutputOperationChange = (outputName: string, operation: VariableOperationType) => {
+        const currentMapping = output_mappings[outputName as ToolOutputName];
+        let newMapping: EnhancedOutputMapping;
+
+        // Get the variable name from the current mapping
+        const variableName = getVariableNameFromMapping(currentMapping);
+
+        // Create an enhanced mapping with the new operation
+        newMapping = {
+            variable: variableName,
+            operation: operation
+        };
+
+        const newMappings = {
+            ...output_mappings,
+            [outputName as ToolOutputName]: newMapping
+        };
+
+        onOutputMappingChange(newMappings);
+    };
 
     const handleCreateVariableSubmit = () => {
         const paramOrOutput = creatingForParameter
-            ? tool.signature.parameters.find(p => p.name === creatingForParameter)
+            ? tool.signature.parameters?.find(p => p.name === creatingForParameter)
             : creatingForOutput
-                ? tool.signature.outputs.find(o => o.name === creatingForOutput)
+                ? tool.signature.outputs?.find(o => o.name === creatingForOutput)
                 : null;
 
-        console.log('Creating variable from:', paramOrOutput);
-        console.log('Using schema:', newVarSchema);
-
-        if (!newVarName || !newVarSchema) {
-            setNameError('Variable name and schema are required');
+        if (!paramOrOutput || !newVarName || !onVariableCreate) {
             return;
         }
 
-        // Ensure the schema is properly structured before creating the variable
-        const validatedSchema: Schema = {
-            type: newVarSchema.type || 'string',
-            is_array: Boolean(newVarSchema.is_array),
-            description: newVarSchema.description || '',
-            fields: newVarSchema.fields ? { ...newVarSchema.fields } : {},
-            format: newVarSchema.format,
-            content_types: newVarSchema.content_types
-        };
+        // Validate schema
+        const validatedSchema = validateSchema(newVarSchema);
 
         // Create the new variable
-        const newVar = createWorkflowVariable(
-            `new_${Date.now()}`, // Temporary ID, backend will assign real one
-            newVarName,
-            validatedSchema,
-            creatingForParameter ? 'input' : 'output'
-        );
+        const newVar: WorkflowVariable = {
+            variable_id: `var_${Date.now()}`,
+            name: newVarName as WorkflowVariableName,
+            schema: validatedSchema,
+            io_type: creatingForParameter ? 'input' : 'output',
+            required: creatingForParameter ? true : false
+        };
 
         console.log('Created new variable:', newVar);
-
-        // Call the callback
-        if (onVariableCreate) {
-            onVariableCreate(newVar);
-        }
+        onVariableCreate(newVar);
 
         // Update the mapping
         if (creatingForParameter) {
             handleParameterMappingChange(creatingForParameter, newVarName);
-        } else if (creatingForOutput) {
+        } else {
             handleOutputMappingChange(creatingForOutput, newVarName);
         }
 
-        // Reset state
+        // Close the modal
         setShowVariableCreation(false);
-        setNewVarName('');
-        setNewVarSchema(null);
         setCreatingForParameter(null);
         setCreatingForOutput(null);
+        setNewVarName('');
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -509,36 +536,74 @@ const DataFlowMapper2: React.FC<DataFlowMapper2Props> = ({
 
         return (
             <div className="space-y-1.5">
-                {tool.signature.outputs.map(output => (
-                    <div key={output.name} className="bg-gray-50 dark:bg-gray-800/50 rounded-md p-1.5">
-                        <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-1">
-                                <span className={`text-xs font-medium ${getTypeColor(output.schema?.type || 'string', Boolean(output.schema?.is_array))}`}>
-                                    {output.name}
-                                    {output.schema?.is_array && '[]'}
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => handleCreateOutputVariable(output.name)}
-                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                            >
-                                + Create Variable
-                            </button>
-                        </div>
+                {tool.signature.outputs.map(output => {
+                    const currentMapping = output_mappings[output.name as ToolOutputName];
+                    const variableName = getVariableNameFromMapping(currentMapping);
+                    const operation = getOperationFromMapping(currentMapping);
 
-                        <VariablePathButton
-                            variables={workflowState || []}
-                            selectedWorkflowVariablePath={output_mappings[output.name as ToolOutputName] || ''}
-                            onChange={(selectedWorkflowVariablePath) => handleOutputMappingChange(output.name, selectedWorkflowVariablePath)}
-                            placeholder="Select variable..."
-                            className="text-xs py-1"
-                            targetSchema={output.schema}
-                            modalTitle={`Select for output: ${output.name}`}
-                        />
-                    </div>
-                ))}
+                    // Check if the output schema is an array or string (supports append)
+                    const supportsAppend = output.schema?.is_array || output.schema?.type === 'string';
+
+                    return (
+                        <div key={output.name} className="bg-gray-50 dark:bg-gray-800/50 rounded-md p-1.5">
+                            <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-1">
+                                    <span className={`text-xs font-medium ${getTypeColor(output.schema?.type || 'string', Boolean(output.schema?.is_array))}`}>
+                                        {output.name}
+                                        {output.schema?.is_array && '[]'}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => handleCreateOutputVariable(output.name)}
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                    + Create Variable
+                                </button>
+                            </div>
+
+                            <div className="flex gap-2 items-center">
+                                <div className="flex-grow">
+                                    <VariablePathButton
+                                        variables={workflowState || []}
+                                        selectedWorkflowVariablePath={variableName || ''}
+                                        onChange={(selectedWorkflowVariablePath) => handleOutputMappingChange(output.name, selectedWorkflowVariablePath)}
+                                        placeholder="Select variable..."
+                                        className="text-xs py-1"
+                                        targetSchema={output.schema}
+                                        modalTitle={`Select for output: ${output.name}`}
+                                    />
+                                </div>
+
+                                {supportsAppend && (
+                                    <div className="flex-shrink-0">
+                                        <select
+                                            value={operation}
+                                            onChange={(e) => handleOutputOperationChange(output.name, e.target.value as VariableOperationType)}
+                                            className="text-xs border border-gray-300 dark:border-gray-600 rounded-md py-1 px-2 bg-white dark:bg-gray-700"
+                                        >
+                                            <option value={VariableOperationType.ASSIGN}>Assign</option>
+                                            <option value={VariableOperationType.APPEND}>Append</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         );
+    };
+
+    // Helper function to validate schema
+    const validateSchema = (schema: Schema): Schema => {
+        return {
+            type: schema.type || 'string',
+            is_array: Boolean(schema.is_array),
+            description: schema.description || '',
+            fields: schema.fields ? { ...schema.fields } : {},
+            format: schema.format,
+            content_types: schema.content_types
+        };
     };
 
     return (

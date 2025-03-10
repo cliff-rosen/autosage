@@ -356,5 +356,74 @@ export const DEFAULT_AGENT_WORKFLOW_CHAIN: AgentWorkflowChain = {
             },
             outputs: [WORKFLOW_VARIABLES.FINAL_ANSWER]
         }
+    ],
+    state: [
+        // Input variable - original question from user
+        {
+            variable_id: 'question',
+            name: 'question' as WorkflowVariableName,
+            schema: {
+                type: 'string',
+                is_array: false,
+                description: 'The original question from the user'
+            },
+            value: '',
+            io_type: 'input',
+            required: true
+        },
+        // Output variable - improved question with explanation
+        {
+            variable_id: 'improvement_response',
+            name: 'improvement_response' as WorkflowVariableName,
+            schema: {
+                type: 'object',
+                is_array: false,
+                description: 'The improved question with explanation',
+                fields: {
+                    improvedQuestion: {
+                        type: 'string',
+                        is_array: false,
+                        description: 'The improved version of the question'
+                    },
+                    explanation: {
+                        type: 'string',
+                        is_array: false,
+                        description: 'Explanation of how the question was improved'
+                    }
+                }
+            },
+            value: {
+                improvedQuestion: '',
+                explanation: ''
+            },
+            io_type: 'output'
+        },
+        // Output variable - evaluation of the response
+        {
+            variable_id: 'response_evaluation',
+            name: 'response_evaluation' as WorkflowVariableName,
+            schema: {
+                type: 'object',
+                is_array: false,
+                description: 'Evaluation of the improved question',
+                fields: {
+                    confidenceScore: {
+                        type: 'number',
+                        is_array: false,
+                        description: 'Confidence score for the improvement'
+                    },
+                    evaluation: {
+                        type: 'string',
+                        is_array: false,
+                        description: 'Textual evaluation of the improvement'
+                    }
+                }
+            },
+            value: {
+                confidenceScore: 0,
+                evaluation: ''
+            },
+            io_type: 'evaluation'
+        }
     ]
 }; 

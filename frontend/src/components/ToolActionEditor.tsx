@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { WorkflowStep, WorkflowVariableName, WorkflowVariable, Workflow, addWorkflowVariable } from '../types/workflows';
+import { WorkflowStep, WorkflowVariableName, WorkflowVariable, Workflow, addWorkflowVariable, EnhancedOutputMapping } from '../types/workflows';
 import { Tool, ToolParameterName, ToolOutputName } from '../types/tools';
 import { toolApi } from '../lib/api/toolApi';
 import PromptTemplateSelector from './PromptTemplateSelector';
@@ -54,7 +54,7 @@ const ToolActionEditor: React.FC<ToolActionEditorProps> = ({
         });
     };
 
-    const handleOutputMappingChange = (outputMappings: Record<ToolOutputName, WorkflowVariableName>) => {
+    const handleOutputMappingChange = (outputMappings: Record<ToolOutputName, WorkflowVariableName | EnhancedOutputMapping>) => {
         updateWorkflowByAction({
             type: 'UPDATE_OUTPUT_MAPPINGS',
             payload: {
@@ -100,11 +100,11 @@ const ToolActionEditor: React.FC<ToolActionEditorProps> = ({
                 </div>
             )}
 
-            {/* Parameter and Output Mapping - more compact */}
-            {(step.tool && (step.tool.tool_type !== 'llm' || step.prompt_template_id)) && (
+            {/* Data Flow Mapping - more compact */}
+            {step.tool && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
                     <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">
-                        Data Flow Configuration
+                        Data Flow Mapping
                     </h3>
                     <DataFlowMapper2
                         tool={step.tool}
