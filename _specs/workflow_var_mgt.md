@@ -1,3 +1,28 @@
+
+Test Cases for applyOutputToVariable
+| Output Type | Variable Type | Operation | Result Type | Result Description |
+|-------------|--------------|-----------|-------------|-------------------|
+| string | string | ASSIGN | string | Direct assignment of output string to variable |
+| string | string | APPEND | string | Original string + delimiter + output string |
+| string[] | string | ASSIGN | string | Each array element converted to string and joined with delimiter |
+| string[] | string | APPEND | string | Original string + delimiter + (array elements joined with delimiter) |
+| object | string | ASSIGN | string | Object converted to JSON string via JSON.stringify() |
+| object | string | APPEND | string | Original string + delimiter + JSON string representation of object |
+| object[] | string | ASSIGN | string | Each object converted to JSON string and all strings joined with delimiter |
+| object[] | string | APPEND | string | Original string + delimiter + (JSON strings of objects joined with delimiter) |
+| string | string[] | ASSIGN | string[] | Single-element array containing the string |
+| string | string[] | APPEND | string[] | Original array with string appended as a new element |
+| string[] | string[] | ASSIGN | string[] | Direct assignment of string array to string array variable |
+| string[] | string[] | APPEND | string[] | Original string array with all elements from new string array appended |
+| object | string[] | ASSIGN | string[] | Single-element array containing the object |
+| object | string[] | APPEND | string[] | Original array with object appended as a new element |
+| object[] | string[] | ASSIGN | string[] | Direct assignment of object array to string array variable |
+| object[] | string[] | APPEND | string[] | Original string array with all elements from object array appended |
+
+note allowed:
+| object | array | ASSIGN | object | Assign object output to array variable |
+
+
 Value Display Components and Utilities:
 VariableRenderer (frontend/src/components/common/VariableRenderer.tsx)
 A universal component for rendering variable values of different types

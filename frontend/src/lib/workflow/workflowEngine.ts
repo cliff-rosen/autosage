@@ -53,7 +53,7 @@ export type WorkflowStateAction = {
     }
 };
 
-const APPEND_DELIMITER = '|';
+const APPEND_DELIMITER = '\n\n';
 
 export class WorkflowEngine {
     /**
