@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Schema, ValueType } from '../types/schema';
+import { Schema, ValueType, SchemaValueType } from '../types/schema';
 import { WorkflowVariable, createBasicSchema, WorkflowVariableName } from '../types/workflows';
 import { useWorkflows } from '../context/WorkflowContext';
 import { FileInfo } from '../lib/api/fileApi';
@@ -231,6 +231,9 @@ const WorkflowIOEditor: React.FC = () => {
     const [showFileSelector, setShowFileSelector] = useState(false);
     const [selectedSchema, setSelectedSchema] = useState<Schema | null>(null);
     const { formatValue } = useValueFormatter();
+    const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
+    const [schemaDialogOpen, setSchemaDialogOpen] = useState(false);
+    const [currentEditingSchema, setCurrentEditingSchema] = useState<{ variableId: string, schema: Schema } | null>(null);
 
     useEffect(() => {
         if (workflow?.state) {
@@ -289,6 +292,7 @@ const WorkflowIOEditor: React.FC = () => {
         if (editingSchema === variable_id) {
             setEditingSchema(null);
         }
+        setDeleteConfirmation(null);
     };
 
     const toggleRowExpansion = (variable_id: string) => {
@@ -313,12 +317,23 @@ const WorkflowIOEditor: React.FC = () => {
         }
     };
 
+    const openSchemaEditor = (variableId: string, schema: Schema) => {
+        setCurrentEditingSchema({ variableId, schema });
+        setSchemaDialogOpen(true);
+    };
+
+    const handleSchemaChange = (schema: Schema) => {
+        if (currentEditingSchema) {
+            handleVariableChange(currentEditingSchema.variableId, { schema });
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 flex items-start justify-center">
-            <div className="w-full bg-white dark:bg-gray-900 shadow-xl border-b border-gray-200 dark:border-gray-700 mt-0">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 flex items-start justify-center">
+            <div className="w-full h-full bg-white dark:bg-gray-900 shadow-xl border-b border-gray-200 dark:border-gray-700 flex flex-col">
                 {/* Header */}
                 <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-                    <div className="px-6 py-4 flex justify-between items-center">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                                 Workflow Variables
@@ -343,223 +358,291 @@ const WorkflowIOEditor: React.FC = () => {
                 </div>
 
                 {/* Add Variable Form */}
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <div className="flex flex-wrap gap-4 items-end">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Variable Type
-                            </label>
-                            <select
-                                value={newVariableType}
-                                onChange={(e) => setNewVariableType(e.target.value as 'input' | 'output')}
-                                className="px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                        <div className="flex flex-wrap gap-4 items-end">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Variable Type
+                                </label>
+                                <select
+                                    value={newVariableType}
+                                    onChange={(e) => setNewVariableType(e.target.value as 'input' | 'output')}
+                                    className="px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                >
+                                    <option value="input">Input</option>
+                                    <option value="output">Output</option>
+                                </select>
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Variable Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newVariableName}
+                                    onChange={(e) => setNewVariableName(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                    placeholder="Enter variable name"
+                                />
+                            </div>
+                            <button
+                                onClick={handleAddVariable}
+                                disabled={!newVariableName.trim()}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                             >
-                                <option value="input">Input</option>
-                                <option value="output">Output</option>
-                            </select>
+                                Add Variable
+                            </button>
                         </div>
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Variable Name
-                            </label>
-                            <input
-                                type="text"
-                                value={newVariableName}
-                                onChange={(e) => setNewVariableName(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
-                                placeholder="Enter variable name"
-                            />
-                        </div>
-                        <button
-                            onClick={handleAddVariable}
-                            disabled={!newVariableName.trim()}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                        >
-                            Add Variable
-                        </button>
                     </div>
                 </div>
 
                 {/* Variables Table */}
-                <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-800">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Type
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Name
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Description
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Data Type
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Value
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                                {variables.map((variable) => (
-                                    <React.Fragment key={variable.variable_id}>
-                                        <tr
-                                            className={`${isExpandable(variable) ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}`}
-                                            onClick={() => isExpandable(variable) && toggleRowExpansion(variable.variable_id)}
-                                        >
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <TypeBadge type={variable.io_type} />
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                {editingVariable === variable.variable_id ? (
-                                                    <input
-                                                        type="text"
-                                                        value={variable.name}
-                                                        onChange={(e) => handleVariableChange(variable.variable_id, {
-                                                            name: e.target.value as WorkflowVariableName
-                                                        })}
-                                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
-                                                        onBlur={() => setEditingVariable(null)}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className="font-medium text-gray-900 dark:text-gray-100"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingVariable(variable.variable_id);
-                                                        }}
-                                                    >
-                                                        {variable.name}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {editingVariable === variable.variable_id ? (
-                                                    <textarea
-                                                        value={variable.schema.description || ''}
-                                                        onChange={(e) => handleVariableChange(variable.variable_id, {
-                                                            schema: { ...variable.schema, description: e.target.value }
-                                                        })}
-                                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
-                                                        rows={2}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className="text-sm text-gray-700 dark:text-gray-300"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingVariable(variable.variable_id);
-                                                        }}
-                                                    >
-                                                        {variable.schema.description || 'No description'}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                {editingSchema === variable.variable_id ? (
-                                                    <div onClick={(e) => e.stopPropagation()} className="relative">
-                                                        <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 rounded-lg p-4 w-96">
-                                                            <SchemaEditor
-                                                                schema={variable.schema}
-                                                                onChange={(schema) => handleVariableChange(variable.variable_id, { schema })}
-                                                                compact={true}
-                                                            />
-                                                            <div className="mt-4 flex justify-end">
-                                                                <button
-                                                                    onClick={() => setEditingSchema(null)}
-                                                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                                                                >
-                                                                    Done
-                                                                </button>
-                                                            </div>
-                                                        </div>
+                <div className="flex-1 overflow-auto">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-800">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                            Type
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                            Name
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                            Description
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                            Data Type
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                            Value
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                                    {variables.map((variable) => (
+                                        <React.Fragment key={variable.variable_id}>
+                                            <tr
+                                                className={`${isExpandable(variable) ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}`}
+                                                onClick={() => isExpandable(variable) && toggleRowExpansion(variable.variable_id)}
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <TypeBadge type={variable.io_type} />
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {editingVariable === variable.variable_id ? (
+                                                        <input
+                                                            type="text"
+                                                            value={variable.name}
+                                                            onChange={(e) => handleVariableChange(variable.variable_id, {
+                                                                name: e.target.value as WorkflowVariableName
+                                                            })}
+                                                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                                            onBlur={() => setEditingVariable(null)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    ) : (
                                                         <div
-                                                            className="text-sm text-blue-600 dark:text-blue-400 cursor-pointer"
+                                                            className="font-medium text-gray-900 dark:text-gray-100"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingVariable(variable.variable_id);
+                                                            }}
                                                         >
-                                                            {variable.schema.type}{variable.schema.is_array ? '[]' : ''}
+                                                            {variable.name}
                                                         </div>
-                                                    </div>
-                                                ) : (
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {editingVariable === variable.variable_id ? (
+                                                        <textarea
+                                                            value={variable.schema.description || ''}
+                                                            onChange={(e) => handleVariableChange(variable.variable_id, {
+                                                                schema: { ...variable.schema, description: e.target.value }
+                                                            })}
+                                                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-gray-900 dark:text-gray-100"
+                                                            rows={2}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            className="text-sm text-gray-700 dark:text-gray-300"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingVariable(variable.variable_id);
+                                                            }}
+                                                        >
+                                                            {variable.schema.description || 'No description'}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     <div
                                                         className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setEditingSchema(variable.variable_id);
+                                                            openSchemaEditor(variable.variable_id, variable.schema);
                                                         }}
                                                     >
                                                         {variable.schema.type}{variable.schema.is_array ? '[]' : ''}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm text-gray-700 dark:text-gray-300">
-                                                    {isExpandable(variable) ? (
-                                                        <div className="flex items-center">
-                                                            <span className="truncate max-w-xs">
-                                                                {typeof variable.value === 'object'
-                                                                    ? (Array.isArray(variable.value)
-                                                                        ? `Array(${variable.value.length})`
-                                                                        : `Object(${Object.keys(variable.value || {}).length})`)
-                                                                    : String(variable.value).substring(0, 50) + (String(variable.value).length > 50 ? '...' : '')}
-                                                            </span>
-                                                            <span className="ml-2 text-blue-600 dark:text-blue-400">
-                                                                {expandedRows.has(variable.variable_id) ? '▼' : '▶'}
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        formatValue(variable.value)
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                {variable.io_type !== 'evaluation' && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleRemoveVariable(variable.variable_id);
-                                                        }}
-                                                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                        {expandedRows.has(variable.variable_id) && (
-                                            <tr>
-                                                <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
-                                                    <div className="text-sm text-gray-800 dark:text-gray-200">
-                                                        <VariableRenderer
-                                                            value={variable.value}
-                                                            schema={variable.schema}
-                                                            maxTextLength={500}
-                                                            maxArrayItems={10}
-                                                        />
+                                                        <span className="ml-1 text-blue-600 dark:text-blue-400">(Edit)</span>
                                                     </div>
                                                 </td>
+                                                <td className="px-6 py-4">
+                                                    <div
+                                                        className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleRowExpansion(variable.variable_id);
+                                                        }}
+                                                    >
+                                                        {isExpandable(variable) ? (
+                                                            <div className="flex items-center">
+                                                                <span className="truncate max-w-xs">
+                                                                    {typeof variable.value === 'object'
+                                                                        ? (Array.isArray(variable.value)
+                                                                            ? `Array(${variable.value.length})`
+                                                                            : `Object(${Object.keys(variable.value || {}).length})`)
+                                                                        : String(variable.value).substring(0, 50) + (String(variable.value).length > 50 ? '...' : '')}
+                                                                </span>
+                                                                <span className="ml-2 text-blue-600 dark:text-blue-400">
+                                                                    {expandedRows.has(variable.variable_id) ? '▼' : '▶'}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleRowExpansion(variable.variable_id);
+                                                            }}>
+                                                                {formatValue(variable.value) || (
+                                                                    <span className="text-gray-400 dark:text-gray-500 italic cursor-pointer">
+                                                                        Click to edit
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    {variable.io_type !== 'evaluation' && (
+                                                        <>
+                                                            {deleteConfirmation === variable.variable_id ? (
+                                                                <div className="flex items-center justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
+                                                                    <span className="text-xs text-gray-500 dark:text-gray-400">Confirm?</span>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleRemoveVariable(variable.variable_id);
+                                                                        }}
+                                                                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-medium"
+                                                                    >
+                                                                        Yes
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setDeleteConfirmation(null);
+                                                                        }}
+                                                                        className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300"
+                                                                    >
+                                                                        No
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setDeleteConfirmation(variable.variable_id);
+                                                                    }}
+                                                                    className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </td>
                                             </tr>
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                                {variables.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                                            No variables defined. Add a variable to get started.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                            {expandedRows.has(variable.variable_id) && (
+                                                <tr>
+                                                    <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="text-sm text-gray-800 dark:text-gray-200">
+                                                            {variable.value !== undefined && variable.value !== null ? (
+                                                                <VariableRenderer
+                                                                    value={variable.value}
+                                                                    schema={variable.schema}
+                                                                    maxTextLength={500}
+                                                                    maxArrayItems={10}
+                                                                />
+                                                            ) : (
+                                                                <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="text-gray-500 dark:text-gray-400 italic">No value set</span>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                // Set a default value based on the schema type
+                                                                                let defaultValue: SchemaValueType | undefined;
+                                                                                if (variable.schema.type === 'string') defaultValue = '';
+                                                                                else if (variable.schema.type === 'number') defaultValue = 0;
+                                                                                else if (variable.schema.type === 'boolean') defaultValue = false;
+                                                                                else if (variable.schema.type === 'object') defaultValue = {};
+                                                                                else if (variable.schema.is_array) {
+                                                                                    // For arrays, initialize with an empty object that has string indexer
+                                                                                    defaultValue = {} as Record<string, any>;
+                                                                                }
+
+                                                                                handleVariableChange(variable.variable_id, { value: defaultValue });
+                                                                            }}
+                                                                            className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                                                        >
+                                                                            Initialize Value
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                    {variables.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                                No variables defined. Add a variable to get started.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
+
+                {/* Schema Editor Dialog */}
+                {schemaDialogOpen && currentEditingSchema && (
+                    <Dialog
+                        isOpen={schemaDialogOpen}
+                        onClose={() => setSchemaDialogOpen(false)}
+                        title="Edit Schema"
+                        maxWidth="3xl"
+                    >
+                        <div className="p-4">
+                            <SchemaEditor
+                                schema={currentEditingSchema.schema}
+                                onChange={handleSchemaChange}
+                                onCancel={() => setSchemaDialogOpen(false)}
+                                compact={false}
+                            />
+                        </div>
+                    </Dialog>
+                )}
 
                 {/* File Selector Dialog */}
                 {showFileSelector && (

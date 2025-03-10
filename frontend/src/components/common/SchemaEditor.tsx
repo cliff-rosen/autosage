@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Schema, ValueType } from '../../types/schema';
 
 interface SchemaField {
@@ -9,6 +9,7 @@ interface SchemaField {
 interface SchemaEditorProps {
     schema: Schema;
     onChange: (schema: Schema) => void;
+    onCancel?: () => void;
     compact?: boolean;
 }
 
@@ -17,25 +18,33 @@ interface EditingField {
     value: string;
 }
 
-const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, compact = false }) => {
+const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, onCancel, compact = false }) => {
     const [editMode, setEditMode] = useState<'gui' | 'json'>('gui');
     const [jsonError, setJsonError] = useState<string | null>(null);
-    const [jsonText, setJsonText] = useState(() => {
-        if (schema.type === 'object' && 'fields' in schema) {
-            return JSON.stringify(schema.fields || {}, null, 2);
-        }
-        return '{}';
-    });
+    const [jsonText, setJsonText] = useState('{}');
     const [editingFieldName, setEditingFieldName] = useState<EditingField | null>(null);
+    const [newFieldName, setNewFieldName] = useState('');
+    const [fieldToRemove, setFieldToRemove] = useState<string | null>(null);
+    const [localSchema, setLocalSchema] = useState<Schema>(schema);
 
-    // Update JSON text when schema changes externally or mode switches
+    // Update local schema when the prop changes
     useEffect(() => {
-        if (schema.type === 'object' && 'fields' in schema) {
-            setJsonText(JSON.stringify(schema.fields || {}, null, 2));
+        setLocalSchema(schema);
+    }, [schema]);
+
+    // Update JSON text when schema changes or mode switches
+    useEffect(() => {
+        if (localSchema.type === 'object' && 'fields' in localSchema) {
+            setJsonText(JSON.stringify(localSchema.fields || {}, null, 2));
         } else {
             setJsonText('{}');
         }
-    }, [schema, editMode]);
+    }, [localSchema, editMode]);
+
+    const updateSchema = useCallback((updatedSchema: Schema) => {
+        setLocalSchema(updatedSchema);
+        onChange(updatedSchema);
+    }, [onChange]);
 
     const handleJsonChange = (text: string) => {
         setJsonText(text);
@@ -43,17 +52,28 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, compact =
             const parsed = JSON.parse(text);
             setJsonError(null);
             const fields: Record<string, Schema> = {};
+
             Object.entries(parsed).forEach(([key, value]: [string, any]) => {
-                fields[key] = {
-                    type: (value.type || 'string') as ValueType,
-                    is_array: false,
-                    description: value.description
-                };
+                // Handle both simple values and properly formatted schema objects
+                if (typeof value === 'object' && value !== null && 'type' in value) {
+                    fields[key] = {
+                        type: (value.type || 'string') as ValueType,
+                        is_array: value.is_array || false,
+                        description: value.description || '',
+                        ...(value.type === 'object' && value.fields ? { fields: value.fields } : {})
+                    };
+                } else {
+                    fields[key] = {
+                        type: 'string',
+                        is_array: false,
+                        description: ''
+                    };
+                }
             });
-            onChange({
+
+            updateSchema({
+                ...localSchema,
                 type: 'object',
-                is_array: false,
-                description: schema.description,
                 fields
             });
         } catch (err) {
@@ -61,51 +81,102 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, compact =
         }
     };
 
-    const handleTypeChange = (type: 'string' | 'object') => {
-        if (type === 'string') {
-            onChange({
-                type: 'string',
-                is_array: false,
-                description: schema.description
-            });
-        } else {
-            onChange({
+    const handleTypeChange = (type: ValueType) => {
+        let updatedSchema: Schema;
+
+        if (type === 'object') {
+            updatedSchema = {
+                ...localSchema,
                 type: 'object',
-                is_array: false,
-                description: schema.description,
-                fields: {}
-            });
+                fields: localSchema.type === 'object' && localSchema.fields ? localSchema.fields : {}
+            };
+        } else {
+            // For non-object types, remove the fields property if it exists
+            const { fields, ...rest } = localSchema;
+            updatedSchema = {
+                ...rest,
+                type
+            };
         }
+
+        updateSchema(updatedSchema);
     };
 
     const handleAddField = () => {
-        if (schema.type !== 'object' || !('fields' in schema)) return;
+        if (localSchema.type !== 'object') return;
 
-        const currentFields = schema.fields || {};
-        const newFields = {
-            ...currentFields,
-            [`field${Object.keys(currentFields).length + 1}`]: {
-                type: 'string' as ValueType,
-                is_array: false,
-                description: ''
+        const fieldName = newFieldName.trim()
+            ? newFieldName.trim()
+            : `field${Object.keys(localSchema.fields || {}).length + 1}`;
+
+        const currentFields = localSchema.fields || {};
+
+        // Check if field name already exists
+        if (currentFields[fieldName]) {
+            // If it exists, create a unique name by appending a number
+            let counter = 1;
+            let uniqueFieldName = `${fieldName}_${counter}`;
+            while (currentFields[uniqueFieldName]) {
+                counter++;
+                uniqueFieldName = `${fieldName}_${counter}`;
             }
-        };
-        onChange({
-            ...schema,
-            fields: newFields
-        });
+
+            const newFields = {
+                ...currentFields,
+                [uniqueFieldName]: {
+                    type: 'string' as ValueType,
+                    is_array: false,
+                    description: ''
+                }
+            };
+
+            updateSchema({
+                ...localSchema,
+                fields: newFields
+            });
+        } else {
+            // If it doesn't exist, use the original name
+            const newFields = {
+                ...currentFields,
+                [fieldName]: {
+                    type: 'string' as ValueType,
+                    is_array: false,
+                    description: ''
+                }
+            };
+
+            updateSchema({
+                ...localSchema,
+                fields: newFields
+            });
+        }
+
+        setNewFieldName('');
     };
 
-    const handleRemoveField = (fieldName: string) => {
-        if (schema.type !== 'object' || !('fields' in schema)) return;
+    const confirmRemoveField = (fieldName: string) => {
+        setFieldToRemove(fieldName);
+    };
 
-        const currentFields = schema.fields || {};
-        const newFields = { ...currentFields };
-        delete newFields[fieldName];
-        onChange({
-            ...schema,
-            fields: newFields
+    const handleRemoveField = () => {
+        if (!fieldToRemove || localSchema.type !== 'object' || !localSchema.fields) {
+            setFieldToRemove(null);
+            return;
+        }
+
+        const currentFields = { ...localSchema.fields };
+        delete currentFields[fieldToRemove];
+
+        updateSchema({
+            ...localSchema,
+            fields: currentFields
         });
+
+        setFieldToRemove(null);
+    };
+
+    const cancelRemoveField = () => {
+        setFieldToRemove(null);
     };
 
     const handleFieldNameChange = (fieldName: string, value: string) => {
@@ -113,7 +184,10 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, compact =
     };
 
     const handleFieldNameBlur = () => {
-        if (!editingFieldName || schema.type !== 'object' || !('fields' in schema)) return;
+        if (!editingFieldName || localSchema.type !== 'object' || !localSchema.fields) {
+            setEditingFieldName(null);
+            return;
+        }
 
         const { fieldName, value } = editingFieldName;
         if (fieldName === value || !value.trim()) {
@@ -121,66 +195,103 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, compact =
             return;
         }
 
-        const currentFields = schema.fields || {};
-        const entries = Object.entries(currentFields);
+        const currentFields = localSchema.fields;
+
+        // Check if the new field name already exists
+        if (currentFields[value] && fieldName !== value) {
+            // Don't change the name if it would overwrite an existing field
+            setEditingFieldName(null);
+            return;
+        }
+
         const newFields: Record<string, Schema> = {};
 
-        entries.forEach(([key, fieldValue]) => {
+        // Create a new fields object with the renamed field
+        Object.entries(currentFields).forEach(([key, fieldValue]) => {
             if (key === fieldName) {
-                newFields[value] = {
-                    ...fieldValue
-                };
+                newFields[value] = fieldValue;
             } else {
                 newFields[key] = fieldValue;
             }
         });
 
-        onChange({
-            ...schema,
+        updateSchema({
+            ...localSchema,
             fields: newFields
         });
+
         setEditingFieldName(null);
     };
 
     const handleFieldChange = (
         fieldName: string,
-        property: 'type' | 'description',
-        value: string
+        property: 'type' | 'description' | 'is_array' | 'fields',
+        value: any
     ) => {
-        if (schema.type !== 'object' || !('fields' in schema)) return;
-        const currentFields = schema.fields || {};
+        if (localSchema.type !== 'object' || !localSchema.fields) return;
 
-        onChange({
-            ...schema,
-            fields: {
-                ...currentFields,
-                [fieldName]: {
-                    ...currentFields[fieldName],
-                    [property]: value
-                }
-            }
+        const currentFields = { ...localSchema.fields };
+        const updatedField = { ...currentFields[fieldName] } as any;
+
+        if (property === 'type' && value === 'object' && !updatedField.fields) {
+            updatedField.fields = {};
+        }
+
+        updatedField[property] = value;
+        currentFields[fieldName] = updatedField;
+
+        updateSchema({
+            ...localSchema,
+            fields: currentFields
         });
+    };
+
+    const handleArrayChange = (isArray: boolean) => {
+        updateSchema({
+            ...localSchema,
+            is_array: isArray
+        });
+    };
+
+    const handleDone = () => {
+        if (editMode === 'json') {
+            handleJsonChange(jsonText);
+        }
+        if (onCancel) onCancel();
     };
 
     return (
         <div className={`${compact ? 'space-y-2' : 'space-y-4'}`}>
             <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap">
                     <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-700 dark:text-gray-300 mr-2`}>
                         Schema Type:
                     </label>
                     <select
-                        value={schema.type}
-                        onChange={(e) => handleTypeChange(e.target.value as 'string' | 'object')}
+                        value={localSchema.type}
+                        onChange={(e) => handleTypeChange(e.target.value as ValueType)}
                         className={`rounded-md border border-gray-300 dark:border-gray-600 
                                  shadow-sm ${compact ? 'py-0.5 px-1 text-xs' : 'py-1 px-2 text-sm'} focus:outline-none focus:ring-blue-500 
                                  focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
                     >
                         <option value="string">String</option>
+                        <option value="number">Number</option>
+                        <option value="boolean">Boolean</option>
                         <option value="object">Object</option>
+                        <option value="file">File</option>
                     </select>
 
-                    {schema.type === 'object' && (
+                    <label className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            checked={localSchema.is_array}
+                            onChange={e => handleArrayChange(e.target.checked)}
+                            className="rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+                        />
+                        <span className={`${compact ? 'text-xs' : 'text-sm'} text-gray-700 dark:text-gray-300`}>Is Array</span>
+                    </label>
+
+                    {localSchema.type === 'object' && (
                         <>
                             <button
                                 type="button"
@@ -205,28 +316,17 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, compact =
                         </>
                     )}
                 </div>
-                {schema.type === 'object' && editMode === 'gui' && (
-                    <button
-                        type="button"
-                        onClick={handleAddField}
-                        className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} font-medium text-blue-600 hover:text-blue-700 
-                                 dark:text-blue-400 dark:hover:text-blue-300`}
-                    >
-                        Add Field
-                    </button>
-                )}
             </div>
 
-            {schema.type === 'string' ? (
+            {localSchema.type !== 'object' ? (
                 <div className={`${compact ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 ${compact ? 'p-2' : 'p-4'} rounded-md`}>
-                    This schema will output a simple string value.
+                    This schema will output a {localSchema.type} value{localSchema.is_array ? ' array' : ''}.
                 </div>
             ) : editMode === 'json' ? (
                 <div className={`${compact ? 'space-y-1' : 'space-y-2'}`}>
                     <textarea
                         value={jsonText}
                         onChange={(e) => setJsonText(e.target.value)}
-                        onBlur={() => handleJsonChange(jsonText)}
                         rows={compact ? 4 : 8}
                         placeholder="Enter JSON schema"
                         className={`mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
@@ -237,81 +337,177 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({ schema, onChange, compact =
                     {jsonError && (
                         <p className={`${compact ? 'text-xs' : 'text-sm'} text-red-600 dark:text-red-400`}>{jsonError}</p>
                     )}
-                    <div className="flex justify-end">
-                        <button
-                            onClick={() => handleJsonChange(jsonText)}
-                            className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} font-medium text-blue-600 hover:text-blue-700 
-                                     dark:text-blue-400 dark:hover:text-blue-300`}
-                        >
-                            Apply Changes
-                        </button>
-                    </div>
                 </div>
             ) : (
-                <div className={`${compact ? 'space-y-2' : 'space-y-4'}`}>
-                    <div className={`${compact ? 'space-y-2' : 'space-y-4'}`}>
-                        {schema.type === 'object' && 'fields' in schema && Object.entries(schema.fields || {}).map(([fieldName, field]) => (
-                            <div key={fieldName} className={`flex items-start space-x-2 ${compact ? 'p-2' : 'p-4'} bg-gray-50 dark:bg-gray-800 rounded-lg`}>
-                                <div className="flex-1 grid grid-cols-3 gap-2">
-                                    <div>
-                                        <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-700 dark:text-gray-300`}>
-                                            Field Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={editingFieldName?.fieldName === fieldName ? editingFieldName.value : fieldName}
-                                            onChange={(e) => handleFieldNameChange(fieldName, e.target.value)}
-                                            onBlur={handleFieldNameBlur}
-                                            className={`mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                                     shadow-sm ${compact ? 'py-0.5 px-1 text-xs' : 'py-1 px-2 text-sm'} focus:outline-none focus:ring-blue-500 
-                                                     focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
-                                        />
+                <div className={`${compact ? 'space-y-1' : 'space-y-3'}`}>
+                    {localSchema.type === 'object' && localSchema.fields && Object.entries(localSchema.fields).map(([fieldName, field]) => (
+                        <div key={fieldName} className="border border-gray-200 dark:border-gray-700 rounded-md p-3">
+                            <div className="flex justify-between items-center mb-2">
+                                {editingFieldName && editingFieldName.fieldName === fieldName ? (
+                                    <input
+                                        type="text"
+                                        value={editingFieldName.value}
+                                        onChange={(e) => handleFieldNameChange(fieldName, e.target.value)}
+                                        onBlur={handleFieldNameBlur}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleFieldNameBlur();
+                                            }
+                                        }}
+                                        className={`${compact ? 'text-xs' : 'text-sm'} border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
+                                        autoFocus
+                                    />
+                                ) : (
+                                    <div
+                                        className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-900 dark:text-gray-100 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400`}
+                                        onClick={() => handleFieldNameChange(fieldName, fieldName)}
+                                    >
+                                        {fieldName}
                                     </div>
-                                    <div>
-                                        <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-700 dark:text-gray-300`}>
-                                            Type
-                                        </label>
-                                        <select
-                                            value={field.type}
-                                            onChange={(e) => handleFieldChange(fieldName, 'type', e.target.value)}
-                                            className={`mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                                     shadow-sm ${compact ? 'py-0.5 px-1 text-xs' : 'py-1 px-2 text-sm'} focus:outline-none focus:ring-blue-500 
-                                                     focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
+                                )}
+
+                                {fieldToRemove === fieldName ? (
+                                    <div className="flex items-center space-x-2">
+                                        <span className={`${compact ? 'text-xs' : 'text-sm'} text-gray-500 dark:text-gray-400`}>
+                                            Confirm?
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveField}
+                                            className={`${compact ? 'text-xs' : 'text-sm'} text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300`}
                                         >
-                                            <option value="string">String</option>
-                                            <option value="number">Number</option>
-                                            <option value="boolean">Boolean</option>
-                                        </select>
+                                            Yes
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={cancelRemoveField}
+                                            className={`${compact ? 'text-xs' : 'text-sm'} text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300`}
+                                        >
+                                            No
+                                        </button>
                                     </div>
-                                    <div>
-                                        <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-700 dark:text-gray-300`}>
-                                            Description
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={field.description || ''}
-                                            onChange={(e) => handleFieldChange(fieldName, 'description', e.target.value)}
-                                            className={`mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
-                                                     shadow-sm ${compact ? 'py-0.5 px-1 text-xs' : 'py-1 px-2 text-sm'} focus:outline-none focus:ring-blue-500 
-                                                     focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
-                                            placeholder="Field description"
-                                        />
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveField(fieldName)}
-                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                                >
-                                    <svg className={`${compact ? 'h-4 w-4' : 'h-5 w-5'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => confirmRemoveField(fieldName)}
+                                        className={`${compact ? 'text-xs' : 'text-sm'} text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300`}
+                                    >
+                                        Remove
+                                    </button>
+                                )}
                             </div>
-                        ))}
-                    </div>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                <div className="flex-1">
+                                    <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-700 dark:text-gray-300 mb-1`}>
+                                        Type
+                                    </label>
+                                    <select
+                                        value={field.type}
+                                        onChange={(e) => handleFieldChange(fieldName, 'type', e.target.value)}
+                                        className={`w-full rounded-md border border-gray-300 dark:border-gray-600 
+                                                 shadow-sm ${compact ? 'py-0.5 px-1 text-xs' : 'py-1 px-2 text-sm'} focus:outline-none focus:ring-blue-500 
+                                                 focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
+                                    >
+                                        <option value="string">String</option>
+                                        <option value="number">Number</option>
+                                        <option value="boolean">Boolean</option>
+                                        <option value="object">Object</option>
+                                        <option value="file">File</option>
+                                    </select>
+                                </div>
+                                <div className="flex-1">
+                                    <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-700 dark:text-gray-300 mb-1`}>
+                                        Description
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={field.description || ''}
+                                        onChange={(e) => handleFieldChange(fieldName, 'description', e.target.value)}
+                                        className={`w-full rounded-md border border-gray-300 dark:border-gray-600 
+                                                 shadow-sm ${compact ? 'py-0.5 px-1 text-xs' : 'py-1 px-2 text-sm'} focus:outline-none focus:ring-blue-500 
+                                                 focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
+                                        placeholder="Field description"
+                                    />
+                                </div>
+                                <div>
+                                    <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-700 dark:text-gray-300 mb-1`}>
+                                        Is Array
+                                    </label>
+                                    <input
+                                        type="checkbox"
+                                        checked={field.is_array}
+                                        onChange={(e) => handleFieldChange(fieldName, 'is_array', e.target.checked)}
+                                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                    />
+                                </div>
+                            </div>
+
+                            {field.type === 'object' && field.fields && (
+                                <div className="mt-3 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                                    <SchemaEditor
+                                        schema={field}
+                                        onChange={(updatedField) => {
+                                            const updatedFields = { ...localSchema.fields };
+                                            updatedFields[fieldName] = updatedField;
+                                            updateSchema({
+                                                ...localSchema,
+                                                fields: updatedFields
+                                            });
+                                        }}
+                                        compact={true}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {localSchema.type === 'object' && (
+                        <div className="flex items-center mt-2">
+                            <input
+                                type="text"
+                                value={newFieldName}
+                                onChange={(e) => setNewFieldName(e.target.value)}
+                                placeholder="New field name"
+                                className={`flex-1 rounded-md border border-gray-300 dark:border-gray-600 
+                                         shadow-sm ${compact ? 'py-0.5 px-1 text-xs' : 'py-1 px-2 text-sm'} focus:outline-none focus:ring-blue-500 
+                                         focus:border-blue-500 dark:bg-gray-800 text-gray-900 dark:text-gray-100 mr-2`}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleAddField();
+                                    }
+                                }}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleAddField}
+                                className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} bg-blue-600 text-white rounded-md hover:bg-blue-700`}
+                            >
+                                Add Field
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
+
+            <div className="flex justify-end space-x-2 mt-4">
+                {onCancel && (
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} border border-gray-300 dark:border-gray-600 
+                                 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800`}
+                    >
+                        Cancel
+                    </button>
+                )}
+                <button
+                    type="button"
+                    onClick={handleDone}
+                    className={`${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} bg-blue-600 text-white rounded-md hover:bg-blue-700`}
+                >
+                    Done
+                </button>
+            </div>
         </div>
     );
 };

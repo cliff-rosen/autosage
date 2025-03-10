@@ -245,7 +245,7 @@ const Workflow: React.FC = () => {
             />
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Navigation */}
-                <div className={`border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col ${isCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 ease-in-out`}>
+                <div className={`border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col ${isCollapsed ? 'w-16' : 'w-80'} transition-all duration-300 ease-in-out`}>
                     {/* Header */}
                     <div className="border-b border-gray-200 dark:border-gray-700">
                         <div className="p-4 flex items-center justify-between">
