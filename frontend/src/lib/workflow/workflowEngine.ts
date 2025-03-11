@@ -368,6 +368,13 @@ export class WorkflowEngine {
         mapping: WorkflowVariableName | EnhancedOutputMapping,
         outputValue: any
     ): any {
+        // Add debugging
+        console.log('Applying output to variable:', {
+            variableName: variable.name,
+            variableSchema: variable.schema,
+            outputValue
+        });
+
         // Handle enhanced output mappings; first handle the case where the mapping is a simple variable name   
         if (typeof mapping !== 'object' || !('variable' in mapping) || !('operation' in mapping)) {
             // For simple mapping, convert the output value to match the variable type
@@ -449,6 +456,13 @@ export class WorkflowEngine {
         variable: WorkflowVariable,
         value: any
     ): any {
+        // Add debugging
+        console.log('Converting value to match variable type:', {
+            variableName: variable.name,
+            variableSchema: variable.schema,
+            value
+        });
+
         // If the value is already the correct type, return it as is
         if (variable.schema.is_array && Array.isArray(value)) {
             return value;

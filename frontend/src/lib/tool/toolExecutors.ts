@@ -59,7 +59,11 @@ export const executeSearch = async (_toolId: string, parameters: ResolvedParamet
     try {
         const searchResults = await searchApi.search(query);
 
+        // Log the raw search results for debugging
+        console.log('Raw search results:', searchResults);
+
         // Return the search results directly - the schema should be defined in the tool signature
+        // The schema expects an array of objects with specific fields
         return {
             ['results' as ToolOutputName]: searchResults as unknown as SchemaValueType
         };

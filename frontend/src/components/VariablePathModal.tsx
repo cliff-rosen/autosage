@@ -77,7 +77,7 @@ const VariablePathModal: React.FC<VariablePathModalProps> = ({
         if (!targetSchema) return true;
 
         // For primitive target schemas, check if the object has any compatible properties
-        if (['string', 'number', 'boolean'].includes(targetSchema.type)) {
+        if (targetSchema.type && ['string', 'number', 'boolean'].includes(targetSchema.type)) {
             return Object.values(schema.fields).some(
                 fieldSchema => fieldSchema.type === targetSchema.type
             );
@@ -88,7 +88,7 @@ const VariablePathModal: React.FC<VariablePathModalProps> = ({
             return isCompatibleType(targetSchema, schema);
         }
 
-        return true;
+        return false;
     };
 
     // Helper function to check if a path is currently selected
@@ -121,7 +121,7 @@ const VariablePathModal: React.FC<VariablePathModalProps> = ({
                     const hasCompatibleProps = isObject && hasCompatibleProperties(fieldSchema);
 
                     // Disable object fields that don't have compatible properties
-                    const isObjectDisabled = isObject && targetSchema &&
+                    const isObjectDisabled = isObject && targetSchema && targetSchema.type &&
                         ['string', 'number', 'boolean'].includes(targetSchema.type) &&
                         !hasCompatibleProps;
 

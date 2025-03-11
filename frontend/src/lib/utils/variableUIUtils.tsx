@@ -139,7 +139,12 @@ export const renderVariablePaths = (
 /**
  * Simple type compatibility check between schemas
  */
-export const isCompatibleType = (paramSchema: Schema, varSchema: Schema): boolean => {
+export const isCompatibleType = (paramSchema: Schema | null, varSchema: Schema | null): boolean => {
+    // Handle null schemas - if either is null, we can't determine compatibility
+    if (!paramSchema || !varSchema) {
+        return true; // Default to allowing compatibility when schema info is missing
+    }
+
     // Direct type match
     if (paramSchema.type === varSchema.type && paramSchema.is_array === varSchema.is_array) {
         return true;
@@ -159,9 +164,11 @@ export const isCompatibleType = (paramSchema: Schema, varSchema: Schema): boolea
         // We only allow mapping specific properties of the object to the string
         if (['string', 'number', 'boolean'].includes(paramSchema.type)) {
             // Check if any field in the object is compatible with the parameter
-            return Object.values(varSchema.fields).some(fieldSchema =>
-                isCompatibleType(paramSchema, fieldSchema)
-            );
+            return Object.values(varSchema.fields).some(fieldSchema => {
+                // Skip null fields
+                if (!fieldSchema) return false;
+                return isCompatibleType(paramSchema, fieldSchema);
+            });
         }
         return false;
     }
@@ -186,6 +193,8 @@ export const isCompatibleType = (paramSchema: Schema, varSchema: Schema): boolea
         return Object.entries(paramSchema.fields).every(([fieldName, fieldSchema]) => {
             const varFields = varSchema.fields || {};
             const varField = varFields[fieldName];
+            // Skip null fields or schemas
+            if (!fieldSchema || !varField) return false;
             return varField && isCompatibleType(fieldSchema, varField);
         });
     }
