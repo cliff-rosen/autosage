@@ -1,4 +1,4 @@
-import { ResolvedParameters, ToolOutputName, ToolOutputs } from '../../types/tools';
+import { ResolvedParameters, ToolOutputName, ToolOutputs, ToolParameterName } from '../../types/tools';
 import { SchemaValueType } from '../../types/schema';
 import { executeSearch, executePubMedSearch, executeLLM } from './toolExecutors';
 
@@ -53,7 +53,7 @@ export const TOOL_TYPES = [
         description: '',
         icon: '🛠️',
         tools: [
-            { tool_id: 'echo', name: 'Echo', description: 'Echo input to output' },
+            { tool_id: 'echo', name: 'Echo', description: 'Echo input to output with option to stringify objects' },
             { tool_id: 'concatenate', name: 'Cat', description: 'Concatenate inputs' }
         ]
     }
@@ -68,14 +68,25 @@ const registerAllTools = () => {
 
     // Utility tools
     registerToolExecutor('echo', async (toolId: string, parameters: ResolvedParameters) => {
-        const input = parameters['input'];
+        console.log('Executing echo tool with parameters:', parameters);
+        const input = parameters['input' as ToolParameterName];
+        const stringify = parameters['stringify' as ToolParameterName] as boolean || false;
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Properly handle objects by JSON serializing/deserializing
+        // Process the input based on the stringify parameter
         let processedInput;
         if (typeof input === 'object' && input !== null) {
-            // Serialize and deserialize to ensure clean object representation
-            processedInput = JSON.parse(JSON.stringify(input));
+            console.log('Input is an object:', input);
+            if (stringify && false) {
+                console.log('Stringifying object:', input); // TODO: remove
+                // Convert object to JSON string if stringify is true
+                processedInput = JSON.stringify(input);
+            } else {
+                console.log('Not stringifying object:', input);
+                // Just ensure clean object representation without stringifying
+                processedInput = JSON.parse(JSON.stringify(input));
+                console.log('Processed input:', processedInput); // TODO: remove
+            }
         } else {
             processedInput = input;
         }

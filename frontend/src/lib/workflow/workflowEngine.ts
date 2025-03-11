@@ -348,7 +348,7 @@ export class WorkflowEngine {
             const { value, validPath, errorMessage } = resolveVariablePath(allVariables, varNamePath.toString());
 
             parameters[paramName as ToolParameterName] = value || (null as unknown as SchemaValueType);
-            if (validPath && value !== undefined) {
+            if (validPath && value == undefined) {
                 console.warn(`Invalid or undefined variable path: ${varNamePath}`, errorMessage ? `Error: ${errorMessage}` : '');
             }
         }
@@ -632,6 +632,7 @@ export class WorkflowEngine {
 
             for (const [outputName, mapping] of Object.entries(step.output_mappings)) {
                 if (!(outputName in outputs)) {
+                    console.warn(`Output ${outputName} not found in outputs`);
                     continue;
                 }
 
@@ -643,13 +644,22 @@ export class WorkflowEngine {
                     : mapping as WorkflowVariableName;
 
                 // Find the variable in the state
+                console.log('Finding variable:', variableName); // TODO: remove
+                console.log('typeof mapping:', typeof mapping); // TODO: remove
+
                 const variableIndex = updatedState.findIndex(v => v.name === variableName);
                 if (variableIndex === -1) {
+                    console.warn(`Variable ${variableName} not found in state`);
                     continue;
                 }
 
                 // Apply the output value to the variable based on the mapping
                 const variable = updatedState[variableIndex];
+                console.log('Applying output to variable:', {
+                    variableName: variable.name,
+                    variableSchema: variable.schema,
+                    outputValue
+                });
                 variable.value = this.applyOutputToVariable(variable, mapping, outputValue);
             }
         }
@@ -1306,6 +1316,7 @@ export class WorkflowEngine {
                             toolResult,
                             workflowCopy
                         );
+                        console.log('Updated state:', updatedState); // TODO: remove
 
                         // Notify status: running with progress
                         if (statusCallback) {
@@ -1650,7 +1661,7 @@ export class WorkflowEngine {
                                 case 'UPDATE_OUTPUT_MAPPINGS':
                                     return {
                                         ...step,
-                                        output_mappings: action.payload.mappings as Record<ToolOutputName, WorkflowVariableName>
+                                        output_mappings: action.payload.mappings as Record<ToolOutputName, WorkflowVariableName | EnhancedOutputMapping>
                                     };
                                 case 'UPDATE_STEP_TOOL':
                                     return {

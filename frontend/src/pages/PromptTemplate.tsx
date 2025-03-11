@@ -252,7 +252,7 @@ const PromptTemplate: React.FC = () => {
     if (!templateId) return null;
 
     return (
-        <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
             <PromptMenuBar
                 name={name}
                 isSaving={saving}
@@ -262,9 +262,9 @@ const PromptTemplate: React.FC = () => {
                 onTest={handleTest}
                 onBack={handleBack}
             />
-            <div className="flex-1 overflow-auto">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-md shadow-sm">
+            <div className="flex-1">
+                <div className="h-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-4">
+                    <div className="h-full bg-white dark:bg-gray-800 rounded-md shadow-sm overflow-y-auto">
                         <div className="p-6">
                             {/* Basic Info */}
                             <div className="mb-8">

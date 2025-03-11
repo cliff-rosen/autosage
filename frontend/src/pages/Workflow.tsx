@@ -253,14 +253,14 @@ const Workflow: React.FC = () => {
     }
 
     return (
-        <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
             <WorkflowMenuBar
                 isEditMode={isEditMode}
                 onToggleEditMode={handleToggleEditMode}
             />
-            <div className="flex-1 overflow-auto">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
-                    <div className="flex w-full">
+            <div className="flex-1">
+                <div className="h-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-4">
+                    <div className="flex h-full w-full">
                         {/* Left Navigation */}
                         <div className={`border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 flex flex-col ${isCollapsed ? 'w-16' : 'w-80'} transition-all duration-300 ease-in-out rounded-tl-md rounded-bl-md`}>
                             {/* Header */}

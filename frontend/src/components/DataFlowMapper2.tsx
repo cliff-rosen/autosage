@@ -208,6 +208,14 @@ const DataFlowMapper2: React.FC<DataFlowMapper2Props> = ({
         onOutputMappingChange(newMappings);
     };
 
+    // This method uses the following state as input:
+    // - creatingForParameter
+    // - creatingForOutput
+    // - newVarName
+    // - newVarSchema
+    // It essentially creates a new var named newVarName with the schema newVarSchema
+    // and adds it to the workflowState
+    // It then updates the mapping for the parameter or output that is currently being created
     const handleCreateVariableSubmit = () => {
         const paramOrOutput = creatingForParameter
             ? tool.signature.parameters?.find(p => p.name === creatingForParameter)

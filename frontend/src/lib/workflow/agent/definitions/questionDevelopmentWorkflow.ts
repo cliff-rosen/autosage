@@ -247,7 +247,7 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
     const echoTool: Tool = {
         tool_id: 'echo',
         name: 'Echo',
-        description: 'Echoes the input to the output',
+        description: 'Echoes the input to the output with option to stringify objects',
         tool_type: 'utility',
         signature: {
             parameters: [
@@ -261,6 +261,17 @@ export const createQuestionDevelopmentWorkflow = (): AgentWorkflow => {
                         fields: {}
                     },
                     required: true
+                } as ToolParameter,
+                {
+                    name: 'stringify' as unknown as ToolParameterName,
+                    description: 'Whether to convert objects to JSON strings',
+                    schema: {
+                        type: 'boolean',
+                        description: 'If true, objects will be converted to JSON strings',
+                        is_array: false
+                    },
+                    required: false,
+                    default: false
                 } as ToolParameter
             ],
             outputs: [

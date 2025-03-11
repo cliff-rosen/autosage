@@ -189,8 +189,12 @@ class WorkflowStep(Base):
         if not isinstance(value, dict):
             return {}
             
-        # Ensure all values are strings
-        return {str(k): str(v) if v is not None else "" for k, v in value.items()}
+        # For parameter_mappings, ensure all values are strings
+        if key == 'parameter_mappings':
+            return {str(k): str(v) if v is not None else "" for k, v in value.items()}
+        
+        # For output_mappings, preserve objects for enhanced mappings
+        return {str(k): v for k, v in value.items()}
 
     @validates('evaluation_config')
     def validate_evaluation_config(self, key: str, value: Any) -> Dict:

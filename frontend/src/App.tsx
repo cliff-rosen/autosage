@@ -98,15 +98,16 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col dark:bg-gray-900 bg-gray-50">
+    <div className="min-h-screen flex flex-col dark:bg-gray-900 bg-gray-50" style={{ '--topbar-height': '64px' } as React.CSSProperties}>
       <TopBar />
-      <div className="flex-grow flex">
-        <div className="flex-grow">
+      {/* Main content area - exact height calculation to prevent scrollbar issues */}
+      <div className="flex" style={{ height: 'calc(100vh - var(--topbar-height))' }}>
+        <div className="w-full">
           <Routes>
             <Route path="/workflow/:workflowId" element={<Workflow />} />
             <Route path="/prompt/:templateId" element={<PromptTemplate />} />
             <Route path="*" element={
-              <div className="container mx-auto px-4 py-6">
+              <div className="container mx-auto px-4 py-6" style={{ height: 'calc(100% - 12px)', overflowY: 'auto' }}>
                 <Routes>
                   <Route path="/" element={<WorkflowsManager />} />
                   <Route path="/prompts" element={<PromptTemplateManager />} />

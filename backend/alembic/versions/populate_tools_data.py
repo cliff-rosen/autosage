@@ -88,7 +88,7 @@ def upgrade():
         {
             'tool_id': 'echo',
             'name': 'Echo Tool',
-            'description': 'Echoes back the input with a prefix',
+            'description': 'Echoes back the input with option to stringify objects',
             'tool_type': 'utility',
             'signature': {
                 'parameters': [
@@ -100,6 +100,17 @@ def upgrade():
                             'is_array': False,
                             'description': 'The input to echo'
                         }
+                    },
+                    {
+                        'name': 'stringify',
+                        'description': 'Whether to convert objects to JSON strings',
+                        'schema': {
+                            'type': 'boolean',
+                            'is_array': False,
+                            'description': 'If true, objects will be converted to JSON strings'
+                        },
+                        'required': False,
+                        'default': False
                     }
                 ],
                 'outputs': [
