@@ -9,10 +9,11 @@ import { WorkflowStep, WorkflowVariableName } from '../types/workflows';
 import { isFileValue } from '../types/schema';
 import Dialog from './common/Dialog';
 import FileLibrary from './FileLibrary';
-import PromptTemplateEditor from './PromptTemplateEditor';
 import VariableRenderer from './common/VariableRenderer';
 import JsonEditor from './common/JsonEditor';
 import { WorkflowEngine } from '../lib/workflow/workflowEngine';
+import { Link } from 'react-router-dom';
+import TemplateEditorDialog from './TemplateEditorDialog';
 
 interface ActionStepRunnerProps {
     actionStep: WorkflowStep;
@@ -334,6 +335,60 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
 
     return (
         <div className="space-y-6">
+            {/* Tool Info Section */}
+            <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    Tool
+                </h3>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {actionStep.tool.name}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                            {actionStep.tool.tool_type}
+                        </span>
+                    </div>
+                    {actionStep.tool.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                            {actionStep.tool.description}
+                        </p>
+                    )}
+
+                    {/* LLM Template Information */}
+                    {actionStep.tool.tool_type === 'llm' && currentTemplate && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center">
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">
+                                        Template:
+                                    </span>
+                                    <Link
+                                        to={`/prompt/${currentTemplate.template_id}`}
+                                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                    >
+                                        {currentTemplate.name}
+                                    </Link>
+                                </div>
+                                <button
+                                    onClick={handleEditTemplate}
+                                    className="px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 
+                                             dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 
+                                             dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-md transition-colors"
+                                >
+                                    Edit Template
+                                </button>
+                            </div>
+                            {currentTemplate.description && (
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    {currentTemplate.description}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Inputs Section */}
             <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -385,25 +440,6 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
                                 ) : (
                                     <div className="mt-2">
                                         {renderEditableValue(paramName, varName as string, valueObj)}
-                                    </div>
-                                )}
-
-                                {/* Special handling for LLM prompt templates */}
-                                {actionStep.tool?.tool_type === 'llm' && paramName === 'prompt' && currentTemplate && (
-                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                Using Template: {currentTemplate.name}
-                                            </span>
-                                            <button
-                                                onClick={handleEditTemplate}
-                                                className="px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 
-                                                         dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 
-                                                         dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-md transition-colors"
-                                            >
-                                                Edit Template
-                                            </button>
-                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -475,17 +511,12 @@ const ActionStepRunner: React.FC<ActionStepRunnerProps> = ({
             )}
 
             {/* Template Editor Dialog */}
-            {showTemplateEditor && currentTemplate && (
-                <Dialog
-                    title="Edit Prompt Template"
-                    onClose={() => setShowTemplateEditor(false)}
+            {currentTemplate && (
+                <TemplateEditorDialog
                     isOpen={showTemplateEditor}
-                >
-                    <PromptTemplateEditor
-                        template={currentTemplate}
-                        onClose={() => setShowTemplateEditor(false)}
-                    />
-                </Dialog>
+                    template={currentTemplate}
+                    onClose={() => setShowTemplateEditor(false)}
+                />
             )}
         </div>
     );

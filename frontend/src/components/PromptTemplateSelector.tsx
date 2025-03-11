@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { WorkflowStep } from '../types/workflows';
-import PromptTemplateEditor from './PromptTemplateEditor';
 import { usePromptTemplates } from '../context/PromptTemplateContext';
 import { toolApi } from '../lib/api/toolApi';
+import TemplateEditorDialog from './TemplateEditorDialog';
 
 interface PromptTemplateSelectorProps {
     step: WorkflowStep;
@@ -77,8 +77,9 @@ const PromptTemplateSelector: React.FC<PromptTemplateSelectorProps> = ({
             </div>
 
             {/* Template Editor */}
-            {isEditing && currentTemplate && (
-                <PromptTemplateEditor
+            {currentTemplate && (
+                <TemplateEditorDialog
+                    isOpen={isEditing}
                     template={currentTemplate}
                     onTemplateChange={onTemplateChange}
                     onClose={() => setIsEditing(false)}
@@ -86,13 +87,12 @@ const PromptTemplateSelector: React.FC<PromptTemplateSelectorProps> = ({
             )}
 
             {/* New Template Creator */}
-            {isCreating && (
-                <PromptTemplateEditor
-                    template={null}
-                    onTemplateChange={onTemplateChange}
-                    onClose={() => setIsCreating(false)}
-                />
-            )}
+            <TemplateEditorDialog
+                isOpen={isCreating}
+                template={null}
+                onTemplateChange={onTemplateChange}
+                onClose={() => setIsCreating(false)}
+            />
         </div>
     );
 };

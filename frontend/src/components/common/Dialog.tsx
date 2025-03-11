@@ -35,24 +35,24 @@ const Dialog: React.FC<DialogProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="flex items-center justify-center min-h-screen p-0">
                 <div className="fixed inset-0 transition-opacity cursor-pointer" aria-hidden="true" onClick={onClose}>
                     <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
                 </div>
 
                 <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-                <div className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left 
-                               overflow-hidden shadow-xl transform transition-all sm:my-4 sm:align-middle 
-                               ${maxWidthClass} sm:w-full`}
+                <div className={`inline-block align-middle bg-white dark:bg-gray-800 rounded-lg text-left 
+                               overflow-hidden shadow-xl transform transition-all my-8
+                               ${maxWidthClass} w-full`}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="modal-headline">
-                    <div className="px-3 pt-3 pb-2 sm:p-4 sm:pb-3">
+                    <div className="px-6 pt-6 pb-4 sm:p-6">
                         <div className="sm:flex sm:items-start">
-                            <div className="mt-2 text-center sm:mt-0 sm:text-left w-full">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="text-base leading-6 font-medium text-gray-900 dark:text-gray-100" id="modal-headline">
+                            <div className="w-full">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xl leading-6 font-medium text-gray-900 dark:text-gray-100" id="modal-headline">
                                         {title}
                                     </h3>
                                     <button
@@ -60,12 +60,12 @@ const Dialog: React.FC<DialogProps> = ({
                                         className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none"
                                         aria-label="Close dialog"
                                     >
-                                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                         </svg>
                                     </button>
                                 </div>
-                                <div className="mt-1">
+                                <div className="mt-2">
                                     {children}
                                 </div>
                             </div>

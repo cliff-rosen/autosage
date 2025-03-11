@@ -35,7 +35,6 @@ const PromptTemplateEditor: React.FC<PromptTemplateEditorProps> = ({
     const [testParameters, setTestParameters] = useState<Record<string, string>>({});
     const [testResult, setTestResult] = useState<string>('');
     const [error, setError] = useState<string>('');
-    const [isOpen, setIsOpen] = useState(true);
     const [showFileSelector, setShowFileSelector] = useState(false);
     const [selectedTokenName, setSelectedTokenName] = useState<string | null>(null);
     const [fileNames, setFileNames] = useState<Record<string, string>>({});
@@ -126,7 +125,6 @@ const PromptTemplateEditor: React.FC<PromptTemplateEditorProps> = ({
     }, [userMessageTemplate, updateTokens]);
 
     const handleClose = () => {
-        setIsOpen(false);
         onClose();
     };
 
@@ -252,22 +250,17 @@ IMPORTANT: Your response must be properly formatted JSON that follows this schem
     };
 
     return (
-        <Dialog
-            isOpen={isOpen}
-            title={template?.template_id ? 'Edit Template' : 'Create Template'}
-            onClose={handleClose}
-            maxWidth="4xl"
-        >
-            <div className="space-y-3 p-3 max-h-[80vh] overflow-y-auto">
+        <div className="space-y-6">
+            <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                     {/* Template Name */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Template Name</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Template Name</label>
                         <input
                             ref={nameInputRef}
                             type="text"
                             className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm 
-                                    focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1.5
+                                    focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2
                                     bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -277,11 +270,11 @@ IMPORTANT: Your response must be properly formatted JSON that follows this schem
 
                     {/* Template Description */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Description (Optional)</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description (Optional)</label>
                         <input
                             type="text"
                             className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm 
-                                    focus:border-indigo-500 focus:ring-indigo-500 text-xs py-1.5
+                                    focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2
                                     bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
@@ -543,7 +536,7 @@ IMPORTANT: Your response must be properly formatted JSON that follows this schem
                     </div>
                 </Dialog>
             )}
-        </Dialog>
+        </div>
     );
 };
 
