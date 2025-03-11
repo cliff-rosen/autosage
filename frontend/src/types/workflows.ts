@@ -151,6 +151,7 @@ export interface Workflow {
     // Combined state array containing both inputs and outputs
     state?: WorkflowVariable[];
     steps: WorkflowStep[];
+    nextStepIndex?: number; // The index of the next step to execute (may not be sequential if jumps occur)
 }
 
 // Default workflow with empty arrays

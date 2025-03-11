@@ -14,6 +14,7 @@ interface WorkflowNavigationProps {
     onExecute: () => void;
     onRestart: () => void;
     onInputSubmit: () => void;
+    nextStepIndex?: number;
 }
 
 const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
@@ -28,13 +29,19 @@ const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
     onNext,
     onExecute,
     onRestart,
-    onInputSubmit
+    onInputSubmit,
+    nextStepIndex
 }) => {
     // Only show navigation in run mode
     if (isEditMode) return null;
 
     const isLastStep = activeStep === totalSteps - 1;
 
+    // Determine if we're jumping to a non-sequential step
+    const isJumping = nextStepIndex !== undefined && nextStepIndex !== activeStep + 1;
+
+    // Button text for next/jump action
+    const nextButtonText = isJumping ? 'Jump' : 'Next Step';
 
     return (
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg">
@@ -125,7 +132,7 @@ const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
                         )}
 
                         {/* Next button */}
-                        {(stepExecuted) && !isLastStep && (
+                        {(stepExecuted) && (isJumping || !isLastStep) && (
                             <button
                                 onClick={onNext}
                                 disabled={isLoading}
@@ -138,7 +145,7 @@ const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
                                           focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500
                                           transition-colors`}
                             >
-                                <span>{'Next Step'}</span>
+                                <span>{nextButtonText}</span>
                                 <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
@@ -167,7 +174,7 @@ const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
                         )}
 
                         {/* Restart button - show when on last step or when workflow needs restart */}
-                        {(isLastStep && stepExecuted) && (
+                        {(isLastStep && stepExecuted && !isJumping) && (
                             <button
                                 onClick={onRestart}
                                 className="inline-flex items-center justify-center rounded-md

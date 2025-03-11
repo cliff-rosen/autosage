@@ -394,7 +394,7 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
 
             // Execute step using WorkflowEngine.executeStepSimple instead of executeStep
-            const { updatedState, result } = await WorkflowEngine.executeStepSimple(workflow, stepIndex);
+            const { updatedState, result, nextStepIndex } = await WorkflowEngine.executeStepSimple(workflow, stepIndex);
             console.log('executeCurrentStep result:', result);
 
             // Update the workflow state manually
@@ -404,7 +404,8 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     payload: {
                         workflowUpdates: {
                             state: updatedState,
-                            steps: workflow.steps
+                            steps: workflow.steps,
+                            nextStepIndex: nextStepIndex // Store the next step index
                         }
                     }
                 });
@@ -443,28 +444,30 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } finally {
             setIsExecuting(false);
         }
-    }, [workflow, activeStep, updateWorkflowByAction, setStepExecuted, setError, setIsExecuting]);
+    }, [workflow, activeStep, updateWorkflowByAction, setStepExecuted, setError, setIsExecuting, clearClearStepOutputs]);
 
     const moveToNextStep = useCallback(() => {
         if (!workflow) return;
 
-        // Get the next step index and updated state
-        const { nextStepIndex, updatedState } = WorkflowEngine.getNextStepIndex(workflow, activeStep);
-        console.log('moveToNextStep', nextStepIndex, updatedState);
-
-        // Update the workflow state if it has changed
-        if (updatedState !== workflow.state) {
-            updateWorkflowByAction({
-                type: 'UPDATE_STATE',
-                payload: {
-                    state: updatedState
-                }
-            });
+        // Use the stored nextStepIndex if available, otherwise just go to the next sequential step
+        if (workflow.nextStepIndex !== undefined) {
+            setActiveStep(workflow.nextStepIndex);
+        } else {
+            setActiveStep(prevStep => prevStep + 1);
         }
 
-        setActiveStep(nextStepIndex);
+        // Clear the nextStepIndex after using it
+        updateWorkflowByAction({
+            type: 'UPDATE_WORKFLOW',
+            payload: {
+                workflowUpdates: {
+                    nextStepIndex: undefined
+                }
+            }
+        });
+
         setStepExecuted(false);
-    }, [workflow, activeStep, updateWorkflowByAction]);
+    }, [workflow, updateWorkflowByAction]);
 
     const moveToPreviousStep = useCallback(() => {
         setActiveStep(Math.max(0, activeStep - 1));

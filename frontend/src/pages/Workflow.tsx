@@ -376,6 +376,7 @@ const Workflow: React.FC = () => {
                                                     onExecute={handleExecute}
                                                     onRestart={handleNewQuestion}
                                                     onInputSubmit={handleInputSubmit}
+                                                    nextStepIndex={workflow?.nextStepIndex}
                                                 />
                                             )}
                                         </>
