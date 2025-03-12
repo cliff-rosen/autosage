@@ -1,5 +1,5 @@
 import React from 'react';
-import { WorkflowStep, WorkflowVariableName, EvaluationOperator } from '../types/workflows';
+import { WorkflowStep, WorkflowVariableName } from '../types/workflows';
 import { useWorkflows } from '../context/WorkflowContext';
 import VariablePathSelector from './VariablePathSelector';
 

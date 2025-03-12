@@ -2,12 +2,10 @@ import {
     WorkflowStep,
     WorkflowVariable,
     WorkflowVariableName,
-    EvaluationOperator,
     StepExecutionResult,
     WorkflowStepType,
     Workflow,
     WorkflowStepId,
-    EvaluationResult,
     EnhancedOutputMapping,
     VariableOperationType,
     WorkflowStatus

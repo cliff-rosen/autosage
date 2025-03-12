@@ -3,17 +3,13 @@ import {
     WorkflowVariable,
     WorkflowVariableName,
     StepExecutionResult,
-    Workflow,
-    EvaluationCondition
+    Workflow
 } from '../../types/workflows';
+import {
+    EvaluationCondition,
+    EvaluationConditionResult
+} from '../../types/evaluation';
 import { resolveVariablePath } from '../utils/variablePathUtils';
-
-// Define the missing interface
-interface EvaluationConditionResult {
-    condition: EvaluationCondition;
-    result: boolean;
-    value: any;
-}
 
 export class EvaluationEngine {
     /**
@@ -101,7 +97,7 @@ export class EvaluationEngine {
      * Evaluates conditions with provided inputs instead of resolving from workflow state
      * This is a more focused version of evaluateConditions that works with pre-extracted inputs
      */
-    static executeEvaluationStep(
+    static async executeEvaluationStep(
         step: WorkflowStep,
         currentStepIndex: number,
         state: WorkflowVariable[],
@@ -207,7 +203,6 @@ export class EvaluationEngine {
             nextStepIndex
         };
     }
-
 
     /**
      * Manages jump count for an evaluation step
