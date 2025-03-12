@@ -106,6 +106,7 @@ const Workflow: React.FC = () => {
     }, [executeCurrentStep, setStepRequestsInput]);
 
     const handleInputCancel = useCallback(() => {
+        setStepRequestsInput(false);
         setShowInputModal(false);
     }, []);
 
@@ -319,7 +320,7 @@ const Workflow: React.FC = () => {
                                         <>
                                             {/* Step Detail */}
                                             <div>
-                                                {stepRequestsInput ? (
+                                                {stepRequestsInput && !isEditMode ? (
                                                     <InputStepRunner
                                                         isOpen={showInputModal}
                                                         onClose={handleInputCancel}
