@@ -29,8 +29,9 @@ export class EvaluationEngine {
 
         const allVariables = state || [];
         const conditionResults: EvaluationConditionResult[] = [];
+        let foundMatchingCondition = false;
 
-        // Evaluate each condition
+        // Evaluate each condition until we find one that's met
         for (const condition of step.evaluation_config.conditions) {
             if (!condition.variable) continue;
 
@@ -77,18 +78,23 @@ export class EvaluationEngine {
                 result = false;
             }
 
+            // Add this condition to the results
             conditionResults.push({
                 condition,
                 result,
                 value
             });
+
+            // If this condition is met, we can stop checking others
+            if (result) {
+                foundMatchingCondition = true;
+                console.log(`Found matching condition: ${condition.variable} ${condition.operator} ${condition.value}`);
+                break;
+            }
         }
 
-        // Combine results based on the logical operator (default to AND)
-        const finalResult = conditionResults.every(cr => cr.result);
-
         return {
-            result: finalResult,
+            result: foundMatchingCondition,
             conditions: conditionResults
         };
     }
@@ -134,9 +140,11 @@ export class EvaluationEngine {
         let jumpCount = 0;
         let maxJumpsReached = false;
 
-        // Find the first condition that was met
+        // Get the first condition that was met (if any)
+        // Since we're stopping at the first matching condition in evaluateConditions,
+        // it will be the last one in the results array if any condition was met
         const metCondition = evaluationResult.result
-            ? evaluationResult.conditions.find(c => c.result)
+            ? evaluationResult.conditions[evaluationResult.conditions.length - 1]
             : null;
 
         // If a condition was met and it has a target step, prepare for jump
@@ -313,21 +321,18 @@ export class EvaluationEngine {
     ): number {
         let nextStepIndex = currentStepIndex + 1;
 
-        // If the evaluation passed and there's a condition with a target step index
+        // If a condition was met, it will be the last one in the results array
         if (evaluationResult.result) {
-            // Find the first condition with a target step that was met
-            const targetCondition = evaluationResult.conditions.find(c =>
-                c.result && c.condition.target_step_index !== undefined
-            );
+            const metCondition = evaluationResult.conditions[evaluationResult.conditions.length - 1];
 
-            if (targetCondition && targetCondition.condition.target_step_index !== undefined) {
-                nextStepIndex = targetCondition.condition.target_step_index;
+            if (metCondition.condition.target_step_index !== undefined) {
+                nextStepIndex = metCondition.condition.target_step_index;
                 console.log('Jump will occur to step:', nextStepIndex);
             } else {
-                console.log('Continuing to next step:', nextStepIndex);
+                console.log('Condition met but no jump target specified, continuing to next step:', nextStepIndex);
             }
         } else {
-            console.log('Evaluation failed, continuing to next step:', nextStepIndex);
+            console.log('No condition met, continuing to next step:', nextStepIndex);
         }
 
         return nextStepIndex;
