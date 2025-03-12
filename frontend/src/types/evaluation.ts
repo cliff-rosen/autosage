@@ -50,7 +50,6 @@ export interface EvaluationResult extends Omit<StepExecutionResult, 'outputs'> {
     nextAction: 'continue' | 'jump' | 'end';
     targetStepIndex?: number;  // Only required when nextAction is 'jump'
     reason?: string;  // Optional explanation for the decision
-    updatedState?: WorkflowVariable[];  // Optional updated workflow state
     outputs?: EvaluationOutputs;  // Typed outputs for evaluation steps
 }
 

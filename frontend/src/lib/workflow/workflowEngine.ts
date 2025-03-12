@@ -579,7 +579,7 @@ export class WorkflowEngine {
                 throw new Error('Evaluation step is missing configuration');
             }
 
-            // 1 Prepare inputs for evaluation
+            // 1. Prepare inputs for evaluation
             const evalInputs = this.prepareInputsForEval(workflow);
 
             // Notify status: running with progress
@@ -601,13 +601,11 @@ export class WorkflowEngine {
                 statusCallback
             );
 
-            // Apply: Update workflow state with evaluation results using our own method
-            // This is redundant since EvaluationEngine already calls getUpdatedWorkflowStateFromResults,
-            // but we'll keep it for consistency with the pattern
+            // 3. Apply: Update workflow state with evaluation results using our own method
             const outputs = evaluationResult.result.outputs || {};
             const updatedState = this.applyOutputsFromEval(step, outputs, workflow);
 
-            // Determine next step index based on the evaluation result
+            // Get the next step index from the evaluation result
             let nextStepIndex = evaluationResult.nextStepIndex;
 
             return {

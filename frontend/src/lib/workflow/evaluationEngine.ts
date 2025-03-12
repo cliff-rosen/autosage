@@ -111,7 +111,6 @@ export class EvaluationEngine {
         }) => void
     ): Promise<{
         result: StepExecutionResult,
-        updatedState: WorkflowVariable[],
         nextStepIndex: number
     }> {
         // Notify status: running with progress
@@ -199,7 +198,6 @@ export class EvaluationEngine {
                 success: true,
                 outputs
             },
-            updatedState: state,
             nextStepIndex
         };
     }
