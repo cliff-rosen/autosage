@@ -6,14 +6,177 @@ import {
     StepExecutionResult,
     WorkflowStepType,
     Workflow,
-    EvaluationResult
+    EvaluationResult,
+    EvaluationCondition
 } from '../../types/workflows';
 import { SchemaValueType } from '../../types/schema';
 import { resolveVariablePath } from '../utils/variablePathUtils';
 
+// Define the missing interface
+interface EvaluationConditionResult {
+    condition: EvaluationCondition;
+    result: boolean;
+    value: any;
+}
+
 export class EvaluationEngine {
     /**
+     * Evaluates conditions with provided inputs instead of resolving from workflow state
+     * This is a more focused version of evaluateConditions that works with pre-extracted inputs
+     */
+    static evaluateConditionsWithInputs(
+        conditions: EvaluationCondition[],
+        inputs: Record<string, any>,
+        logicalOperator: 'AND' | 'OR' = 'AND'
+    ): {
+        result: boolean;
+        conditions: EvaluationConditionResult[];
+    } {
+        if (!conditions || conditions.length === 0) {
+            return { result: true, conditions: [] };
+        }
+
+        const conditionResults: EvaluationConditionResult[] = conditions.map(condition => {
+            const variableName = condition.variable?.toString() || '';
+            const value = inputs[variableName];
+
+            let result = false;
+
+            // Evaluate the condition based on the operator
+            switch (condition.operator) {
+                case 'equals':
+                    result = value === condition.value;
+                    break;
+                case 'not_equals':
+                    result = value !== condition.value;
+                    break;
+                case 'greater_than':
+                    result = typeof value === 'number' && typeof condition.value === 'number' && value > condition.value;
+                    break;
+                case 'less_than':
+                    result = typeof value === 'number' && typeof condition.value === 'number' && value < condition.value;
+                    break;
+                case 'contains':
+                    if (typeof value === 'string' && typeof condition.value === 'string') {
+                        result = value.includes(condition.value);
+                    } else if (Array.isArray(value)) {
+                        result = value.includes(condition.value);
+                    }
+                    break;
+                case 'not_contains':
+                    if (typeof value === 'string' && typeof condition.value === 'string') {
+                        result = !value.includes(condition.value);
+                    } else if (Array.isArray(value)) {
+                        result = !value.includes(condition.value);
+                    }
+                    break;
+                default:
+                    console.warn(`Unknown operator: ${condition.operator}`);
+                    result = false;
+            }
+
+            return {
+                condition,
+                result,
+                value
+            };
+        });
+
+        // Combine results based on the operator
+        const finalResult = logicalOperator === 'AND'
+            ? conditionResults.every(cr => cr.result)
+            : conditionResults.some(cr => cr.result);
+
+        return {
+            result: finalResult,
+            conditions: conditionResults
+        };
+    }
+
+    /**
+     * Evaluates conditions for a workflow step
+     * This returns a simple object with result and conditions, not the EvaluationResult type
+     */
+    static evaluateConditions(
+        step: WorkflowStep,
+        workflow: Workflow
+    ): {
+        result: boolean;
+        conditions: EvaluationConditionResult[];
+    } {
+        if (!step.evaluation_config || !step.evaluation_config.conditions) {
+            return { result: true, conditions: [] };
+        }
+
+        const allVariables = workflow.state || [];
+        const conditionResults: EvaluationConditionResult[] = [];
+
+        // Evaluate each condition
+        for (const condition of step.evaluation_config.conditions) {
+            if (!condition.variable) continue;
+
+            // Resolve the variable value
+            const { value, validPath } = resolveVariablePath(allVariables, condition.variable.toString());
+
+            let result = false;
+
+            if (validPath) {
+                // Evaluate the condition based on the operator
+                switch (condition.operator) {
+                    case 'equals':
+                        result = value === condition.value;
+                        break;
+                    case 'not_equals':
+                        result = value !== condition.value;
+                        break;
+                    case 'greater_than':
+                        result = typeof value === 'number' && typeof condition.value === 'number' && value > condition.value;
+                        break;
+                    case 'less_than':
+                        result = typeof value === 'number' && typeof condition.value === 'number' && value < condition.value;
+                        break;
+                    case 'contains':
+                        if (typeof value === 'string' && typeof condition.value === 'string') {
+                            result = value.includes(condition.value);
+                        } else if (Array.isArray(value)) {
+                            result = value.includes(condition.value);
+                        }
+                        break;
+                    case 'not_contains':
+                        if (typeof value === 'string' && typeof condition.value === 'string') {
+                            result = !value.includes(condition.value);
+                        } else if (Array.isArray(value)) {
+                            result = !value.includes(condition.value);
+                        }
+                        break;
+                    default:
+                        console.warn(`Unknown operator: ${condition.operator}`);
+                        result = false;
+                }
+            } else {
+                console.warn(`Invalid variable path: ${condition.variable}`);
+                result = false;
+            }
+
+            conditionResults.push({
+                condition,
+                result,
+                value
+            });
+        }
+
+        // Combine results based on the logical operator (default to AND)
+        const finalResult = conditionResults.every(cr => cr.result);
+
+        return {
+            result: finalResult,
+            conditions: conditionResults
+        };
+    }
+
+    /**
      * Executes an evaluation step and handles all the evaluation logic
+     * This is a simplified version that works with the current implementation
      */
     static async executeEvaluationStep(
         step: WorkflowStep,
@@ -38,7 +201,6 @@ export class EvaluationEngine {
         nextStepIndex: number
     }> {
         console.log(`⚖️ [STEP ${step.step_id}] Evaluating conditions`);
-        let nextStepIndex = currentStepIndex + 1;
 
         // Notify status: running with progress
         if (statusCallback) {
@@ -52,294 +214,90 @@ export class EvaluationEngine {
         }
 
         // Evaluate conditions
-        const result = this.evaluateConditions(step, workflow);
+        const evaluationResult = this.evaluateConditions(step, workflow);
+
+        // Default values
+        let nextStepIndex = currentStepIndex + 1;
+        let nextAction = 'continue';
+        let targetStepIndex = -1;
+        let jumpCount = 0;
+        let maxJumpsReached = false;
+
+        // Find the first condition that was met
+        const metCondition = evaluationResult.result
+            ? evaluationResult.conditions.find(c => c.result)
+            : null;
+
+        // If a condition was met and it has a target step, prepare for jump
+        if (metCondition && metCondition.condition.target_step_index !== undefined) {
+            // Check jump counter to prevent infinite loops
+            const jumpCounterName = `jump_count_${step.step_id}`;
+            const jumpCountVar = workflow.state?.find(v => v.name === jumpCounterName);
+
+            if (jumpCountVar?.value !== undefined) {
+                jumpCount = Number(jumpCountVar.value);
+            }
+
+            const maxJumps = step.evaluation_config?.maximum_jumps || 3;
+            maxJumpsReached = jumpCount >= maxJumps;
+
+            if (!maxJumpsReached) {
+                nextAction = 'jump';
+                targetStepIndex = metCondition.condition.target_step_index;
+                nextStepIndex = targetStepIndex;
+                jumpCount++; // Increment for the output
+            } else {
+                console.warn(`Maximum jumps (${maxJumps}) reached for step ${step.step_id}, continuing to next step`);
+            }
+        }
+
+        // Create evaluation outputs in the original format
+        const outputs: Record<string, any> = {
+            condition_met: metCondition ? metCondition.condition.variable : 'none',
+            variable_name: metCondition ? metCondition.condition.variable.toString() : '',
+            variable_value: metCondition ? JSON.stringify(metCondition.value) : '',
+            operator: metCondition ? metCondition.condition.operator : '',
+            comparison_value: metCondition ? JSON.stringify(metCondition.condition.value) : '',
+            next_action: nextAction,
+            target_step_index: targetStepIndex !== -1 ? targetStepIndex.toString() : '',
+            reason: metCondition
+                ? `Condition met: ${metCondition.condition.variable} ${metCondition.condition.operator} ${metCondition.condition.value}`
+                : 'No conditions met',
+            jump_count: jumpCount.toString(),
+            max_jumps: (step.evaluation_config?.maximum_jumps || 3).toString(),
+            max_jumps_reached: maxJumpsReached ? 'true' : 'false'
+        };
 
         // Update workflow state with evaluation results
-        let updatedState = workflow.state || [];
-        if (result.success && result.outputs) {
-            console.log(`✅ [STEP ${step.step_id}] Evaluation successful, updating state`);
-            updatedState = getUpdatedWorkflowStateFromResults(
-                step,
-                result.outputs,
-                workflow
-            );
+        const updatedState = getUpdatedWorkflowStateFromResults(
+            step,
+            outputs,
+            workflow
+        );
 
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Evaluation successful, updating state`,
-                    progress: 70,
-                    result: { success: true }
-                });
-            }
-        } else {
-            console.error(`❌ [STEP ${step.step_id}] Evaluation failed:`, result.error);
-
-            // Notify status: failed
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'failed',
-                    message: `Evaluation failed: ${result.error}`,
-                    result: { success: false, error: result.error }
-                });
-            }
+        // Notify status: completed
+        if (statusCallback) {
+            statusCallback({
+                stepId: step.step_id,
+                stepIndex: currentStepIndex,
+                status: 'completed',
+                message: `Evaluation ${evaluationResult.result ? 'passed' : 'failed'}, ${nextAction}`,
+                progress: 100,
+                result: {
+                    success: true,
+                    outputs
+                }
+            });
         }
-
-        // Handle jump logic
-        if (result.outputs &&
-            result.outputs['next_action' as WorkflowVariableName] === 'jump' &&
-            result.outputs['target_step_index' as WorkflowVariableName] !== undefined) {
-
-            const targetStepIndex = Number(result.outputs['target_step_index' as WorkflowVariableName]);
-            const jumpReason = result.outputs['reason' as WorkflowVariableName] as string;
-
-            console.log(`↪️ [STEP ${step.step_id}] Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`,
-                    progress: 80
-                });
-            }
-
-            // Manage jump count
-            const jumpResult = this.manageJumpCount(
-                step,
-                updatedState,
-                currentStepIndex,
-                targetStepIndex,
-                jumpReason
-            );
-
-            // Update state and determine next step
-            updatedState = jumpResult.updatedState;
-
-            // Update result outputs with jump info
-            result.outputs = {
-                ...result.outputs,
-                ['next_action' as WorkflowVariableName]: (jumpResult.canJump ? 'jump' : 'continue') as SchemaValueType,
-                ['max_jumps_reached' as WorkflowVariableName]: (!jumpResult.canJump).toString() as SchemaValueType,
-                ['_jump_info' as WorkflowVariableName]: JSON.stringify(jumpResult.jumpInfo) as SchemaValueType
-            };
-
-            console.log(`${jumpResult.canJump ? '↪️' : '⛔'} [STEP ${step.step_id}] Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}`,
-                    progress: 90
-                });
-            }
-        } else if (result.outputs && result.outputs['next_action' as WorkflowVariableName] === 'end') {
-            console.log(`🏁 [STEP ${step.step_id}] End workflow condition met`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `End workflow condition met`,
-                    progress: 90
-                });
-            }
-        } else {
-            console.log(`➡️ [STEP ${step.step_id}] Continuing to next step`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Continuing to next step`,
-                    progress: 90
-                });
-            }
-        }
-
-        // Use determineNextStep to get the next step index
-        nextStepIndex = this.determineNextStep(result, currentStepIndex, workflow.steps.length);
 
         return {
-            result,
+            result: {
+                success: true,
+                outputs
+            },
             updatedState,
             nextStepIndex
         };
-    }
-
-    /**
-     * Evaluates conditions for a workflow step and returns the execution result
-     */
-    static evaluateConditions(
-        step: WorkflowStep,
-        workflow: Workflow
-    ): StepExecutionResult {
-        if (!step.evaluation_config) {
-            return {
-                success: true,
-                outputs: {
-                    ['condition_met' as WorkflowVariableName]: 'none' as SchemaValueType,
-                    ['next_action' as WorkflowVariableName]: 'continue' as SchemaValueType,
-                    ['reason' as WorkflowVariableName]: 'No evaluation configuration' as SchemaValueType
-                }
-            };
-        }
-
-        const { conditions, default_action } = step.evaluation_config;
-        const allVariables = workflow.state || [];
-
-        // If no conditions, use default action
-        if (!conditions || conditions.length === 0) {
-            return {
-                success: true,
-                outputs: {
-                    ['condition_met' as WorkflowVariableName]: 'none' as SchemaValueType,
-                    ['next_action' as WorkflowVariableName]: default_action as SchemaValueType,
-                    ['reason' as WorkflowVariableName]: 'No conditions defined' as SchemaValueType
-                }
-            };
-        }
-
-        // Evaluate each condition
-        for (const condition of conditions) {
-            // Get the variable value using the variable path
-            const { value, validPath } = resolveVariablePath(allVariables, condition.variable.toString());
-
-            // Skip if variable not found or path is invalid
-            if (!validPath || value === undefined) {
-                console.warn(`Variable ${condition.variable} not found or has no value`);
-                continue;
-            }
-
-            // Evaluate the condition
-            const conditionMet = this.evaluateCondition(
-                condition.operator,
-                value,
-                condition.value
-            );
-
-            if (conditionMet) {
-                // Determine next action
-                const nextAction = condition.target_step_index !== undefined ? 'jump' : 'continue';
-                const targetStepIndex = condition.target_step_index;
-
-                return {
-                    success: true,
-                    outputs: {
-                        ['condition_met' as WorkflowVariableName]: condition.condition_id as SchemaValueType,
-                        ['variable_name' as WorkflowVariableName]: condition.variable.toString() as SchemaValueType,
-                        ['variable_value' as WorkflowVariableName]: JSON.stringify(value) as SchemaValueType,
-                        ['operator' as WorkflowVariableName]: condition.operator as SchemaValueType,
-                        ['comparison_value' as WorkflowVariableName]: JSON.stringify(condition.value) as SchemaValueType,
-                        ['next_action' as WorkflowVariableName]: nextAction as SchemaValueType,
-                        ['target_step_index' as WorkflowVariableName]: targetStepIndex?.toString() as SchemaValueType,
-                        ['reason' as WorkflowVariableName]: `Condition met: ${condition.variable} ${condition.operator} ${condition.value}` as SchemaValueType
-                    }
-                };
-            }
-        }
-
-        // No conditions met, use default action
-        return {
-            success: true,
-            outputs: {
-                ['condition_met' as WorkflowVariableName]: 'none' as SchemaValueType,
-                ['next_action' as WorkflowVariableName]: default_action as SchemaValueType,
-                ['reason' as WorkflowVariableName]: 'No conditions met' as SchemaValueType
-            }
-        };
-    }
-
-    /**
-     * Evaluates a single condition with proper type handling
-     */
-    private static evaluateCondition(
-        operator: EvaluationOperator,
-        value: SchemaValueType,
-        compareValue: SchemaValueType
-    ): boolean {
-        // Handle null/undefined values
-        if (value === null || value === undefined || compareValue === null || compareValue === undefined) {
-            return false;
-        }
-
-        try {
-            switch (operator) {
-                case 'equals':
-                    // Handle boolean comparisons
-                    if (typeof value === 'boolean' || typeof compareValue === 'boolean') {
-                        // Convert string representations of booleans to actual booleans
-                        const boolValue = typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')
-                            ? value.toLowerCase() === 'true'
-                            : value;
-
-                        const boolCompare = typeof compareValue === 'string' && (compareValue.toLowerCase() === 'true' || compareValue.toLowerCase() === 'false')
-                            ? compareValue.toLowerCase() === 'true'
-                            : compareValue;
-
-                        return boolValue === boolCompare;
-                    }
-
-                    // Handle numeric comparisons
-                    if (typeof value === 'number' && typeof compareValue === 'string') {
-                        return value === Number(compareValue);
-                    }
-                    if (typeof value === 'string' && typeof compareValue === 'number') {
-                        return Number(value) === compareValue;
-                    }
-
-                    return value === compareValue;
-
-                case 'not_equals':
-                    // Reuse equals logic
-                    return !this.evaluateCondition('equals', value, compareValue);
-
-                case 'greater_than':
-                    // Ensure numeric comparison
-                    const numValue = typeof value === 'string' ? Number(value) : value;
-                    const numCompare = typeof compareValue === 'string' ? Number(compareValue) : compareValue;
-                    if (typeof numValue !== 'number' || typeof numCompare !== 'number' || isNaN(numValue) || isNaN(numCompare)) {
-                        return false;
-                    }
-                    return numValue > numCompare;
-
-                case 'less_than':
-                    // Reuse greater_than logic
-                    return this.evaluateCondition('greater_than', compareValue, value);
-
-                case 'contains':
-                    // Only allow string contains operations
-                    if (typeof value !== 'string' || typeof compareValue !== 'string') {
-                        return false;
-                    }
-                    return value.includes(compareValue);
-
-                case 'not_contains':
-                    // Reuse contains logic
-                    return !this.evaluateCondition('contains', value, compareValue);
-
-                default:
-                    console.warn(`Unknown operator: ${operator}`);
-                    return false;
-            }
-        } catch (error) {
-            console.error('Error in condition evaluation:', error);
-            return false;
-        }
     }
 
     /**
@@ -349,7 +307,7 @@ export class EvaluationEngine {
         step: WorkflowStep,
         currentState: WorkflowVariable[],
         fromStepIndex: number,
-        toStepIndex: number,
+        toStepIndex: number | undefined,
         reason?: string
     ): {
         jumpCount: number,
@@ -357,6 +315,9 @@ export class EvaluationEngine {
         updatedState: WorkflowVariable[],
         jumpInfo: any
     } {
+        // Default to next step if toStepIndex is undefined
+        const targetStepIndex = toStepIndex !== undefined ? toStepIndex : fromStepIndex + 1;
+
         const shortStepId = step.step_id.slice(0, 8);
         const jumpCounterName = `jump_count_${shortStepId}` as WorkflowVariableName;
         let jumpCount = 0;
@@ -381,7 +342,7 @@ export class EvaluationEngine {
             maxJumps,
             canJump,
             fromStep: fromStepIndex,
-            toStep: toStepIndex,
+            toStep: targetStepIndex,
             stateVarCount: currentState.length,
             allJumpCounters: currentState.filter(v => v.name.startsWith('jump_count_')).map(v => `${v.name}=${v.value}`)
         });
@@ -416,7 +377,7 @@ export class EvaluationEngine {
         const jumpInfo = {
             is_jump: canJump,
             from_step: fromStepIndex,
-            to_step: canJump ? toStepIndex : fromStepIndex + 1,
+            to_step: canJump ? targetStepIndex : fromStepIndex + 1,
             reason: canJump
                 ? (reason || 'Jump condition met')
                 : `Maximum jumps (${maxJumps}) reached. Continuing to next step.`
@@ -441,25 +402,30 @@ export class EvaluationEngine {
      * Determines the next step to execute based on evaluation results
      */
     static determineNextStep(
-        result: StepExecutionResult,
+        evaluationResult: {
+            result: boolean;
+            conditions: EvaluationConditionResult[];
+        },
         currentStepIndex: number,
         totalSteps: number
     ): number {
         let nextStepIndex = currentStepIndex + 1;
 
-        // Determine next step based on evaluation result
-        const nextAction = result.outputs?.['next_action' as WorkflowVariableName] as string;
-        const targetStepIndex = result.outputs?.['target_step_index' as WorkflowVariableName] as string | undefined;
-        const maxJumpsReached = result.outputs?.['max_jumps_reached' as WorkflowVariableName] === 'true';
+        // If the evaluation passed and there's a condition with a target step index
+        if (evaluationResult.result) {
+            // Find the first condition with a target step that was met
+            const targetCondition = evaluationResult.conditions.find(c =>
+                c.result && c.condition.target_step_index !== undefined
+            );
 
-        if (nextAction === 'jump' && targetStepIndex !== undefined && !maxJumpsReached) {
-            nextStepIndex = parseInt(targetStepIndex, 10);
-            console.log('Jump will occur to step:', nextStepIndex);
-        } else if (nextAction === 'end') {
-            nextStepIndex = totalSteps; // End workflow
-            console.log('Workflow will end due to evaluation result');
+            if (targetCondition && targetCondition.condition.target_step_index !== undefined) {
+                nextStepIndex = targetCondition.condition.target_step_index;
+                console.log('Jump will occur to step:', nextStepIndex);
+            } else {
+                console.log('Continuing to next step:', nextStepIndex);
+            }
         } else {
-            console.log('Continuing to next step:', nextStepIndex);
+            console.log('Evaluation failed, continuing to next step:', nextStepIndex);
         }
 
         return nextStepIndex;

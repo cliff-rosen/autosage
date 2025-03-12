@@ -229,30 +229,6 @@ export class WorkflowEngine {
         return result;
     }
 
-    /**
-     * Resolves parameter mappings for a workflow step
-     */
-    private static getResolvedParameters(
-        step: WorkflowStep,
-        workflow: Workflow
-    ): Record<ToolParameterName, SchemaValueType> {
-        const parameters: Record<ToolParameterName, SchemaValueType> = {};
-
-        if (!step.parameter_mappings) return parameters;
-
-        const allVariables = workflow.state || [];
-        for (const [paramName, varNamePath] of Object.entries(step.parameter_mappings)) {
-            // Use the utility library to resolve variable paths
-            const { value, validPath, errorMessage } = resolveVariablePath(allVariables, varNamePath.toString());
-
-            parameters[paramName as ToolParameterName] = value || (null as unknown as SchemaValueType);
-            if (validPath && value == undefined) {
-                console.warn(`Invalid or undefined variable path: ${varNamePath}`, errorMessage ? `Error: ${errorMessage}` : '');
-            }
-        }
-
-        return parameters;
-    }
 
     /**
      * Applies the output value to a variable based on the mapping operation
@@ -261,7 +237,7 @@ export class WorkflowEngine {
      * @param outputValue The output value to apply
      * @returns The updated value for the variable
      */
-    private static applyOutputToVariable(
+    static applyOutputToVariable(
         variable: WorkflowVariable,
         mapping: WorkflowVariableName | EnhancedOutputMapping,
         outputValue: any
@@ -585,6 +561,122 @@ export class WorkflowEngine {
     }
 
     /**
+     * Prepares inputs for an evaluation step by extracting values from workflow state
+     * @param step The evaluation step to prepare inputs for
+     * @param workflow The current workflow state
+     * @returns Extracted values needed for evaluation
+     * 
+     * NOTE: This method is currently unused as EvaluationEngine.executeEvaluationStep
+     * extracts its own inputs from the workflow. Kept for potential future use.
+     */
+    private static prepareInputsForEval(
+        step: WorkflowStep,
+        workflow: Workflow
+    ): Record<string, any> {
+        if (!step.evaluation_config || !step.evaluation_config.conditions) {
+            return {};
+        }
+
+        const inputs: Record<string, any> = {};
+        const allVariables = workflow.state || [];
+
+        // Extract only the variables needed for the evaluation conditions
+        for (const condition of step.evaluation_config.conditions) {
+            if (!condition.variable) continue;
+
+            // Use the utility library to resolve variable paths
+            const { value, validPath } = resolveVariablePath(allVariables, condition.variable.toString());
+
+            if (validPath) {
+                inputs[condition.variable.toString()] = value;
+            } else {
+                console.warn(`Invalid variable path for evaluation: ${condition.variable}`);
+                inputs[condition.variable.toString()] = undefined;
+            }
+        }
+
+        // Also extract jump counters if they exist
+        const jumpCounterName = `jump_count_${step.step_id}`;
+        const jumpCounter = allVariables.find(v => v.name === jumpCounterName);
+        if (jumpCounter) {
+            inputs[jumpCounterName] = jumpCounter.value;
+        }
+
+        return inputs;
+    }
+
+    /**
+     * Applies evaluation outputs back to workflow state
+     * @param step The evaluation step that was executed
+     * @param outputs The outputs from the evaluation
+     * @param workflow The current workflow state
+     * @returns Updated workflow state with evaluation outputs applied
+     */
+    private static applyOutputsFromEval(
+        step: WorkflowStep,
+        outputs: Record<string, any>,
+        workflow: Workflow
+    ): WorkflowVariable[] {
+        const updatedState = [...(workflow.state || [])];
+
+        if (!outputs) {
+            return updatedState;
+        }
+
+        // Generate a shorter variable ID using first 8 chars of step ID plus _eval
+        const shortStepId = step.step_id.slice(0, 8);
+        const outputVarName = `eval_${shortStepId}` as WorkflowVariableName;
+
+        // Check if the output variable already exists
+        const outputVarIndex = updatedState.findIndex(v => v.name === outputVarName);
+        if (outputVarIndex !== -1) {
+            updatedState[outputVarIndex] = {
+                ...updatedState[outputVarIndex],
+                value: outputs
+            };
+        } else {
+            updatedState.push({
+                name: outputVarName,
+                variable_id: outputVarName,
+                description: 'Evaluation step result',
+                schema: {
+                    type: 'object',
+                    is_array: false
+                },
+                value: outputs,
+                io_type: 'evaluation'
+            });
+        }
+
+        // Update jump counter if needed
+        if (outputs.next_action === 'jump' && step.evaluation_config) {
+            const jumpCounterName = `jump_count_${step.step_id}` as WorkflowVariableName;
+            const jumpCounterIndex = updatedState.findIndex(v => v.name === jumpCounterName);
+
+            // Get the jump count from the outputs or default to 1
+            const jumpCount = outputs.jump_count ? parseInt(outputs.jump_count) : 1;
+
+            if (jumpCounterIndex !== -1) {
+                updatedState[jumpCounterIndex].value = jumpCount;
+            } else {
+                updatedState.push({
+                    name: jumpCounterName,
+                    variable_id: jumpCounterName,
+                    description: 'Jump counter for evaluation step',
+                    schema: {
+                        type: 'number',
+                        is_array: false
+                    },
+                    value: jumpCount,
+                    io_type: 'evaluation'
+                });
+            }
+        }
+
+        return updatedState;
+    }
+
+    /**
      * Executes a workflow step as an evaluation and returns the result, updated state, and next step index
      */
     private static async executeStepAsEvaluation(
@@ -604,14 +696,154 @@ export class WorkflowEngine {
         updatedState: WorkflowVariable[],
         nextStepIndex: number
     }> {
-        // Delegate to the EvaluationEngine to handle all evaluation logic
-        return await EvaluationEngine.executeEvaluationStep(
-            step,
-            workflow,
-            currentStepIndex,
-            this.getUpdatedWorkflowStateFromResults.bind(this),
-            statusCallback
-        );
+        try {
+            // Check if evaluation config exists
+            if (!step.evaluation_config) {
+                throw new Error('Evaluation step is missing configuration');
+            }
+
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'running',
+                    message: 'Evaluating conditions',
+                    progress: 50
+                });
+            }
+
+            // Use EvaluationEngine to execute the evaluation step
+            const evaluationResult = await EvaluationEngine.executeEvaluationStep(
+                step,
+                workflow,
+                currentStepIndex,
+                this.getUpdatedWorkflowStateFromResults,
+                statusCallback
+            );
+
+            // Apply: Update workflow state with evaluation results using our own method
+            // This is redundant since EvaluationEngine already calls getUpdatedWorkflowStateFromResults,
+            // but we'll keep it for consistency with the pattern
+            const outputs = evaluationResult.result.outputs || {};
+            const updatedState = this.applyOutputsFromEval(step, outputs, workflow);
+
+            // Determine next step index based on the evaluation result
+            let nextStepIndex = evaluationResult.nextStepIndex;
+
+            return {
+                result: evaluationResult.result,
+                updatedState,
+                nextStepIndex
+            };
+        } catch (error) {
+            console.error(`❌ [STEP ${step.step_id}] Evaluation error:`, error);
+
+            // Notify status: failed
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'failed',
+                    message: `Evaluation error: ${error instanceof Error ? error.message : String(error)}`,
+                    progress: 100,
+                    result: {
+                        success: false,
+                        error: error instanceof Error ? error.message : String(error)
+                    }
+                });
+            }
+
+            return {
+                result: {
+                    success: false,
+                    error: error instanceof Error ? error.message : String(error)
+                },
+                updatedState: workflow.state || [],
+                nextStepIndex: currentStepIndex + 1
+            };
+        }
+    }
+
+    /**
+     * Prepares inputs for a tool step by extracting values from workflow state
+     * @param step The workflow step to prepare inputs for
+     * @param workflow The current workflow state
+     * @returns Resolved parameters for the tool
+     */
+    private static prepareInputsForTool(
+        step: WorkflowStep,
+        workflow: Workflow
+    ): Record<ToolParameterName, SchemaValueType> {
+        const parameters: Record<ToolParameterName, SchemaValueType> = {};
+
+        if (!step.parameter_mappings) return parameters;
+
+        const allVariables = workflow.state || [];
+        for (const [paramName, varNamePath] of Object.entries(step.parameter_mappings)) {
+            // Use the utility library to resolve variable paths
+            const { value, validPath, errorMessage } = resolveVariablePath(allVariables, varNamePath.toString());
+
+            parameters[paramName as ToolParameterName] = value || (null as unknown as SchemaValueType);
+            if (validPath && value == undefined) {
+                console.warn(`Invalid or undefined variable path: ${varNamePath}`, errorMessage ? `Error: ${errorMessage}` : '');
+            }
+        }
+
+        return parameters;
+    }
+
+    /**
+     * Applies tool outputs back to workflow state based on output mappings
+     * @param step The workflow step that was executed
+     * @param outputs The outputs from the tool execution
+     * @param workflow The current workflow state
+     * @returns Updated workflow state with tool outputs applied
+     */
+    private static applyOutputsFromTool(
+        step: WorkflowStep,
+        outputs: Record<string, any>,
+        workflow: Workflow
+    ): WorkflowVariable[] {
+        const updatedState = [...(workflow.state || [])];
+
+        if (!step.output_mappings || Object.keys(outputs).length === 0) {
+            return updatedState;
+        }
+
+        for (const [outputName, mapping] of Object.entries(step.output_mappings)) {
+            if (!(outputName in outputs)) {
+                console.warn(`Output ${outputName} not found in outputs`);
+                continue;
+            }
+
+            const outputValue = outputs[outputName];
+
+            // Get the variable name from the mapping
+            const variableName = typeof mapping === 'object' && 'variable' in mapping
+                ? mapping.variable
+                : mapping as WorkflowVariableName;
+
+            // Find the variable in the state
+            console.log('Finding variable:', variableName);
+
+            const variableIndex = updatedState.findIndex(v => v.name === variableName);
+            if (variableIndex === -1) {
+                console.warn(`Variable ${variableName} not found in state`);
+                continue;
+            }
+
+            // Apply the output value to the variable based on the mapping
+            const variable = updatedState[variableIndex];
+            console.log('Applying output to variable:', {
+                variableName: variable.name,
+                variableSchema: variable.schema,
+                outputValue
+            });
+            variable.value = this.applyOutputToVariable(variable, mapping, outputValue);
+        }
+
+        return updatedState;
     }
 
     /**
@@ -633,22 +865,18 @@ export class WorkflowEngine {
         updatedState: WorkflowVariable[]
     }> {
         try {
-            // 1. Resolve parameters for the tool
-            const parameters = this.getResolvedParameters(step, workflow);
+            // 1. Prepare: Extract inputs from workflow state
+            const parameters = this.prepareInputsForTool(step, workflow);
 
-            // 2. Execute the tool using ToolEngine
+            // 2. Process: Execute the tool with those inputs
             let toolOutputs: Record<string, any>;
             try {
                 toolOutputs = await ToolEngine.executeToolStep(step, parameters, statusCallback);
 
-                // 3. Update workflow state with tool results
-                const updatedState = this.getUpdatedWorkflowStateFromResults(
-                    step,
-                    toolOutputs,
-                    workflow
-                );
+                // 3. Apply: Update workflow state with the results
+                const updatedState = this.applyOutputsFromTool(step, toolOutputs, workflow);
 
-                // 4. Return success result with outputs and updated state
+                // Return success result with outputs and updated state
                 return {
                     result: {
                         success: true,
@@ -725,30 +953,23 @@ export class WorkflowEngine {
             return { nextStepIndex, updatedState };
         }
 
-        // Create a copy of the workflow state to avoid mutating the original
-        const workflowStateCopy = [...(workflow.state || [])];
+        // For evaluation steps, check if there's an evaluation result in the state
+        const shortStepId = currentStep.step_id.slice(0, 8);
+        const evalVarName = `eval_${shortStepId}` as WorkflowVariableName;
+        const evalResult = workflow.state?.find(v => v.name === evalVarName);
 
-        // Clear any existing outputs for this step
-        const clearedState = this.clearStepOutputs(currentStep, { ...workflow, state: workflowStateCopy });
+        if (evalResult?.value) {
+            const evalValue = evalResult.value as Record<string, any>;
 
-        // For evaluation, we need the workflow context to evaluate conditions
-        const workflowCopy = { ...workflow, state: clearedState };
-
-        // Evaluate conditions using EvaluationEngine
-        const result = EvaluationEngine.evaluateConditions(currentStep, workflowCopy);
-        console.log('getNextStepIndex evaluation result:', result);
-
-        // If we have updated state from the result, use it
-        if ('updatedState' in result && result.updatedState) {
-            updatedState = result.updatedState;
+            // Check if we need to jump
+            if (evalValue.next_action === 'jump' && evalValue.target_step_index) {
+                const targetIndex = parseInt(evalValue.target_step_index);
+                if (!isNaN(targetIndex) && targetIndex >= 0 && targetIndex < workflow.steps.length) {
+                    nextStepIndex = targetIndex;
+                    console.log(`Jump to step ${targetIndex} based on evaluation result`);
+                }
+            }
         }
-
-        // Use EvaluationEngine to determine the next step
-        nextStepIndex = EvaluationEngine.determineNextStep(
-            result,
-            currentStepIndex,
-            workflow.steps.length
-        );
 
         return { nextStepIndex, updatedState };
     }
@@ -1114,9 +1335,9 @@ export class WorkflowEngine {
     }
 
     /**
- * Gets default value for a schema type
- * Used to initialize form values and create default variables
- */
+     * Gets default value for a schema type
+     * Used to initialize form values and create default variables
+     */
 
     static getDefaultValueForSchema(schema: Schema): SchemaValueType {
         if (schema.type === 'string') return '';

@@ -11,7 +11,7 @@ import { WorkflowStep, StepExecutionResult } from '../../types/workflows';
 
 export class ToolEngine {
     /**
-     * Executes a tool step with provided parameters
+     * Executes a tool with the provided parameters
      * This method focuses solely on tool execution and doesn't handle parameter resolution or state updates
      */
     static async executeToolStep(
@@ -28,7 +28,6 @@ export class ToolEngine {
     ): Promise<Record<string, any>> {
         if (!step.tool) {
             console.error(`❌ [STEP ${step.step_id}] No tool configured for this step`);
-            console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
 
             // Notify status: failed
             if (statusCallback) {
