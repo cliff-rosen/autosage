@@ -171,130 +171,6 @@ export class WorkflowEngine {
         return requiredInputNames;
     }
 
-    /**
-     * Gets default value for a schema type
-     * Used to initialize form values and create default variables
-     */
-    static getDefaultValueForSchema(schema: Schema): SchemaValueType {
-        if (schema.type === 'string') return '';
-        if (schema.type === 'number') return 0;
-        if (schema.type === 'boolean') return false;
-        if (schema.type === 'file') return {
-            file_id: '',
-            name: '',
-            content: new Uint8Array(),
-            mime_type: '',
-            size: 0,
-            created_at: '',
-            updated_at: ''
-        };
-        if (schema.type === 'object') {
-            const result: Record<string, SchemaValueType> = {};
-            if (schema.fields) {
-                for (const [key, fieldSchema] of Object.entries(schema.fields)) {
-                    result[key] = this.getDefaultValueForSchema(fieldSchema);
-                }
-            }
-            return result;
-        }
-        return '';
-    }
-
-    /**
-     * Formats a value for display in the UI
-     * Handles truncation and special formatting for different types
-     */
-    static formatValueForDisplay(
-        value: any,
-        schema: Schema | undefined,
-        options: {
-            maxTextLength?: number,
-            maxArrayLength?: number,
-            maxArrayItemLength?: number
-        } = {}
-    ): string {
-        // Default options
-        const {
-            maxTextLength = 200,
-            maxArrayLength = 3,
-            maxArrayItemLength = 100
-        } = options;
-
-        // Handle undefined/null
-        if (value === undefined || value === null) {
-            return 'No value';
-        }
-
-        // Handle arrays
-        if (Array.isArray(value)) {
-            if (value.length === 0) return '[]';
-
-            const items = value.slice(0, maxArrayLength).map(item => {
-                const itemStr = typeof item === 'object'
-                    ? JSON.stringify(item)
-                    : String(item);
-
-                return itemStr.length > maxArrayItemLength
-                    ? `${itemStr.substring(0, maxArrayItemLength)}...`
-                    : itemStr;
-            });
-
-            const hasMore = value.length > maxArrayLength;
-            return `[${items.join(', ')}${hasMore ? `, ... (${value.length - maxArrayLength} more)` : ''}]`;
-        }
-
-        // Handle objects
-        if (typeof value === 'object') {
-            // Handle file objects
-            if (schema?.type === 'file' && value.file_id) {
-                return `File: ${value.name || value.file_id}`;
-            }
-
-            // Handle schema objects with improved field name display
-            if (schema?.type === 'object' && schema.fields) {
-                // Format object with field names clearly visible
-                const formattedEntries = Object.entries(value)
-                    .filter(([key]) => schema.fields && key in schema.fields)
-                    .map(([key, val]) => {
-                        const fieldSchema = schema.fields?.[key];
-                        const fieldValue = this.formatValueForDisplay(
-                            val,
-                            fieldSchema,
-                            {
-                                maxTextLength: Math.min(50, maxTextLength / 2),
-                                maxArrayLength: 2,
-                                maxArrayItemLength: 30
-                            }
-                        );
-                        return `"${key}": ${fieldValue}`;
-                    });
-
-                const formatted = `{ ${formattedEntries.join(', ')} }`;
-                if (formatted.length > maxTextLength) {
-                    return `${formatted.substring(0, maxTextLength)}...`;
-                }
-                return formatted;
-            }
-
-            // Handle other objects
-            const json = JSON.stringify(value, null, 2);
-            if (json.length > maxTextLength) {
-                return `${json.substring(0, maxTextLength)}...`;
-            }
-            return json;
-        }
-
-        // Handle strings
-        if (typeof value === 'string') {
-            if (value.length > maxTextLength) {
-                return `${value.substring(0, maxTextLength)}...`;
-            }
-            return value;
-        }
-
-        // Handle other primitives
-        return String(value);
-    }
 
     /**
      * Gets the output values for a workflow step for UI display
@@ -465,174 +341,6 @@ export class WorkflowEngine {
                 return WorkflowEngine.convertValueToMatchVariableType(variable, outputValue);
             }
         }
-    }
-
-    /**
-     * Converts a value to match the type of the target variable
-     * @param variable The target variable
-     * @param value The value to convert
-     * @returns The converted value
-     */
-    private static convertValueToMatchVariableType(
-        variable: WorkflowVariable,
-        value: any
-    ): any {
-        // Add debugging
-        console.log('Converting value to match variable type:', {
-            variableName: variable.name,
-            variableSchema: variable.schema,
-            value
-        });
-
-        // If the value is already the correct type, return it as is
-        if (variable.schema.is_array && Array.isArray(value)) {
-            return value;
-        }
-
-        // Handle array conversions
-        if (variable.schema.is_array) {
-            // Convert non-array value to an array with a single element
-            return [value];
-        }
-
-        // Handle string conversions
-        if (variable.schema.type === 'string') {
-            if (typeof value === 'string') {
-                return value;
-            } else if (Array.isArray(value)) {
-                // Convert array to string by joining elements
-                return value.join(',');
-            } else if (typeof value === 'object' && value !== null) {
-                // Convert object to JSON string
-                return JSON.stringify(value);
-            } else {
-                // Convert other types to string
-                return String(value);
-            }
-        }
-
-        // Handle number conversions
-        if (variable.schema.type === 'number') {
-            if (typeof value === 'number') {
-                return value;
-            } else if (typeof value === 'string') {
-                // Try to convert string to number
-                const num = Number(value);
-                return isNaN(num) ? 0 : num;
-            } else if (Array.isArray(value) && value.length > 0) {
-                // Use the first element if it's a number
-                const num = Number(value[0]);
-                return isNaN(num) ? 0 : num;
-            } else {
-                return 0;
-            }
-        }
-
-        // Handle boolean conversions
-        if (variable.schema.type === 'boolean') {
-            if (typeof value === 'boolean') {
-                return value;
-            } else if (typeof value === 'string') {
-                return value.toLowerCase() === 'true';
-            } else if (Array.isArray(value)) {
-                // Array is true if it has elements
-                return value.length > 0;
-            } else if (typeof value === 'number') {
-                return value !== 0;
-            } else {
-                return Boolean(value);
-            }
-        }
-
-        // Handle object conversions
-        if (variable.schema.type === 'object') {
-            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                return value;
-            } else if (typeof value === 'string') {
-                try {
-                    // Try to parse string as JSON
-                    return JSON.parse(value);
-                } catch (e) {
-                    return {};
-                }
-            } else {
-                return {};
-            }
-        }
-
-        // Default: return the value as is
-        return value;
-    }
-
-    /**
-     * Converts a value to match the element type of an array schema
-     * @param schema The schema of the array variable
-     * @param value The value to convert
-     * @returns The converted value
-     */
-    private static convertValueToMatchArrayElementType(
-        schema: Schema,
-        value: any
-    ): any {
-        // If schema is not for an array or doesn't specify element type, return as is
-        if (!schema.is_array) {
-            return value;
-        }
-
-        // Handle conversion based on the element type
-        const elementType = schema.type;
-
-        // Handle object type
-        if (elementType === 'object') {
-            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                return value; // Already an object
-            } else if (typeof value === 'string') {
-                try {
-                    // Try to parse string as JSON
-                    return JSON.parse(value);
-                } catch (e) {
-                    console.warn('Failed to parse string as object:', e);
-                    return {}; // Return empty object if parsing fails
-                }
-            } else {
-                return {}; // Default empty object
-            }
-        }
-
-        // Handle string type
-        if (elementType === 'string') {
-            if (typeof value === 'string') {
-                return value; // Already a string
-            } else if (typeof value === 'object' && value !== null) {
-                return JSON.stringify(value); // Convert object to JSON string
-            } else {
-                return String(value); // Convert other types to string
-            }
-        }
-
-        // Handle number type
-        if (elementType === 'number') {
-            if (typeof value === 'number') {
-                return value; // Already a number
-            } else {
-                const num = Number(value);
-                return isNaN(num) ? 0 : num; // Convert to number or default to 0
-            }
-        }
-
-        // Handle boolean type
-        if (elementType === 'boolean') {
-            if (typeof value === 'boolean') {
-                return value; // Already a boolean
-            } else if (typeof value === 'string') {
-                return value.toLowerCase() === 'true'; // Convert string to boolean
-            } else {
-                return Boolean(value); // Convert other types to boolean
-            }
-        }
-
-        // Default: return the value as is
-        return value;
     }
 
     /**
@@ -1262,138 +970,15 @@ export class WorkflowEngine {
                 }
             } else {
                 // Execute tool step
-                if (!step.tool) {
-                    console.error(`❌ [STEP ${step.step_id}] No tool configured for this step`);
-                    console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
-
-                    // Notify status: failed
-                    if (statusCallback) {
-                        statusCallback({
-                            stepId: step.step_id,
-                            stepIndex,
-                            status: 'failed',
-                            message: `No tool configured for this step`,
-                            result: { success: false, error: 'No tool configured for this step' }
-                        });
-                    }
-
-                    return {
-                        updatedState: clearedState,
-                        result: {
-                            success: false,
-                            error: 'No tool configured for this step'
-                        },
-                        nextStepIndex: stepIndex + 1
-                    };
-                }
-
-                // For tool execution, we need the workflow context to resolve parameters
                 const workflowCopy = { ...workflow, state: clearedState };
-                const parameters = this.getResolvedParameters(step, workflowCopy);
+                const { result: toolResult, updatedState: toolUpdatedState } = await this.executeStepAsTool(
+                    step,
+                    workflowCopy,
+                    statusCallback
+                );
 
-                console.log(`🔧 [STEP ${step.step_id}] Executing tool: ${step.tool.name} (${step.tool.tool_type})`);
-                console.log(`📥 [STEP ${step.step_id}] Tool parameters:`, Object.keys(parameters).length);
-
-                // Notify status: running with progress
-                if (statusCallback) {
-                    statusCallback({
-                        stepId: step.step_id,
-                        stepIndex,
-                        status: 'running',
-                        message: `Executing tool: ${step.tool.name}`,
-                        progress: 30
-                    });
-                }
-
-                // Add prompt template ID for LLM tools
-                if (step.tool.tool_type === 'llm' && step.prompt_template_id) {
-                    parameters['prompt_template_id' as ToolParameterName] = step.prompt_template_id as SchemaValueType;
-                    console.log(`🔄 [STEP ${step.step_id}] Using prompt template: ${step.prompt_template_id}`);
-                }
-
-                // Execute the tool
-                try {
-                    console.time(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
-
-                    // Notify status: running with progress
-                    if (statusCallback) {
-                        statusCallback({
-                            stepId: step.step_id,
-                            stepIndex,
-                            status: 'running',
-                            message: `Tool execution in progress`,
-                            progress: 50
-                        });
-                    }
-
-                    const toolResult = await ToolEngine.executeTool(step.tool, parameters);
-                    console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
-
-                    // Update workflow state with tool results
-                    if (toolResult) {
-                        console.log(`📤 [STEP ${step.step_id}] Tool execution successful, updating state with outputs:`, Object.keys(toolResult).length);
-                        updatedState = this.getUpdatedWorkflowStateFromResults(
-                            step,
-                            toolResult,
-                            workflowCopy
-                        );
-                        console.log('Updated state:', updatedState); // TODO: remove
-
-                        // Notify status: running with progress
-                        if (statusCallback) {
-                            statusCallback({
-                                stepId: step.step_id,
-                                stepIndex,
-                                status: 'running',
-                                message: `Tool execution successful, updating state`,
-                                progress: 80,
-                                result: { success: true, outputs: toolResult }
-                            });
-                        }
-                    } else {
-                        console.warn(`⚠️ [STEP ${step.step_id}] Tool execution returned no results`);
-
-                        // Notify status: running with progress
-                        if (statusCallback) {
-                            statusCallback({
-                                stepId: step.step_id,
-                                stepIndex,
-                                status: 'running',
-                                message: `Tool execution returned no results`,
-                                progress: 80
-                            });
-                        }
-                    }
-
-                    result = {
-                        success: true,
-                        outputs: toolResult
-                    };
-                } catch (toolError) {
-                    console.error(`❌ [STEP ${step.step_id}] Tool execution error:`, toolError);
-                    console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
-
-                    // Notify status: failed
-                    if (statusCallback) {
-                        statusCallback({
-                            stepId: step.step_id,
-                            stepIndex,
-                            status: 'failed',
-                            message: `Tool execution error: ${toolError instanceof Error ? toolError.message : String(toolError)}`,
-                            result: {
-                                success: false,
-                                error: toolError instanceof Error ? toolError.message : String(toolError)
-                            }
-                        });
-                    }
-
-                    // Create a proper error result
-                    result = {
-                        success: false,
-                        error: toolError instanceof Error ? toolError.message : String(toolError),
-                        outputs: {}
-                    };
-                }
+                result = toolResult;
+                updatedState = toolUpdatedState;
             }
 
             console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
@@ -1440,6 +1025,163 @@ export class WorkflowEngine {
                     error: error instanceof Error ? error.message : 'Unknown error occurred'
                 },
                 nextStepIndex: stepIndex + 1
+            };
+        }
+    }
+
+    /**
+     * Executes a workflow step as a tool and returns the result and updated state
+     */
+    private static async executeStepAsTool(
+        step: WorkflowStep,
+        workflow: Workflow,
+        statusCallback?: (status: {
+            stepId: string;
+            stepIndex: number;
+            status: 'running' | 'completed' | 'failed';
+            message?: string;
+            progress?: number;
+            result?: Partial<StepExecutionResult>;
+        }) => void
+    ): Promise<{
+        result: StepExecutionResult,
+        updatedState: WorkflowVariable[]
+    }> {
+        if (!step.tool) {
+            console.error(`❌ [STEP ${step.step_id}] No tool configured for this step`);
+            console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
+
+            // Notify status: failed
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: step.sequence_number,
+                    status: 'failed',
+                    message: `No tool configured for this step`,
+                    result: { success: false, error: 'No tool configured for this step' }
+                });
+            }
+
+            return {
+                result: {
+                    success: false,
+                    error: 'No tool configured for this step'
+                },
+                updatedState: workflow.state || []
+            };
+        }
+
+        // For tool execution, we need the workflow context to resolve parameters
+        const parameters = this.getResolvedParameters(step, workflow);
+
+        console.log(`🔧 [STEP ${step.step_id}] Executing tool: ${step.tool.name} (${step.tool.tool_type})`);
+        console.log(`📥 [STEP ${step.step_id}] Tool parameters:`, Object.keys(parameters).length);
+
+        // Notify status: running with progress
+        if (statusCallback) {
+            statusCallback({
+                stepId: step.step_id,
+                stepIndex: step.sequence_number,
+                status: 'running',
+                message: `Executing tool: ${step.tool.name}`,
+                progress: 30
+            });
+        }
+
+        // Add prompt template ID for LLM tools
+        if (step.tool.tool_type === 'llm' && step.prompt_template_id) {
+            parameters['prompt_template_id' as ToolParameterName] = step.prompt_template_id as SchemaValueType;
+            console.log(`🔄 [STEP ${step.step_id}] Using prompt template: ${step.prompt_template_id}`);
+        }
+
+        // Execute the tool
+        try {
+            console.time(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
+
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: step.sequence_number,
+                    status: 'running',
+                    message: `Tool execution in progress`,
+                    progress: 50
+                });
+            }
+
+            const toolResult = await ToolEngine.executeTool(step.tool, parameters);
+            console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
+
+            // Update workflow state with tool results
+            let updatedState = workflow.state || [];
+            if (toolResult) {
+                console.log(`📤 [STEP ${step.step_id}] Tool execution successful, updating state with outputs:`, Object.keys(toolResult).length);
+                updatedState = this.getUpdatedWorkflowStateFromResults(
+                    step,
+                    toolResult,
+                    workflow
+                );
+                console.log('Updated state:', updatedState); // TODO: remove
+
+                // Notify status: running with progress
+                if (statusCallback) {
+                    statusCallback({
+                        stepId: step.step_id,
+                        stepIndex: step.sequence_number,
+                        status: 'running',
+                        message: `Tool execution successful, updating state`,
+                        progress: 80,
+                        result: { success: true, outputs: toolResult }
+                    });
+                }
+            } else {
+                console.warn(`⚠️ [STEP ${step.step_id}] Tool execution returned no results`);
+
+                // Notify status: running with progress
+                if (statusCallback) {
+                    statusCallback({
+                        stepId: step.step_id,
+                        stepIndex: step.sequence_number,
+                        status: 'running',
+                        message: `Tool execution returned no results`,
+                        progress: 80
+                    });
+                }
+            }
+
+            return {
+                result: {
+                    success: true,
+                    outputs: toolResult
+                },
+                updatedState
+            };
+        } catch (toolError) {
+            console.error(`❌ [STEP ${step.step_id}] Tool execution error:`, toolError);
+            console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
+
+            // Notify status: failed
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: step.sequence_number,
+                    status: 'failed',
+                    message: `Tool execution error: ${toolError instanceof Error ? toolError.message : String(toolError)}`,
+                    result: {
+                        success: false,
+                        error: toolError instanceof Error ? toolError.message : String(toolError)
+                    }
+                });
+            }
+
+            // Create a proper error result
+            return {
+                result: {
+                    success: false,
+                    error: toolError instanceof Error ? toolError.message : String(toolError),
+                    outputs: {}
+                },
+                updatedState: workflow.state || []
             };
         }
     }
@@ -1781,4 +1523,299 @@ export class WorkflowEngine {
             };
         }
     }
+
+    /**
+     * Formats a value for display in the UI
+     * Handles truncation and special formatting for different types
+     */
+    static zz_formatValueForDisplay(
+        value: any,
+        schema: Schema | undefined,
+        options: {
+            maxTextLength?: number,
+            maxArrayLength?: number,
+            maxArrayItemLength?: number
+        } = {}
+    ): string {
+        // Default options
+        const {
+            maxTextLength = 200,
+            maxArrayLength = 3,
+            maxArrayItemLength = 100
+        } = options;
+
+        // Handle undefined/null
+        if (value === undefined || value === null) {
+            return 'No value';
+        }
+
+        // Handle arrays
+        if (Array.isArray(value)) {
+            if (value.length === 0) return '[]';
+
+            const items = value.slice(0, maxArrayLength).map(item => {
+                const itemStr = typeof item === 'object'
+                    ? JSON.stringify(item)
+                    : String(item);
+
+                return itemStr.length > maxArrayItemLength
+                    ? `${itemStr.substring(0, maxArrayItemLength)}...`
+                    : itemStr;
+            });
+
+            const hasMore = value.length > maxArrayLength;
+            return `[${items.join(', ')}${hasMore ? `, ... (${value.length - maxArrayLength} more)` : ''}]`;
+        }
+
+        // Handle objects
+        if (typeof value === 'object') {
+            // Handle file objects
+            if (schema?.type === 'file' && value.file_id) {
+                return `File: ${value.name || value.file_id}`;
+            }
+
+            // Handle schema objects with improved field name display
+            if (schema?.type === 'object' && schema.fields) {
+                // Format object with field names clearly visible
+                const formattedEntries = Object.entries(value)
+                    .filter(([key]) => schema.fields && key in schema.fields)
+                    .map(([key, val]) => {
+                        const fieldSchema = schema.fields?.[key];
+                        const fieldValue = this.zz_formatValueForDisplay(
+                            val,
+                            fieldSchema,
+                            {
+                                maxTextLength: Math.min(50, maxTextLength / 2),
+                                maxArrayLength: 2,
+                                maxArrayItemLength: 30
+                            }
+                        );
+                        return `"${key}": ${fieldValue}`;
+                    });
+
+                const formatted = `{ ${formattedEntries.join(', ')} }`;
+                if (formatted.length > maxTextLength) {
+                    return `${formatted.substring(0, maxTextLength)}...`;
+                }
+                return formatted;
+            }
+
+            // Handle other objects
+            const json = JSON.stringify(value, null, 2);
+            if (json.length > maxTextLength) {
+                return `${json.substring(0, maxTextLength)}...`;
+            }
+            return json;
+        }
+
+        // Handle strings
+        if (typeof value === 'string') {
+            if (value.length > maxTextLength) {
+                return `${value.substring(0, maxTextLength)}...`;
+            }
+            return value;
+        }
+
+        // Handle other primitives
+        return String(value);
+    }
+
+    /**
+ * Gets default value for a schema type
+ * Used to initialize form values and create default variables
+ */
+
+    static getDefaultValueForSchema(schema: Schema): SchemaValueType {
+        if (schema.type === 'string') return '';
+        if (schema.type === 'number') return 0;
+        if (schema.type === 'boolean') return false;
+        if (schema.type === 'file') return {
+            file_id: '',
+            name: '',
+            content: new Uint8Array(),
+            mime_type: '',
+            size: 0,
+            created_at: '',
+            updated_at: ''
+        };
+        if (schema.type === 'object') {
+            const result: Record<string, SchemaValueType> = {};
+            if (schema.fields) {
+                for (const [key, fieldSchema] of Object.entries(schema.fields)) {
+                    result[key] = this.getDefaultValueForSchema(fieldSchema);
+                }
+            }
+            return result;
+        }
+        return '';
+    }
+
+    /**
+     * Converts a value to match the type of the target variable
+     * @param variable The target variable
+     * @param value The value to convert
+     * @returns The converted value
+     */
+    private static convertValueToMatchVariableType(
+        variable: WorkflowVariable,
+        value: any
+    ): any {
+        // Add debugging
+        console.log('Converting value to match variable type:', {
+            variableName: variable.name,
+            variableSchema: variable.schema,
+            value
+        });
+
+        // If the value is already the correct type, return it as is
+        if (variable.schema.is_array && Array.isArray(value)) {
+            return value;
+        }
+
+        // Handle array conversions
+        if (variable.schema.is_array) {
+            // Convert non-array value to an array with a single element
+            return [value];
+        }
+
+        // Handle string conversions
+        if (variable.schema.type === 'string') {
+            if (typeof value === 'string') {
+                return value;
+            } else if (Array.isArray(value)) {
+                // Convert array to string by joining elements
+                return value.join(',');
+            } else if (typeof value === 'object' && value !== null) {
+                // Convert object to JSON string
+                return JSON.stringify(value);
+            } else {
+                // Convert other types to string
+                return String(value);
+            }
+        }
+
+        // Handle number conversions
+        if (variable.schema.type === 'number') {
+            if (typeof value === 'number') {
+                return value;
+            } else if (typeof value === 'string') {
+                // Try to convert string to number
+                const num = Number(value);
+                return isNaN(num) ? 0 : num;
+            } else if (Array.isArray(value) && value.length > 0) {
+                // Use the first element if it's a number
+                const num = Number(value[0]);
+                return isNaN(num) ? 0 : num;
+            } else {
+                return 0;
+            }
+        }
+
+        // Handle boolean conversions
+        if (variable.schema.type === 'boolean') {
+            if (typeof value === 'boolean') {
+                return value;
+            } else if (typeof value === 'string') {
+                return value.toLowerCase() === 'true';
+            } else if (Array.isArray(value)) {
+                // Array is true if it has elements
+                return value.length > 0;
+            } else if (typeof value === 'number') {
+                return value !== 0;
+            } else {
+                return Boolean(value);
+            }
+        }
+
+        // Handle object conversions
+        if (variable.schema.type === 'object') {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                return value;
+            } else if (typeof value === 'string') {
+                try {
+                    // Try to parse string as JSON
+                    return JSON.parse(value);
+                } catch (e) {
+                    return {};
+                }
+            } else {
+                return {};
+            }
+        }
+
+        // Default: return the value as is
+        return value;
+    }
+
+    /**
+     * Converts a value to match the element type of an array schema
+     * @param schema The schema of the array variable
+     * @param value The value to convert
+     * @returns The converted value
+     */
+    private static convertValueToMatchArrayElementType(
+        schema: Schema,
+        value: any
+    ): any {
+        // If schema is not for an array or doesn't specify element type, return as is
+        if (!schema.is_array) {
+            return value;
+        }
+
+        // Handle conversion based on the element type
+        const elementType = schema.type;
+
+        // Handle object type
+        if (elementType === 'object') {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                return value; // Already an object
+            } else if (typeof value === 'string') {
+                try {
+                    // Try to parse string as JSON
+                    return JSON.parse(value);
+                } catch (e) {
+                    console.warn('Failed to parse string as object:', e);
+                    return {}; // Return empty object if parsing fails
+                }
+            } else {
+                return {}; // Default empty object
+            }
+        }
+
+        // Handle string type
+        if (elementType === 'string') {
+            if (typeof value === 'string') {
+                return value; // Already a string
+            } else if (typeof value === 'object' && value !== null) {
+                return JSON.stringify(value); // Convert object to JSON string
+            } else {
+                return String(value); // Convert other types to string
+            }
+        }
+
+        // Handle number type
+        if (elementType === 'number') {
+            if (typeof value === 'number') {
+                return value; // Already a number
+            } else {
+                const num = Number(value);
+                return isNaN(num) ? 0 : num; // Convert to number or default to 0
+            }
+        }
+
+        // Handle boolean type
+        if (elementType === 'boolean') {
+            if (typeof value === 'boolean') {
+                return value; // Already a boolean
+            } else if (typeof value === 'string') {
+                return value.toLowerCase() === 'true'; // Convert string to boolean
+            } else {
+                return Boolean(value); // Convert other types to boolean
+            }
+        }
+
+        // Default: return the value as is
+        return value;
+    }
+
 }

@@ -39,8 +39,7 @@ const Workflow: React.FC = () => {
         moveToPreviousStep,
         updateWorkflowByAction,
         updateWorkflowStep,
-        resetWorkflow,
-        saveWorkflow,
+        resetWorkflow
     } = useWorkflows();
 
     // State
@@ -143,16 +142,6 @@ const Workflow: React.FC = () => {
         });
     }, [updateWorkflowByAction]);
 
-    // Add a new handler for saving workflow
-    const handleSaveWorkflow = useCallback(async () => {
-        try {
-            await saveWorkflow();
-            // The URL will be updated by the effect if needed
-        } catch (err) {
-            console.error('Error saving workflow:', err);
-            setError('Failed to save workflow');
-        }
-    }, [saveWorkflow]);
 
     // Effects
     useEffect(() => {
