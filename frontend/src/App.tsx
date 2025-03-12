@@ -21,112 +21,6 @@ import Job from './pages/Job';
 import AgentWorkflowPage from './pages/AgentWorkflow';
 import TestPage from './pages/TestPage';
 
-// Main app content when authenticated
-const AuthenticatedApp = () => {
-  const {
-    isLoading,
-    error,
-    workflow,
-    loadWorkflow
-  } = useWorkflows();
-  const location = useLocation();
-
-  // Handle navigation and workflow state
-  useEffect(() => {
-    console.log("location.pathname", location.pathname);
-    const match = location.pathname.match(/^\/workflow\/([^/]+)/);
-    if (match) {
-      const workflowId = match[1];
-      // Only load from DB if we don't have this workflow or have a different one
-      if (!workflow || (workflow.workflow_id !== workflowId && workflowId !== 'new')) {
-        loadWorkflow(workflowId);
-      }
-    }
-  }, [location.pathname, workflow, loadWorkflow]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 bg-gray-50">
-        <div className="text-center space-y-8">
-          {/* Flowing Dots Animation */}
-          <div className="relative px-8">
-            <div className="flex space-x-6">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className={`w-4 h-4 rounded-full 
-                                    bg-blue-500 
-                                    ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900
-                                    dark:bg-blue-400
-                                    shadow-[0_0_10px_rgba(59,130,246,0.5)]
-                                    dark:shadow-[0_0_10px_rgba(96,165,250,0.5)]
-                                    animate-[flowingDot_1.5s_ease-in-out_infinite]`}
-                  style={{
-                    animationDelay: `${i * 0.2}s`
-                  }}
-                />
-              ))}
-            </div>
-            {/* Connection Lines */}
-            <div className="absolute top-1/2 left-0 w-full -translate-y-1/2 -z-10">
-              <div className="h-1.5 bg-gradient-to-r from-transparent via-blue-500/70 to-transparent animate-glow-pulse" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-lg font-medium text-gray-700 dark:text-gray-200">Processing...</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Please wait while we set things up...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 bg-gray-50">
-        <div className="text-center space-y-4">
-          <div className="text-red-500 text-5xl">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Error Loading Workflow</h2>
-          <p className="text-gray-600 dark:text-gray-300">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col dark:bg-gray-900 bg-gray-50" style={{ '--topbar-height': '64px' } as React.CSSProperties}>
-      <TopBar />
-      {/* Main content area - exact height calculation to prevent scrollbar issues */}
-      <div className="flex" style={{ height: 'calc(100vh - var(--topbar-height))' }}>
-        <div className="w-full">
-          <Routes>
-            <Route path="/workflow/:workflowId" element={<Workflow />} />
-            <Route path="/prompt/:templateId" element={<PromptTemplate />} />
-            <Route path="*" element={
-              <div className="container mx-auto px-4 py-6" style={{ height: 'calc(100% - 12px)', overflowY: 'auto' }}>
-                <Routes>
-                  <Route path="/" element={<WorkflowsManager />} />
-                  <Route path="/prompts" element={<PromptTemplateManager />} />
-                  <Route path="/files" element={<FilesManager />} />
-                  <Route path="/jobs" element={<JobsManager />} />
-                  <Route path="/jobs/:jobId" element={<Job />} />
-                  <Route path="/agent-workflow" element={<AgentWorkflowPage />} />
-                  <Route path="/test" element={<TestPage />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </div>
-            } />
-          </Routes>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 function App() {
   const { handleSessionExpired, isAuthenticated, login, register, error: authError } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
@@ -136,6 +30,109 @@ function App() {
     setStreamSessionExpiredHandler(handleSessionExpired);
     return () => setStreamSessionExpiredHandler(() => { });
   }, [handleSessionExpired]);
+
+  // Main app content when authenticated - defined inside App to ensure context is available
+  const AuthenticatedApp = () => {
+    const {
+      isLoading,
+      error,
+      workflow,
+      loadWorkflow
+    } = useWorkflows();
+    const location = useLocation();
+
+    // Handle navigation and workflow state
+    useEffect(() => {
+      console.log("location.pathname", location.pathname);
+      const match = location.pathname.match(/^\/workflow\/([^/]+)/);
+      if (match) {
+        const workflowId = match[1];
+        // Only load from DB if we don't have this workflow or have a different one
+        if (!workflow || (workflow.workflow_id !== workflowId && workflowId !== 'new')) {
+          loadWorkflow(workflowId);
+        }
+      }
+    }, [location.pathname, workflow, loadWorkflow]);
+
+    if (isLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 bg-gray-50">
+          <div className="text-center space-y-8">
+            {/* Flowing Dots Animation */}
+            <div className="relative px-8">
+              <div className="flex space-x-6">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className={`w-4 h-4 rounded-full 
+                                      bg-blue-500 
+                                      ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900
+                                      dark:bg-blue-400
+                                      animate-pulse`}
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="text-xl font-semibold text-gray-700 dark:text-gray-300">
+              Loading...
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 bg-gray-50">
+          <div className="text-center space-y-4">
+            <div className="text-xl font-semibold text-red-600 dark:text-red-400">
+              Error
+            </div>
+            <div className="text-gray-700 dark:text-gray-300">
+              {error}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen flex flex-col dark:bg-gray-900 bg-gray-50">
+        <TopBar />
+        <div className="flex-1 overflow-auto">
+          <Routes>
+            <Route path="/" element={<Navigate to="/workflows" />} />
+
+            {/* Workflow routes */}
+            <Route path="/workflows" element={<WorkflowsManager />} />
+            <Route path="/workflows/:id" element={<Workflow />} />
+            <Route path="/workflow/:id" element={<Workflow />} />
+
+            {/* Prompt template routes with multiple path patterns */}
+            <Route path="/prompt-templates" element={<PromptTemplateManager />} />
+            <Route path="/prompts" element={<PromptTemplateManager />} />
+            <Route path="/prompt-template/:id" element={<PromptTemplate />} />
+            <Route path="/prompt/:id" element={<PromptTemplate />} />
+
+            {/* File routes */}
+            <Route path="/files" element={<FilesManager />} />
+
+            {/* Job routes */}
+            <Route path="/jobs" element={<JobsManager />} />
+            <Route path="/jobs/:id" element={<Job />} />
+            <Route path="/job/:id" element={<Job />} />
+
+            <Route path="/agent-workflow" element={<AgentWorkflowPage />} />
+            <Route path="/test" element={<TestPage />} />
+
+            {/* Catch-all route for unmatched paths */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </div>
+    );
+  };
 
   if (!isAuthenticated) {
     return (

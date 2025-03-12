@@ -475,6 +475,7 @@ export class WorkflowEngine {
         }
     }
 
+    //////////////////// EVALUATION ENGINE ////////////////////
 
     private static prepareInputsForEval(
         workflow: Workflow
@@ -648,6 +649,9 @@ export class WorkflowEngine {
      * @param workflow The current workflow state
      * @returns Resolved parameters for the tool
      */
+
+    //////////////////// TOOL ENGINE ////////////////////
+
     private static prepareInputsForTool(
         step: WorkflowStep,
         workflow: Workflow
@@ -788,6 +792,9 @@ export class WorkflowEngine {
             };
         }
     }
+
+
+    //////////////////// MISC ////////////////////
 
     /**
      * Clears outputs for a step before execution
