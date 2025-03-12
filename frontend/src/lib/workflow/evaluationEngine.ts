@@ -13,6 +13,175 @@ import { resolveVariablePath } from '../utils/variablePathUtils';
 
 export class EvaluationEngine {
     /**
+     * Executes an evaluation step and handles all the evaluation logic
+     */
+    static async executeEvaluationStep(
+        step: WorkflowStep,
+        workflow: Workflow,
+        currentStepIndex: number,
+        getUpdatedWorkflowStateFromResults: (
+            step: WorkflowStep,
+            outputs: Record<string, any>,
+            workflow: Workflow
+        ) => WorkflowVariable[],
+        statusCallback?: (status: {
+            stepId: string;
+            stepIndex: number;
+            status: 'running' | 'completed' | 'failed';
+            message?: string;
+            progress?: number;
+            result?: Partial<StepExecutionResult>;
+        }) => void
+    ): Promise<{
+        result: StepExecutionResult,
+        updatedState: WorkflowVariable[],
+        nextStepIndex: number
+    }> {
+        console.log(`⚖️ [STEP ${step.step_id}] Evaluating conditions`);
+        let nextStepIndex = currentStepIndex + 1;
+
+        // Notify status: running with progress
+        if (statusCallback) {
+            statusCallback({
+                stepId: step.step_id,
+                stepIndex: currentStepIndex,
+                status: 'running',
+                message: `Evaluating conditions`,
+                progress: 30
+            });
+        }
+
+        // Evaluate conditions
+        const result = this.evaluateConditions(step, workflow);
+
+        // Update workflow state with evaluation results
+        let updatedState = workflow.state || [];
+        if (result.success && result.outputs) {
+            console.log(`✅ [STEP ${step.step_id}] Evaluation successful, updating state`);
+            updatedState = getUpdatedWorkflowStateFromResults(
+                step,
+                result.outputs,
+                workflow
+            );
+
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'running',
+                    message: `Evaluation successful, updating state`,
+                    progress: 70,
+                    result: { success: true }
+                });
+            }
+        } else {
+            console.error(`❌ [STEP ${step.step_id}] Evaluation failed:`, result.error);
+
+            // Notify status: failed
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'failed',
+                    message: `Evaluation failed: ${result.error}`,
+                    result: { success: false, error: result.error }
+                });
+            }
+        }
+
+        // Handle jump logic
+        if (result.outputs &&
+            result.outputs['next_action' as WorkflowVariableName] === 'jump' &&
+            result.outputs['target_step_index' as WorkflowVariableName] !== undefined) {
+
+            const targetStepIndex = Number(result.outputs['target_step_index' as WorkflowVariableName]);
+            const jumpReason = result.outputs['reason' as WorkflowVariableName] as string;
+
+            console.log(`↪️ [STEP ${step.step_id}] Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`);
+
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'running',
+                    message: `Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`,
+                    progress: 80
+                });
+            }
+
+            // Manage jump count
+            const jumpResult = this.manageJumpCount(
+                step,
+                updatedState,
+                currentStepIndex,
+                targetStepIndex,
+                jumpReason
+            );
+
+            // Update state and determine next step
+            updatedState = jumpResult.updatedState;
+
+            // Update result outputs with jump info
+            result.outputs = {
+                ...result.outputs,
+                ['next_action' as WorkflowVariableName]: (jumpResult.canJump ? 'jump' : 'continue') as SchemaValueType,
+                ['max_jumps_reached' as WorkflowVariableName]: (!jumpResult.canJump).toString() as SchemaValueType,
+                ['_jump_info' as WorkflowVariableName]: JSON.stringify(jumpResult.jumpInfo) as SchemaValueType
+            };
+
+            console.log(`${jumpResult.canJump ? '↪️' : '⛔'} [STEP ${step.step_id}] Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}`);
+
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'running',
+                    message: `Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}`,
+                    progress: 90
+                });
+            }
+        } else if (result.outputs && result.outputs['next_action' as WorkflowVariableName] === 'end') {
+            console.log(`🏁 [STEP ${step.step_id}] End workflow condition met`);
+
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'running',
+                    message: `End workflow condition met`,
+                    progress: 90
+                });
+            }
+        } else {
+            console.log(`➡️ [STEP ${step.step_id}] Continuing to next step`);
+
+            // Notify status: running with progress
+            if (statusCallback) {
+                statusCallback({
+                    stepId: step.step_id,
+                    stepIndex: currentStepIndex,
+                    status: 'running',
+                    message: `Continuing to next step`,
+                    progress: 90
+                });
+            }
+        }
+
+        // Use determineNextStep to get the next step index
+        nextStepIndex = this.determineNextStep(result, currentStepIndex, workflow.steps.length);
+
+        return {
+            result,
+            updatedState,
+            nextStepIndex
+        };
+    }
+
+    /**
      * Evaluates conditions for a workflow step and returns the execution result
      */
     static evaluateConditions(
@@ -266,5 +435,33 @@ export class EvaluationEngine {
             updatedState,
             jumpInfo
         };
+    }
+
+    /**
+     * Determines the next step to execute based on evaluation results
+     */
+    static determineNextStep(
+        result: StepExecutionResult,
+        currentStepIndex: number,
+        totalSteps: number
+    ): number {
+        let nextStepIndex = currentStepIndex + 1;
+
+        // Determine next step based on evaluation result
+        const nextAction = result.outputs?.['next_action' as WorkflowVariableName] as string;
+        const targetStepIndex = result.outputs?.['target_step_index' as WorkflowVariableName] as string | undefined;
+        const maxJumpsReached = result.outputs?.['max_jumps_reached' as WorkflowVariableName] === 'true';
+
+        if (nextAction === 'jump' && targetStepIndex !== undefined && !maxJumpsReached) {
+            nextStepIndex = parseInt(targetStepIndex, 10);
+            console.log('Jump will occur to step:', nextStepIndex);
+        } else if (nextAction === 'end') {
+            nextStepIndex = totalSteps; // End workflow
+            console.log('Workflow will end due to evaluation result');
+        } else {
+            console.log('Continuing to next step:', nextStepIndex);
+        }
+
+        return nextStepIndex;
     }
 } 

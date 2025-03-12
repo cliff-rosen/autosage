@@ -604,147 +604,14 @@ export class WorkflowEngine {
         updatedState: WorkflowVariable[],
         nextStepIndex: number
     }> {
-        console.log(`⚖️ [STEP ${step.step_id}] Evaluating conditions`);
-        let nextStepIndex = currentStepIndex + 1;
-
-        // Notify status: running with progress
-        if (statusCallback) {
-            statusCallback({
-                stepId: step.step_id,
-                stepIndex: currentStepIndex,
-                status: 'running',
-                message: `Evaluating conditions`,
-                progress: 30
-            });
-        }
-
-        // Use EvaluationEngine to evaluate conditions
-        const result = EvaluationEngine.evaluateConditions(step, workflow);
-
-        // Update workflow state with evaluation results
-        let updatedState = workflow.state || [];
-        if (result.success && result.outputs) {
-            console.log(`✅ [STEP ${step.step_id}] Evaluation successful, updating state`);
-            updatedState = this.getUpdatedWorkflowStateFromResults(
-                step,
-                result.outputs,
-                workflow
-            );
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Evaluation successful, updating state`,
-                    progress: 70,
-                    result: { success: true }
-                });
-            }
-        } else {
-            console.error(`❌ [STEP ${step.step_id}] Evaluation failed:`, result.error);
-
-            // Notify status: failed
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'failed',
-                    message: `Evaluation failed: ${result.error}`,
-                    result: { success: false, error: result.error }
-                });
-            }
-        }
-
-        // Handle jump logic
-        if (result.outputs &&
-            result.outputs['next_action' as WorkflowVariableName] === 'jump' &&
-            result.outputs['target_step_index' as WorkflowVariableName] !== undefined) {
-
-            const targetStepIndex = Number(result.outputs['target_step_index' as WorkflowVariableName]);
-            const jumpReason = result.outputs['reason' as WorkflowVariableName] as string;
-
-            console.log(`↪️ [STEP ${step.step_id}] Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Jump condition met, target step: ${targetStepIndex}, reason: ${jumpReason}`,
-                    progress: 80
-                });
-            }
-
-            // Use EvaluationEngine to manage jump count
-            const jumpResult = EvaluationEngine.manageJumpCount(
-                step,
-                updatedState,
-                currentStepIndex,
-                targetStepIndex,
-                jumpReason
-            );
-
-            // Update state and determine next step
-            updatedState = jumpResult.updatedState;
-            nextStepIndex = jumpResult.canJump ? targetStepIndex : currentStepIndex + 1;
-
-            // Update result outputs with jump info
-            result.outputs = {
-                ...result.outputs,
-                ['next_action' as WorkflowVariableName]: (jumpResult.canJump ? 'jump' : 'continue') as SchemaValueType,
-                ['max_jumps_reached' as WorkflowVariableName]: (!jumpResult.canJump).toString() as SchemaValueType,
-                ['_jump_info' as WorkflowVariableName]: JSON.stringify(jumpResult.jumpInfo) as SchemaValueType
-            };
-
-            console.log(`${jumpResult.canJump ? '↪️' : '⛔'} [STEP ${step.step_id}] Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}, next step: ${nextStepIndex}`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Jump ${jumpResult.canJump ? 'allowed' : 'blocked'}, next step: ${nextStepIndex}`,
-                    progress: 90
-                });
-            }
-        } else if (result.outputs && result.outputs['next_action' as WorkflowVariableName] === 'end') {
-            nextStepIndex = workflow.steps.length; // End workflow
-            console.log(`🏁 [STEP ${step.step_id}] End workflow condition met`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `End workflow condition met`,
-                    progress: 90
-                });
-            }
-        } else {
-            console.log(`➡️ [STEP ${step.step_id}] Continuing to next step: ${nextStepIndex}`);
-
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: currentStepIndex,
-                    status: 'running',
-                    message: `Continuing to next step: ${nextStepIndex}`,
-                    progress: 90
-                });
-            }
-        }
-
-        return {
-            result,
-            updatedState,
-            nextStepIndex
-        };
+        // Delegate to the EvaluationEngine to handle all evaluation logic
+        return await EvaluationEngine.executeEvaluationStep(
+            step,
+            workflow,
+            currentStepIndex,
+            this.getUpdatedWorkflowStateFromResults.bind(this),
+            statusCallback
+        );
     }
 
     /**
@@ -765,138 +632,51 @@ export class WorkflowEngine {
         result: StepExecutionResult,
         updatedState: WorkflowVariable[]
     }> {
-        if (!step.tool) {
-            console.error(`❌ [STEP ${step.step_id}] No tool configured for this step`);
-            console.timeEnd(`⏱️ Step ${step.step_id} Execution Time`);
-
-            // Notify status: failed
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: step.sequence_number,
-                    status: 'failed',
-                    message: `No tool configured for this step`,
-                    result: { success: false, error: 'No tool configured for this step' }
-                });
-            }
-
-            return {
-                result: {
-                    success: false,
-                    error: 'No tool configured for this step'
-                },
-                updatedState: workflow.state || []
-            };
-        }
-
-        // For tool execution, we need the workflow context to resolve parameters
-        const parameters = this.getResolvedParameters(step, workflow);
-
-        console.log(`🔧 [STEP ${step.step_id}] Executing tool: ${step.tool.name} (${step.tool.tool_type})`);
-        console.log(`📥 [STEP ${step.step_id}] Tool parameters:`, Object.keys(parameters).length);
-
-        // Notify status: running with progress
-        if (statusCallback) {
-            statusCallback({
-                stepId: step.step_id,
-                stepIndex: step.sequence_number,
-                status: 'running',
-                message: `Executing tool: ${step.tool.name}`,
-                progress: 30
-            });
-        }
-
-        // Add prompt template ID for LLM tools
-        if (step.tool.tool_type === 'llm' && step.prompt_template_id) {
-            parameters['prompt_template_id' as ToolParameterName] = step.prompt_template_id as SchemaValueType;
-            console.log(`🔄 [STEP ${step.step_id}] Using prompt template: ${step.prompt_template_id}`);
-        }
-
-        // Execute the tool
         try {
-            console.time(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
+            // 1. Resolve parameters for the tool
+            const parameters = this.getResolvedParameters(step, workflow);
 
-            // Notify status: running with progress
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: step.sequence_number,
-                    status: 'running',
-                    message: `Tool execution in progress`,
-                    progress: 50
-                });
-            }
+            // 2. Execute the tool using ToolEngine
+            let toolOutputs: Record<string, any>;
+            try {
+                toolOutputs = await ToolEngine.executeToolStep(step, parameters, statusCallback);
 
-            const toolResult = await ToolEngine.executeTool(step.tool, parameters);
-            console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
-
-            // Update workflow state with tool results
-            let updatedState = workflow.state || [];
-            if (toolResult) {
-                console.log(`📤 [STEP ${step.step_id}] Tool execution successful, updating state with outputs:`, Object.keys(toolResult).length);
-                updatedState = this.getUpdatedWorkflowStateFromResults(
+                // 3. Update workflow state with tool results
+                const updatedState = this.getUpdatedWorkflowStateFromResults(
                     step,
-                    toolResult,
+                    toolOutputs,
                     workflow
                 );
-                console.log('Updated state:', updatedState); // TODO: remove
 
-                // Notify status: running with progress
-                if (statusCallback) {
-                    statusCallback({
-                        stepId: step.step_id,
-                        stepIndex: step.sequence_number,
-                        status: 'running',
-                        message: `Tool execution successful, updating state`,
-                        progress: 80,
-                        result: { success: true, outputs: toolResult }
-                    });
-                }
-            } else {
-                console.warn(`⚠️ [STEP ${step.step_id}] Tool execution returned no results`);
+                // 4. Return success result with outputs and updated state
+                return {
+                    result: {
+                        success: true,
+                        outputs: toolOutputs
+                    },
+                    updatedState
+                };
+            } catch (toolError) {
+                // Handle tool execution errors
+                console.error(`❌ [STEP ${step.step_id}] Tool execution error:`, toolError);
 
-                // Notify status: running with progress
-                if (statusCallback) {
-                    statusCallback({
-                        stepId: step.step_id,
-                        stepIndex: step.sequence_number,
-                        status: 'running',
-                        message: `Tool execution returned no results`,
-                        progress: 80
-                    });
-                }
-            }
-
-            return {
-                result: {
-                    success: true,
-                    outputs: toolResult
-                },
-                updatedState
-            };
-        } catch (toolError) {
-            console.error(`❌ [STEP ${step.step_id}] Tool execution error:`, toolError);
-            console.timeEnd(`⏱️ Tool ${step.tool.tool_id} Execution Time`);
-
-            // Notify status: failed
-            if (statusCallback) {
-                statusCallback({
-                    stepId: step.step_id,
-                    stepIndex: step.sequence_number,
-                    status: 'failed',
-                    message: `Tool execution error: ${toolError instanceof Error ? toolError.message : String(toolError)}`,
+                return {
                     result: {
                         success: false,
-                        error: toolError instanceof Error ? toolError.message : String(toolError)
-                    }
-                });
+                        error: toolError instanceof Error ? toolError.message : String(toolError),
+                        outputs: {}
+                    },
+                    updatedState: workflow.state || []
+                };
             }
+        } catch (error) {
+            // Handle other errors in parameter resolution or state updates
+            console.error(`❌ [STEP ${step.step_id}] Error in executeStepAsTool:`, error);
 
-            // Create a proper error result
             return {
                 result: {
                     success: false,
-                    error: toolError instanceof Error ? toolError.message : String(toolError),
+                    error: error instanceof Error ? error.message : String(error),
                     outputs: {}
                 },
                 updatedState: workflow.state || []
@@ -954,7 +734,7 @@ export class WorkflowEngine {
         // For evaluation, we need the workflow context to evaluate conditions
         const workflowCopy = { ...workflow, state: clearedState };
 
-        // Evaluate conditions - this already handles jump count management internally
+        // Evaluate conditions using EvaluationEngine
         const result = EvaluationEngine.evaluateConditions(currentStep, workflowCopy);
         console.log('getNextStepIndex evaluation result:', result);
 
@@ -963,17 +743,12 @@ export class WorkflowEngine {
             updatedState = result.updatedState;
         }
 
-        // Determine next step based on evaluation result
-        const nextAction = result.outputs?.['next_action' as WorkflowVariableName] as string;
-        const targetStepIndex = result.outputs?.['target_step_index' as WorkflowVariableName] as string | undefined;
-        const maxJumpsReached = result.outputs?.['max_jumps_reached' as WorkflowVariableName] === 'true';
-
-        if (nextAction === 'jump' && targetStepIndex !== undefined && !maxJumpsReached) {
-            nextStepIndex = parseInt(targetStepIndex, 10);
-            console.log('Jump will occur in getNextStepIndex to step:', nextStepIndex);
-        } else if (nextAction === 'end') {
-            nextStepIndex = workflow.steps.length; // End workflow
-        }
+        // Use EvaluationEngine to determine the next step
+        nextStepIndex = EvaluationEngine.determineNextStep(
+            result,
+            currentStepIndex,
+            workflow.steps.length
+        );
 
         return { nextStepIndex, updatedState };
     }
