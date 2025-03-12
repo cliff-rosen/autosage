@@ -568,7 +568,7 @@ export class WorkflowEngine {
      * 
      * NOTE: This method is currently unused as EvaluationEngine.executeEvaluationStep
      * extracts its own inputs from the workflow. Kept for potential future use.
-     */              
+     */
     private static prepareInputsForEval(
         step: WorkflowStep,
         workflow: Workflow
@@ -716,9 +716,8 @@ export class WorkflowEngine {
             // Use EvaluationEngine to execute the evaluation step
             const evaluationResult = await EvaluationEngine.executeEvaluationStep(
                 step,
-                workflow,
                 currentStepIndex,
-                this.getUpdatedWorkflowStateFromResults,
+                workflow.state || [],
                 statusCallback
             );
 
