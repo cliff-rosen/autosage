@@ -320,89 +320,6 @@ export class WorkflowEngine {
         }
     }
 
-    /**
-     * Updates workflow state with tool outputs based on output mappings
-     */
-    private static getUpdatedWorkflowStateFromResults(
-        step: WorkflowStep,
-        outputs: Record<string, any>,
-        workflow: Workflow
-    ): WorkflowVariable[] {
-        const updatedState = [...(workflow.state || [])];
-
-        // If step is type ACTION, handle tool outputs with mappings
-        if (step.step_type === WorkflowStepType.ACTION) {
-            if (!step.output_mappings || Object.keys(outputs).length === 0) {
-                return updatedState;
-            }
-
-            for (const [outputName, mapping] of Object.entries(step.output_mappings)) {
-                if (!(outputName in outputs)) {
-                    console.warn(`Output ${outputName} not found in outputs`);
-                    continue;
-                }
-
-                const outputValue = outputs[outputName];
-
-                // Get the variable name from the mapping
-                const variableName = typeof mapping === 'object' && 'variable' in mapping
-                    ? mapping.variable
-                    : mapping as WorkflowVariableName;
-
-                // Find the variable in the state
-                console.log('Finding variable:', variableName); // TODO: remove
-                console.log('typeof mapping:', typeof mapping); // TODO: remove
-
-                const variableIndex = updatedState.findIndex(v => v.name === variableName);
-                if (variableIndex === -1) {
-                    console.warn(`Variable ${variableName} not found in state`);
-                    continue;
-                }
-
-                // Apply the output value to the variable based on the mapping
-                const variable = updatedState[variableIndex];
-                console.log('Applying output to variable:', {
-                    variableName: variable.name,
-                    variableSchema: variable.schema,
-                    outputValue
-                });
-                variable.value = this.applyOutputToVariable(variable, mapping, outputValue);
-            }
-        }
-        // If step is type EVALUATION, handle evaluation outputs
-        else if (step.step_type === WorkflowStepType.EVALUATION) {
-            // Generate a shorter variable ID using first 8 chars of step ID plus _eval
-            const shortStepId = step.step_id.slice(0, 8);
-            const outputVarName = `eval_${shortStepId}` as WorkflowVariableName;
-
-            // Check if the output variable already exists
-            const outputVarIndex = updatedState.findIndex(v => v.name === outputVarName);
-            if (outputVarIndex !== -1) {
-                updatedState[outputVarIndex] = {
-                    ...updatedState[outputVarIndex],
-                    // NOTE: We're only storing the outputs object here, not the full EvaluationResult.
-                    // This is why in EvaluationStepRunner we cast the value to EvaluationOutputs.
-                    value: outputs
-                };
-            } else {
-                updatedState.push({
-                    name: outputVarName,
-                    variable_id: outputVarName,
-                    description: 'Evaluation step result',
-                    schema: {
-                        type: 'object',
-                        is_array: false
-                    },
-                    // NOTE: We're only storing the outputs object here, not the full EvaluationResult.
-                    // This is why in EvaluationStepRunner we cast the value to EvaluationOutputs.
-                    value: outputs,
-                    io_type: 'evaluation'
-                });
-            }
-        }
-
-        return updatedState;
-    }
 
     /**
      * Executes a workflow step and returns the updated workflow and execution result
@@ -560,49 +477,11 @@ export class WorkflowEngine {
         }
     }
 
-    /**
-     * Prepares inputs for an evaluation step by extracting values from workflow state
-     * @param step The evaluation step to prepare inputs for
-     * @param workflow The current workflow state
-     * @returns Extracted values needed for evaluation
-     * 
-     * NOTE: This method is currently unused as EvaluationEngine.executeEvaluationStep
-     * extracts its own inputs from the workflow. Kept for potential future use.
-     */
+
     private static prepareInputsForEval(
-        step: WorkflowStep,
         workflow: Workflow
-    ): Record<string, any> {
-        if (!step.evaluation_config || !step.evaluation_config.conditions) {
-            return {};
-        }
-
-        const inputs: Record<string, any> = {};
-        const allVariables = workflow.state || [];
-
-        // Extract only the variables needed for the evaluation conditions
-        for (const condition of step.evaluation_config.conditions) {
-            if (!condition.variable) continue;
-
-            // Use the utility library to resolve variable paths
-            const { value, validPath } = resolveVariablePath(allVariables, condition.variable.toString());
-
-            if (validPath) {
-                inputs[condition.variable.toString()] = value;
-            } else {
-                console.warn(`Invalid variable path for evaluation: ${condition.variable}`);
-                inputs[condition.variable.toString()] = undefined;
-            }
-        }
-
-        // Also extract jump counters if they exist
-        const jumpCounterName = `jump_count_${step.step_id}`;
-        const jumpCounter = allVariables.find(v => v.name === jumpCounterName);
-        if (jumpCounter) {
-            inputs[jumpCounterName] = jumpCounter.value;
-        }
-
-        return inputs;
+    ): WorkflowVariable[] {
+        return workflow.state || [];
     }
 
     /**
@@ -702,6 +581,9 @@ export class WorkflowEngine {
                 throw new Error('Evaluation step is missing configuration');
             }
 
+            // 1 Prepare inputs for evaluation
+            const evalInputs = this.prepareInputsForEval(workflow);
+
             // Notify status: running with progress
             if (statusCallback) {
                 statusCallback({
@@ -713,11 +595,11 @@ export class WorkflowEngine {
                 });
             }
 
-            // Use EvaluationEngine to execute the evaluation step
+            // 2. Process: Use EvaluationEngine to execute the evaluation step
             const evaluationResult = await EvaluationEngine.executeEvaluationStep(
                 step,
                 currentStepIndex,
-                workflow.state || [],
+                evalInputs,
                 statusCallback
             );
 
