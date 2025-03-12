@@ -1,9 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
     Workflow,
-    WorkflowStepType,
-    WorkflowStatus,
-    WorkflowStepId,
     StepExecutionResult,
     WorkflowStep
 } from '../types';
@@ -34,7 +31,6 @@ interface WorkflowContextType {
     updateWorkflowByAction(action: WorkflowStateAction): void
 
     // legacy update methods
-    updateWorkflow(updates: Partial<Workflow>): void
     updateWorkflowStep(step: WorkflowStep): void
 
     // Workflow Execution
@@ -46,6 +42,8 @@ interface WorkflowContextType {
     moveToPreviousStep(): void
     resetWorkflow(): void
     resetWorkflowState(): void
+
+    zz_updateWorkflow(updates: Partial<Workflow>): void
 
 }
 
@@ -100,25 +98,7 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // User Operations
     const createWorkflow = useCallback(() => {
-        const newWorkflow: Workflow = {
-            workflow_id: 'new',
-            name: 'Untitled Workflow',
-            description: 'A new custom workflow',
-            status: WorkflowStatus.DRAFT,
-            state: [],
-            steps: [{
-                step_id: `step-${crypto.randomUUID()}` as WorkflowStepId,
-                label: 'Step 1',
-                description: 'First step',
-                step_type: WorkflowStepType.ACTION,
-                parameter_mappings: {},
-                output_mappings: {},
-                workflow_id: 'new',
-                sequence_number: 0,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            }]
-        };
+        const newWorkflow = WorkflowEngine.createNewWorkflow();
         setWorkflow(newWorkflow);
         setHasUnsavedChanges(true);
         setActiveStep(0);
@@ -232,21 +212,6 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
     }, [originalWorkflow, activeStep]);
 
-    const updateWorkflow = useCallback((updates: Partial<Workflow>) => {
-        if (!workflow) return;
-
-        // DEPRECATED: This method is being phased out in favor of updateWorkflowByAction.
-        // Use updateWorkflowByAction with the UPDATE_WORKFLOW action type instead.
-        console.warn('updateWorkflow is deprecated. Use updateWorkflowByAction with UPDATE_WORKFLOW action type instead.');
-
-        updateWorkflowByAction({
-            type: 'UPDATE_WORKFLOW',
-            payload: {
-                workflowUpdates: updates
-            }
-        });
-    }, [workflow, updateWorkflowByAction]);
-
     const updateWorkflowStep = useCallback((step: WorkflowStep) => {
         console.log('updateWorkflowStep called with step:', step);
         if (!workflow) return;
@@ -352,7 +317,6 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         sessionStorage.removeItem('originalWorkflow');
     }, []);
 
-
     // HACK: clear the outputs of the current step  
     const clearClearStepOutputs = useCallback(() => {
         if (!workflow) return;
@@ -361,7 +325,6 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const updatedState = WorkflowEngine.clearStepOutputs(step, workflow);
         updateWorkflowByAction({ type: 'UPDATE_STATE', payload: { state: updatedState } });
     }, [workflow, activeStep, updateWorkflowByAction]);
-
 
     // Workflow Execution Methods
     const executeCurrentStep = useCallback(async (): Promise<StepExecutionResult> => {
@@ -509,6 +472,21 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setStepRequestsInput(true);
     }, [workflow, updateWorkflowByAction]);
 
+    const zz_updateWorkflow = useCallback((updates: Partial<Workflow>) => {
+        if (!workflow) return;
+
+        // DEPRECATED: This method is being phased out in favor of updateWorkflowByAction.
+        // Use updateWorkflowByAction with the UPDATE_WORKFLOW action type instead.
+        console.warn('updateWorkflow is deprecated. Use updateWorkflowByAction with UPDATE_WORKFLOW action type instead.');
+
+        updateWorkflowByAction({
+            type: 'UPDATE_WORKFLOW',
+            payload: {
+                workflowUpdates: updates
+            }
+        });
+    }, [workflow, updateWorkflowByAction]);
+
     // Initial load
     useEffect(() => {
         loadWorkflows();
@@ -536,7 +514,6 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         createWorkflow,
         loadWorkflow,
         loadWorkflows,
-        updateWorkflow,
         updateWorkflowStep,
         saveWorkflow,
         exitWorkflow,
@@ -547,7 +524,9 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         moveToNextStep,
         moveToPreviousStep,
         resetWorkflow,
-        resetWorkflowState
+        resetWorkflowState,
+
+        zz_updateWorkflow
     };
 
     return (

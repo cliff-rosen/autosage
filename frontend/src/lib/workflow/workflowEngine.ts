@@ -9,7 +9,8 @@ import {
     WorkflowStepId,
     EvaluationResult,
     EnhancedOutputMapping,
-    VariableOperationType
+    VariableOperationType,
+    WorkflowStatus
 } from '../../types/workflows';
 import { ToolParameterName, ToolOutputName, Tool } from '../../types/tools';
 import { SchemaValueType, Schema } from '../../types/schema';
@@ -56,6 +57,26 @@ export type WorkflowStateAction = {
 const APPEND_DELIMITER = '\n\n';
 
 export class WorkflowEngine {
+    /**
+     * Creates a new workflow with default values and a single step
+     */
+    static createNewWorkflow(): Workflow {
+        const newWorkflow: Workflow = {
+            workflow_id: 'new',
+            name: 'Untitled Workflow',
+            description: 'A new custom workflow',
+            status: WorkflowStatus.DRAFT,
+            state: [],
+            steps: []
+        };
+
+        // Add a single step to the workflow
+        const firstStep = this.createNewStep(newWorkflow);
+        newWorkflow.steps = [firstStep];
+
+        return newWorkflow;
+    }
+
     /**
      * Creates a new workflow step with proper defaults and business logic
      */
