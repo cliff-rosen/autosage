@@ -1,4 +1,5 @@
-import { Workflow, WorkflowStepId, WorkflowVariableName, WorkflowVariable } from './workflows';
+import { Workflow, WorkflowVariableName, } from './workflows';
+import { createWorkflowFromTemplate, workflowTemplates as templates, workflowTemplates } from './workflow-templates';
 
 /**
  * Enum defining the types of agent workflows
@@ -14,261 +15,12 @@ export enum AgentWorkflowType {
  * Interface extending the base Workflow with agent-specific properties
  */
 export interface AgentWorkflow extends Workflow {
-    agent_workflow_type: AgentWorkflowType;
+    agent_workflow_type: string;
     max_iterations?: number;
     confidence_threshold?: number;
 }
 
-/**
- * Current phase of the agent workflow orchestration
- */
-export type OrchestrationPhase =
-    | 'question_development'
-    | 'kb_development'
-    | 'answer_generation'
-    | 'completed'
-    | 'failed';
 
-/**
- * Status of the agent workflow orchestration
- */
-export interface OrchestrationStatus {
-    sessionId: string;
-    currentPhase: OrchestrationPhase;
-    progress: number; // 0-100
-    startTime: string;
-    endTime?: string;
-    error?: string;
-    results?: {
-        improvedQuestion?: string;
-        knowledgeBase?: any;
-        finalAnswer?: string;
-    };
-    currentWorkflowId?: string;
-    currentWorkflowStatus?: {
-        id: string;
-        status: string;
-        progress: number;
-        state: {
-            steps?: Array<{
-                id: string;
-                name: string;
-                status: string;
-                result?: any;
-            }>;
-            variables?: Array<any>;
-        };
-    };
-}
-
-/**
- * Configuration for the agent workflow orchestration
- */
-export interface AgentWorkflowConfig {
-    maxIterationsPerPhase?: {
-        [AgentWorkflowType.QUESTION_DEVELOPMENT]?: number;
-        [AgentWorkflowType.KNOWLEDGE_BASE_DEVELOPMENT]?: number;
-        [AgentWorkflowType.ANSWER_GENERATION]?: number;
-    };
-    confidenceThresholds?: {
-        [AgentWorkflowType.QUESTION_DEVELOPMENT]?: number;
-        [AgentWorkflowType.KNOWLEDGE_BASE_DEVELOPMENT]?: number;
-        [AgentWorkflowType.ANSWER_GENERATION]?: number;
-    };
-    enableFeedbackLoop?: boolean;
-    persistState?: boolean;
-}
-
-/**
- * Request to start a new agent workflow
- */
-export interface StartAgentWorkflowRequest {
-    question: string;
-    config?: AgentWorkflowConfig;
-}
-
-/**
- * Response from starting a new agent workflow
- */
-export interface StartAgentWorkflowResponse {
-    sessionId: string;
-    status: OrchestrationStatus;
-    statusUrl: string;
-}
-
-/**
- * Request to get the status of an agent workflow
- */
-export interface GetAgentWorkflowStatusRequest {
-    sessionId: string;
-}
-
-/**
- * Response with the status of an agent workflow
- */
-export interface GetAgentWorkflowStatusResponse {
-    status: OrchestrationStatus;
-}
-
-/**
- * Request to cancel an agent workflow
- */
-export interface CancelAgentWorkflowRequest {
-    sessionId: string;
-}
-
-/**
- * Response from canceling an agent workflow
- */
-export interface CancelAgentWorkflowResponse {
-    success: boolean;
-    message?: string;
-}
-
-/**
- * Event types for agent workflow orchestration
- */
-export enum AgentWorkflowEventType {
-    STATUS_CHANGE = 'status_change',
-    PHASE_COMPLETE = 'phase_complete',
-    WORKFLOW_COMPLETE = 'workflow_complete',
-    ERROR = 'error'
-}
-
-/**
- * Base event interface for agent workflow events
- */
-export interface AgentWorkflowEvent {
-    type: AgentWorkflowEventType;
-    sessionId: string;
-    timestamp: string;
-}
-
-/**
- * Status change event
- */
-export interface StatusChangeEvent extends AgentWorkflowEvent {
-    type: AgentWorkflowEventType.STATUS_CHANGE;
-    status: OrchestrationStatus;
-}
-
-/**
- * Phase complete event
- */
-export interface PhaseCompleteEvent extends AgentWorkflowEvent {
-    type: AgentWorkflowEventType.PHASE_COMPLETE;
-    phase: OrchestrationPhase;
-    result: any;
-}
-
-/**
- * Workflow complete event
- */
-export interface WorkflowCompleteEvent extends AgentWorkflowEvent {
-    type: AgentWorkflowEventType.WORKFLOW_COMPLETE;
-    finalAnswer: string;
-}
-
-/**
- * Error event
- */
-export interface ErrorEvent extends AgentWorkflowEvent {
-    type: AgentWorkflowEventType.ERROR;
-    error: string;
-}
-
-/**
- * Union type for all agent workflow events
- */
-export type AgentWorkflowEventUnion =
-    | StatusChangeEvent
-    | PhaseCompleteEvent
-    | WorkflowCompleteEvent
-    | ErrorEvent;
-
-/**
- * Interface for the agent workflow orchestrator
- */
-export interface AgentWorkflowOrchestratorInterface {
-    executeWorkflowChain(
-        inputValues: WorkflowVariable[],
-        workflowChain: AgentWorkflowChain,
-        config?: AgentWorkflowConfig
-    ): Promise<string>;
-    getStatus(sessionId?: string): OrchestrationStatus;
-    cancelExecution(sessionId?: string): Promise<boolean>;
-    onStatusChange(callback: (event: StatusChangeEvent) => void): void;
-    onPhaseComplete(callback: (event: PhaseCompleteEvent) => void): void;
-    onWorkflowComplete(callback: (event: WorkflowCompleteEvent) => void): void;
-    onError(callback: (event: ErrorEvent) => void): void;
-}
-
-/**
- * Interface for the workflow engine used by the orchestrator
- */
-export interface WorkflowEngineInterface {
-    runJob(job: WorkflowJob): Promise<JobResult>;
-    getJobStatus(jobId: string): Promise<JobStatus>;
-    cancelJob(jobId: string): Promise<boolean>;
-}
-
-/**
- * Job to run a workflow
- */
-export interface WorkflowJob {
-    workflow: Workflow;
-    inputs: WorkflowVariable[];
-    jobId?: string;
-}
-
-/**
- * Result of running a workflow job
- */
-export interface JobResult {
-    jobId: string;
-    success: boolean;
-    error?: string;
-    outputs?: Record<WorkflowVariableName, any>;
-}
-
-/**
- * Status of a workflow job
- */
-export interface JobStatus {
-    jobId: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    progress: number;
-    currentStepId?: WorkflowStepId;
-    error?: string;
-}
-
-/**
- * Constants for workflow variable names
- */
-export const WORKFLOW_VARIABLES = {
-    // Question Development
-    ORIGINAL_QUESTION: 'original_question' as WorkflowVariableName,
-    IMPROVED_QUESTION: 'improved_question' as WorkflowVariableName,
-    QUESTION_IMPROVEMENT_CONFIDENCE: 'question_improvement_confidence' as WorkflowVariableName,
-    QUESTION_IMPROVEMENT_ITERATIONS: 'question_improvement_iterations' as WorkflowVariableName,
-    QUESTION_IMPROVEMENT_FEEDBACK: 'question_improvement_feedback' as WorkflowVariableName,
-
-    // Knowledge Base Development
-    KB_INPUT_QUESTION: 'kb_input_question' as WorkflowVariableName,
-    KNOWLEDGE_BASE: 'knowledge_base' as WorkflowVariableName,
-    KB_COMPLETENESS_SCORE: 'kb_completeness_score' as WorkflowVariableName,
-    KB_DEVELOPMENT_ITERATIONS: 'kb_development_iterations' as WorkflowVariableName,
-    KB_SOURCES: 'kb_sources' as WorkflowVariableName,
-    KB_GAPS: 'kb_gaps' as WorkflowVariableName,
-
-    // Answer Generation
-    ANSWER_INPUT_QUESTION: 'answer_input_question' as WorkflowVariableName,
-    ANSWER_INPUT_KB: 'answer_input_kb' as WorkflowVariableName,
-    FINAL_ANSWER: 'final_answer' as WorkflowVariableName,
-    ANSWER_CONFIDENCE: 'answer_confidence' as WorkflowVariableName,
-    ANSWER_ITERATIONS: 'answer_iterations' as WorkflowVariableName,
-    ANSWER_SOURCES: 'answer_sources' as WorkflowVariableName
-};
 
 /**
  * Interface for a workflow phase in a chain
@@ -278,14 +30,9 @@ export interface WorkflowPhase {
     type: AgentWorkflowType;
     label: string;
     description: string;
-    createWorkflow: () => Promise<AgentWorkflow> | AgentWorkflow;
-    inputs: Record<string, {
-        source: 'previous' | 'original' | 'constant';
-        sourcePhaseId?: string;
-        sourceVariable?: WorkflowVariableName;
-        value?: any;
-    }>;
-    outputs: WorkflowVariableName[];
+    workflow: () => Promise<AgentWorkflow> | AgentWorkflow;
+    inputs_mappings: Record<WorkflowVariableName, WorkflowVariableName>;
+    outputs_mappings: Record<WorkflowVariableName, WorkflowVariableName>;
 }
 
 /**
@@ -299,131 +46,98 @@ export interface AgentWorkflowChain {
     state?: Record<string, any>; // For now, keeping as Record for backward compatibility
 }
 
+
 /**
- * Default agent workflow chain with the standard three phases
+ * Simplified agent workflow chain using sample workflow templates
  */
-export const DEFAULT_AGENT_WORKFLOW_CHAIN: AgentWorkflowChain = {
-    id: 'default_agent_workflow_chain',
-    name: 'Default Agent Workflow Chain',
-    description: 'Standard three-phase agent workflow: question development, knowledge base development, and answer generation',
+export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
+    id: 'sample_workflow_chain',
+    name: 'Sample Workflow Chain',
+    description: 'Simple workflow chain using our sample workflow templates',
     phases: [
         {
-            id: 'question_development',
+            id: 'echo_phase',
             type: AgentWorkflowType.QUESTION_DEVELOPMENT,
-            label: 'Question Development',
-            description: 'Improve and refine the original question',
-            createWorkflow: () => import('../lib/workflow/agent/definitions/questionDevelopmentWorkflow').then(m => m.createQuestionDevelopmentWorkflow()),
-            inputs: {
-                [WORKFLOW_VARIABLES.ORIGINAL_QUESTION]: {
-                    source: 'original',
-                    value: null
-                }
+            label: 'Echo Input',
+            description: 'Simple echo of the input',
+            workflow: () => createWorkflowFromTemplate('echo') as AgentWorkflow,
+            inputs_mappings: {
             },
-            outputs: [WORKFLOW_VARIABLES.IMPROVED_QUESTION]
+            outputs_mappings: {
+            }
         },
         {
-            id: 'kb_development',
+            id: 'search_phase',
             type: AgentWorkflowType.KNOWLEDGE_BASE_DEVELOPMENT,
-            label: 'Knowledge Base Development',
-            description: 'Build a comprehensive knowledge base for the question',
-            createWorkflow: () => import('../lib/workflow/agent/definitions/knowledgeBaseDevelopmentWorkflow').then(m => m.createKnowledgeBaseDevelopmentWorkflow()),
-            inputs: {
-                [WORKFLOW_VARIABLES.KB_INPUT_QUESTION]: {
-                    source: 'previous',
-                    sourcePhaseId: 'question_development',
-                    sourceVariable: WORKFLOW_VARIABLES.IMPROVED_QUESTION
-                }
+            label: 'Search Information',
+            description: 'Search for information based on the input',
+            workflow: () => createWorkflowFromTemplate('search') as AgentWorkflow,
+            inputs_mappings: {
             },
-            outputs: [WORKFLOW_VARIABLES.KNOWLEDGE_BASE]
+            outputs_mappings: {
+            }
         },
         {
-            id: 'answer_generation',
+            id: 'transform_phase',
             type: AgentWorkflowType.ANSWER_GENERATION,
-            label: 'Answer Generation',
-            description: 'Generate a comprehensive answer based on the knowledge base',
-            createWorkflow: () => import('../lib/workflow/agent/definitions/answerGenerationWorkflow').then(m => m.createAnswerGenerationWorkflow()),
-            inputs: {
-                [WORKFLOW_VARIABLES.ANSWER_INPUT_QUESTION]: {
-                    source: 'previous',
-                    sourcePhaseId: 'question_development',
-                    sourceVariable: WORKFLOW_VARIABLES.IMPROVED_QUESTION
-                },
-                [WORKFLOW_VARIABLES.ANSWER_INPUT_KB]: {
-                    source: 'previous',
-                    sourcePhaseId: 'kb_development',
-                    sourceVariable: WORKFLOW_VARIABLES.KNOWLEDGE_BASE
-                }
+            label: 'Transform Data',
+            description: 'Process and transform the data from previous phases',
+            workflow: () => createWorkflowFromTemplate('data-transformation') as AgentWorkflow,
+            inputs_mappings: {
             },
-            outputs: [WORKFLOW_VARIABLES.FINAL_ANSWER]
+            outputs_mappings: {
+            }
         }
     ],
     state: [
-        // Input variable - original question from user
+        // Input variable - question from user
         {
-            variable_id: 'question',
-            name: 'question' as WorkflowVariableName,
+            variable_id: 'input1',
+            name: 'input1',
             schema: {
                 type: 'string',
                 is_array: false,
-                description: 'The original question from the user'
+                description: 'The input question from the user'
             },
             value: '',
             io_type: 'input',
             required: true
         },
-        // Output variable - improved question with explanation
+        // Echo output
         {
-            variable_id: 'improvement_response',
-            name: 'improvement_response' as WorkflowVariableName,
+            variable_id: 'output1',
+            name: 'output1',
             schema: {
-                type: 'object',
+                type: 'string',
                 is_array: false,
-                description: 'The improved question with explanation',
-                fields: {
-                    improvedQuestion: {
-                        type: 'string',
-                        is_array: false,
-                        description: 'The improved version of the question'
-                    },
-                    explanation: {
-                        type: 'string',
-                        is_array: false,
-                        description: 'Explanation of how the question was improved'
-                    }
-                }
+                description: 'The echoed output from the first phase'
             },
-            value: {
-                improvedQuestion: '',
-                explanation: ''
-            },
+            value: '',
             io_type: 'output'
         },
-        // Output variable - evaluation of the response
+        // Search results
         {
-            variable_id: 'response_evaluation',
-            name: 'response_evaluation' as WorkflowVariableName,
+            variable_id: 'output2',
+            name: 'output2',
             schema: {
-                type: 'object',
+                type: 'string',
                 is_array: false,
-                description: 'Evaluation of the improved question',
-                fields: {
-                    confidenceScore: {
-                        type: 'number',
-                        is_array: false,
-                        description: 'Confidence score for the improvement'
-                    },
-                    evaluation: {
-                        type: 'string',
-                        is_array: false,
-                        description: 'Textual evaluation of the improvement'
-                    }
-                }
+                description: 'The search results from the second phase'
             },
-            value: {
-                confidenceScore: 0,
-                evaluation: ''
+            value: '',
+            io_type: 'output'
+        },
+        // Final output
+        {
+            variable_id: 'output3',
+            name: 'output3',
+            schema: {
+                type: 'string',
+                is_array: false,
+                description: 'The final processed result from the third phase'
             },
-            io_type: 'evaluation'
+            value: '',
+            io_type: 'output'
         }
     ]
 }; 

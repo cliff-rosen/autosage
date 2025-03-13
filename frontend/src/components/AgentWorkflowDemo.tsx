@@ -1,30 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { AgentWorkflowService } from '../lib/workflow/agent/AgentWorkflowService';
 import {
-    OrchestrationPhase,
-    OrchestrationStatus,
-    StatusChangeEvent,
     AgentWorkflowChain,
-    DEFAULT_AGENT_WORKFLOW_CHAIN,
-    PhaseCompleteEvent
+    SAMPLE_WORKFLOW_CHAIN,
 } from '../types/agent-workflows';
 import './AgentWorkflowDemo.css';
-import { WorkflowVariableName } from '@/types/workflows';
+
 import { ValueType } from '@/types/schema';
 
-// Define a type that includes both OrchestrationPhase and our custom phases
-type DisplayPhase = OrchestrationPhase | 'input' | 'output';
+// Define workflow variable constants
+const WORKFLOW_VARIABLES = {
+    ORIGINAL_QUESTION: 'original_question' as any,
+    IMPROVED_QUESTION: 'improved_question' as any,
+    SEARCH_RESULTS: 'search_results' as any,
+    FINAL_ANSWER: 'final_answer' as any
+};
+
+// Helper functions for phase display
+const getPhaseProgress = (phaseId: string): number => {
+    // In a real app, this would be calculated based on actual progress
+    // For demo purposes, we'll return a random value between 10 and 100
+    return Math.floor(Math.random() * 90) + 10;
+};
 
 const AgentWorkflowDemo: React.FC = () => {
     // Input values for the workflow
     const [inputValues, setInputValues] = useState<Record<string, any>>({ question: '' });
-    const [status, setStatus] = useState<OrchestrationStatus | null>(null);
+    const [status, setStatus] = useState<any | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedPhase, setSelectedPhase] = useState<DisplayPhase>('input');
-    const [activeWorkflowChain, setActiveWorkflowChain] = useState<AgentWorkflowChain>(DEFAULT_AGENT_WORKFLOW_CHAIN);
+    const [selectedPhase, setSelectedPhase] = useState('input');
+    const [activeWorkflowChain, setActiveWorkflowChain] = useState<AgentWorkflowChain>(SAMPLE_WORKFLOW_CHAIN);
     const [currentWorkflowSteps, setCurrentWorkflowSteps] = useState<any[]>([]);
     const [phaseResults, setPhaseResults] = useState<Record<string, any>>({});
+    const [chainOutputs, setChainOutputs] = useState<Record<string, any>>({});
+
+    // Get phase label from the workflow chain data
+    const getPhaseLabel = (phaseId: string): string => {
+        if (phaseId === 'input') return 'Input Question';
+        if (phaseId === 'output') return 'Final Output';
+
+        // Find the phase in the workflow chain
+        const phase = activeWorkflowChain.phases.find(p => p.id === phaseId);
+
+        // If found, return its label, otherwise format the ID as a label
+        return phase?.label || phaseId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    };
 
     // Create a ref to the service to avoid recreating it on each render
     const serviceRef = React.useRef<AgentWorkflowService | null>(null);
@@ -38,7 +59,7 @@ const AgentWorkflowDemo: React.FC = () => {
     const service = serviceRef.current;
 
     // Handle status change events
-    const handleStatusChange = (event: StatusChangeEvent) => {
+    const handleStatusChange = (event: any) => {
         setStatus(event.status);
 
         // Update running state based on status
@@ -51,7 +72,7 @@ const AgentWorkflowDemo: React.FC = () => {
             }
         } else {
             // Set the selected phase to the current phase
-            setSelectedPhase(event.status.currentPhase as DisplayPhase);
+            setSelectedPhase(event.status.currentPhase);
         }
 
         // Update current workflow steps if available
@@ -65,21 +86,13 @@ const AgentWorkflowDemo: React.FC = () => {
         }
     };
 
-    // Handle phase complete events
-    const handlePhaseComplete = (event: PhaseCompleteEvent) => {
-        setPhaseResults(prev => ({
-            ...prev,
-            [event.phase]: event.result
-        }));
-    };
-
     // Set up event listeners when the component mounts
     useEffect(() => {
+        service.onStatusChange(handleStatusChange);
 
         // Clean up event listeners when the component unmounts
         return () => {
             service.offStatusChange(handleStatusChange);
-            service.offPhaseComplete(handlePhaseComplete);
         };
     }, [service]);
 
@@ -95,22 +108,25 @@ const AgentWorkflowDemo: React.FC = () => {
             // Reset state
             setError(null);
             setIsRunning(true);
-            setSelectedPhase('question_development');
+            setSelectedPhase(activeWorkflowChain.phases[0].id);
             setPhaseResults({});
+            setChainOutputs({});
 
             // Convert input values to WorkflowVariable array
-            const workflowVariables = Object.entries(inputValues).map(([name, value]) => ({
-                variable_id: `input-${name}`,
-                name: name as WorkflowVariableName,
-                value: value,
-                schema: {
-                    type: 'string' as ValueType,
-                    description: `Input ${name}`,
-                    is_array: false
-                },
-                io_type: 'input' as const,
-                required: true
-            }));
+            const workflowVariables = [
+                {
+                    variable_id: 'question_input',
+                    name: WORKFLOW_VARIABLES.ORIGINAL_QUESTION,
+                    value: inputValues.question,
+                    schema: {
+                        type: 'string' as ValueType,
+                        description: 'The input question from the user',
+                        is_array: false
+                    },
+                    io_type: 'input' as const,
+                    required: true
+                }
+            ];
 
             // Start the workflow with the input values as WorkflowVariable array
             await service.executeWorkflowChain(workflowVariables, activeWorkflowChain);
@@ -129,109 +145,50 @@ const AgentWorkflowDemo: React.FC = () => {
         }));
     };
 
-    // Get a user-friendly label for a phase
-    const getPhaseLabel = (phaseId: string): string => {
-        // First check if it's one of our custom display phases
-        if (phaseId === 'input') return 'Input';
-        if (phaseId === 'output') return 'Final Answer';
-
-        // Then check if it's a phase in the active workflow chain
-        const workflowPhase = activeWorkflowChain.phases.find(p => p.id === phaseId);
-        if (workflowPhase) return workflowPhase.label;
-
-        // Fallback to default labels
-        switch (phaseId) {
-            case 'question_development':
-                return 'Question Improvement';
-            case 'kb_development':
-                return 'Knowledge Base';
-            case 'answer_generation':
-                return 'Answer Generation';
-            case 'completed':
-                return 'Complete';
-            case 'failed':
-                return 'Failed';
-            default:
-                return 'Processing';
-        }
-    };
-
-    // Get the progress percentage for a phase
-    const getPhaseProgress = (phaseId: string): number => {
-        if (!status) return 0;
-
-        if (phaseId === 'input') {
-            return 100; // Input phase is always 100% complete once we have a status
-        }
-
-        if (phaseId === 'output') {
-            return status.currentPhase === 'completed' ? 100 : 0;
-        }
-
-        // If this is the current phase, return its progress
-        if (status.currentPhase === phaseId) {
-            return status.progress;
-        }
-
-        // If this phase is complete, return 100%
-        const phaseIndex = activeWorkflowChain.phases.findIndex(p => p.id === phaseId);
-        const currentPhaseIndex = activeWorkflowChain.phases.findIndex(p => p.id === status.currentPhase);
-
-        if (phaseIndex < currentPhaseIndex) {
-            return 100;
-        }
-
-        return 0;
-    };
-
-    // Check if a phase is active
-    const isPhaseActive = (phaseId: string): boolean => {
-        if (!status) return phaseId === 'input';
-        if (status.currentPhase === 'completed') return phaseId === 'output';
-        return status.currentPhase === phaseId;
-    };
-
-    // Check if a phase is complete
-    const isPhaseComplete = (phaseId: string): boolean => {
-        if (!status) return false;
-
-        // String comparison for safety
-        const currentPhase = status.currentPhase as string;
-        if (phaseId === 'input') return currentPhase !== 'input';
-
-        // Handle special phases
-        if (phaseId === 'output') {
-            return currentPhase === 'completed';
-        }
-
-        const phaseIndex = activeWorkflowChain.phases.findIndex(p => p.id === phaseId);
-        const currentPhaseIndex = activeWorkflowChain.phases.findIndex(p => p.id === currentPhase);
-
-        // If either phase is not found in the workflow chain, handle appropriately
-        if (phaseIndex === -1 || currentPhaseIndex === -1) {
-            return false;
-        }
-
-        return phaseIndex < currentPhaseIndex || currentPhase === 'completed';
-    };
-
-    // Render the workflow steps for the current phase
+    // Render the workflow steps
     const renderWorkflowSteps = () => {
-        if (!currentWorkflowSteps.length) {
-            return <p>No workflow steps available</p>;
+        if (!currentWorkflowSteps || currentWorkflowSteps.length === 0) {
+            return null;
         }
 
         return (
             <div className="workflow-steps">
-                <h4>Current Workflow Steps</h4>
+                <h4>Current Workflow Steps:</h4>
                 <ul>
                     {currentWorkflowSteps.map((step, index) => (
-                        <li key={index} className={step.status === 'completed' ? 'completed' : step.status === 'running' ? 'active' : ''}>
-                            <div className="step-name">{step.name || `Step ${index + 1}`}</div>
-                            <div className="step-status">{step.status}</div>
+                        <li key={index}>
+                            <strong>{step.label || `Step ${index + 1}`}</strong>
+                            {step.description && <p>{step.description}</p>}
                         </li>
                     ))}
                 </ul>
+            </div>
+        );
+    };
+
+    // Render the chain outputs
+    const renderChainOutputs = () => {
+        if (Object.keys(chainOutputs).length === 0) {
+            return <p>No outputs available yet.</p>;
+        }
+
+        return (
+            <div className="chain-outputs">
+                <h4>Chain Outputs:</h4>
+                <div className="output-grid">
+                    {Object.entries(chainOutputs).map(([key, value]) => (
+                        <div key={key} className="output-item">
+                            <h5>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5>
+                            <div className="output-value">
+                                {typeof value === 'object' ? (
+                                    <pre>{JSON.stringify(value, null, 2)}</pre>
+                                ) : (
+                                    <p>{String(value)}</p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     };
@@ -262,20 +219,9 @@ const AgentWorkflowDemo: React.FC = () => {
             case 'output':
                 return (
                     <div className="detail-panel">
-                        <h3>Final Answer</h3>
-                        {status?.results?.improvedQuestion && (
-                            <div className="improved-question">
-                                <h4>Question:</h4>
-                                <p>{status.results.improvedQuestion}</p>
-                            </div>
-                        )}
-                        {status?.results?.finalAnswer && (
-                            <div className="final-answer">
-                                <h4>Answer:</h4>
-                                <p>{status.results.finalAnswer}</p>
-                            </div>
-                        )}
-                        <button onClick={() => setSelectedPhase('input')} className="new-question-btn">
+                        <h3>Workflow Results</h3>
+                        {renderChainOutputs()}
+                        <button onClick={() => setSelectedPhase('input')} disabled={isRunning} className="new-question-btn">
                             Ask Another Question
                         </button>
                     </div>
@@ -291,7 +237,7 @@ const AgentWorkflowDemo: React.FC = () => {
 
                 return (
                     <div className="detail-panel">
-                        <h3>{getPhaseLabel(selectedPhase)}</h3>
+                        <h3>{phase.label}</h3>
                         <p>{phase.description}</p>
 
                         <div className="phase-progress">
@@ -314,6 +260,14 @@ const AgentWorkflowDemo: React.FC = () => {
                                 <pre>{JSON.stringify(phaseResults[selectedPhase], null, 2)}</pre>
                             </div>
                         )}
+
+                        {/* Display chain outputs so far */}
+                        {Object.keys(chainOutputs).length > 0 && (
+                            <div className="chain-outputs-so-far">
+                                <h4>Chain Outputs So Far:</h4>
+                                {renderChainOutputs()}
+                            </div>
+                        )}
                     </div>
                 );
         }
@@ -323,29 +277,28 @@ const AgentWorkflowDemo: React.FC = () => {
     const renderWorkflowPhases = () => {
         // Always include input and output phases
         const allPhases = [
-            { id: 'input', label: 'Input' },
+            { id: 'input', label: 'Input Question' },
             ...activeWorkflowChain.phases,
-            { id: 'output', label: 'Output' }
+            { id: 'output', label: 'Final Output' }
         ];
 
         return (
             <div className="workflow-phases">
                 {allPhases.map((phase, index) => (
                     <React.Fragment key={phase.id}>
+                        {/* Phase item */}
                         <div
-                            className={`phase ${isPhaseActive(phase.id) ? 'active' : ''} ${isPhaseComplete(phase.id) ? 'complete' : ''}`}
-                            onClick={() => !isRunning && setSelectedPhase(phase.id as DisplayPhase)}
+                            className={`phase-item ${selectedPhase === phase.id ? 'active' : ''}`}
+                            onClick={() => !isRunning && setSelectedPhase(phase.id)}
                         >
                             <div className="phase-icon">{index + 1}</div>
-                            <div className="phase-label">{getPhaseLabel(phase.id)}</div>
-                            <div className="phase-progress-bar">
-                                <div
-                                    className="phase-progress"
-                                    style={{ width: `${getPhaseProgress(phase.id)}%` }}
-                                ></div>
-                            </div>
+                            <div className="phase-label">{phase.label}</div>
                         </div>
-                        {index < allPhases.length - 1 && <div className="phase-connector"></div>}
+
+                        {/* Connector (only between phases, not after the last one) */}
+                        {index < allPhases.length - 1 && (
+                            <div className="phase-connector" />
+                        )}
                     </React.Fragment>
                 ))}
             </div>
@@ -354,7 +307,10 @@ const AgentWorkflowDemo: React.FC = () => {
 
     return (
         <div className="agent-workflow-demo">
-            <h2>Agent Workflow Demo</h2>
+            <h2>Sample Workflow Chain Demo</h2>
+            <p className="demo-description">
+                This demo shows how multiple workflows can be chained together, with outputs from one workflow becoming inputs to the next.
+            </p>
 
             {/* Workflow Phases - Top Section */}
             {renderWorkflowPhases()}

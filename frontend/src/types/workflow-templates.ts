@@ -3,10 +3,10 @@ import {
     WorkflowStatus,
     WorkflowStepType,
     WorkflowStepId,
-    WorkflowVariableName,
-    VariableOperationType
+    WorkflowVariableName
 } from './workflows';
 import { ToolParameterName, ToolOutputName } from './tools';
+import { AgentWorkflow, AgentWorkflowType } from './agent-workflows';
 
 // Helper function to create typed string literals for branded types
 const asStepId = (id: string): WorkflowStepId => id as unknown as WorkflowStepId;
@@ -23,12 +23,14 @@ export interface WorkflowTemplate {
 }
 
 // Define the Echo workflow template (1-step workflow)
-export const echoWorkflowTemplate: Workflow = {
+export const echoWorkflowTemplate: AgentWorkflow = {
     workflow_id: "template-echo",
+    agent_workflow_type: "QUESTION DEVELOPMENT",
+    max_iterations: 1,
+    confidence_threshold: 0.9,
     name: "Echo Workflow",
     description: "A simple workflow that echoes the input",
     status: WorkflowStatus.DRAFT,
-    user_id: 1,
     error: undefined,
     created_at: "2025-03-12T01:04:58",
     updated_at: "2025-03-13T04:04:19",
@@ -106,9 +108,6 @@ export const echoWorkflowTemplate: Workflow = {
             },
             io_type: "input",
             variable_id: "echo_var_input_1",
-            workflow_id: "template-echo",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
             value: ""
         },
         {
@@ -123,9 +122,6 @@ export const echoWorkflowTemplate: Workflow = {
             },
             io_type: "output",
             variable_id: "echo_var_output_1",
-            workflow_id: "template-echo",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
             value: ""
         }
     ]

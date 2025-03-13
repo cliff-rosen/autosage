@@ -1,15 +1,5 @@
 import { EventEmitter } from '../../../lib/utils/EventEmitter';
-import {
-    AgentWorkflowConfig,
-    AgentWorkflowEventType,
-    AgentWorkflowOrchestratorInterface,
-    ErrorEvent,
-    OrchestrationStatus,
-    PhaseCompleteEvent,
-    StatusChangeEvent,
-    WorkflowCompleteEvent,
-    AgentWorkflowChain
-} from '../../../types/agent-workflows';
+import { AgentWorkflowChain } from '../../../types/agent-workflows';
 import { WorkflowVariable } from '../../../types/workflows';
 import { AgentWorkflowOrchestrator } from './AgentWorkflowOrchestrator';
 
@@ -68,7 +58,6 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
     async executeWorkflowChain(
         inputValues: WorkflowVariable[],
         workflowChain: AgentWorkflowChain,
-        config?: AgentWorkflowConfig
     ): Promise<string> {
         try {
             // Create a new orchestrator
@@ -129,7 +118,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback Function to call when status changes
      */
     onStatusChange(callback: (event: StatusChangeEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.STATUS_CHANGE, callback);
+        //this.eventEmitter.on(AgentWorkflowEventType.STATUS_CHANGE, callback);
+        console.log('onStatusChange', callback);
     }
 
     /**
@@ -137,7 +127,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback Function to call when a phase completes
      */
     onPhaseComplete(callback: (event: PhaseCompleteEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.PHASE_COMPLETE, callback);
+        //this.eventEmitter.on(AgentWorkflowEventType.PHASE_COMPLETE, callback);
+        console.log('onPhaseComplete', callback);
     }
 
     /**
@@ -145,7 +136,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback Function to call when the workflow completes
      */
     onWorkflowComplete(callback: (event: WorkflowCompleteEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.WORKFLOW_COMPLETE, callback);
+        //this.eventEmitter.on(AgentWorkflowEventType.WORKFLOW_COMPLETE, callback);
+        console.log('onWorkflowComplete', callback);
     }
 
     /**
@@ -153,7 +145,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback Function to call when an error occurs
      */
     onError(callback: (event: ErrorEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.ERROR, callback);
+        //this.eventEmitter.on(AgentWorkflowEventType.ERROR, callback);
+        console.log('onError', callback);
     }
 
     /**
@@ -161,7 +154,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback The callback to remove
      */
     offStatusChange(callback: (event: StatusChangeEvent) => void): void {
-        this.eventEmitter.removeListener(AgentWorkflowEventType.STATUS_CHANGE, callback);
+        //this.eventEmitter.removeListener(AgentWorkflowEventType.STATUS_CHANGE, callback);
+        console.log('offStatusChange', callback);
     }
 
     /**
@@ -169,7 +163,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback The callback to remove
      */
     offPhaseComplete(callback: (event: PhaseCompleteEvent) => void): void {
-        this.eventEmitter.removeListener(AgentWorkflowEventType.PHASE_COMPLETE, callback);
+        //this.eventEmitter.removeListener(AgentWorkflowEventType.PHASE_COMPLETE, callback);
+        console.log('offPhaseComplete', callback);
     }
 
     /**
@@ -177,7 +172,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback The callback to remove
      */
     offWorkflowComplete(callback: (event: WorkflowCompleteEvent) => void): void {
-        this.eventEmitter.removeListener(AgentWorkflowEventType.WORKFLOW_COMPLETE, callback);
+        //this.eventEmitter.removeListener(AgentWorkflowEventType.WORKFLOW_COMPLETE, callback);
+        console.log('offWorkflowComplete', callback);
     }
 
     /**
@@ -185,7 +181,8 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
      * @param callback The callback to remove
      */
     offError(callback: (event: ErrorEvent) => void): void {
-        this.eventEmitter.removeListener(AgentWorkflowEventType.ERROR, callback);
+        // this.eventEmitter.removeListener(AgentWorkflowEventType.ERROR, callback);
+        console.log('offError', callback);
     }
 
     /**
@@ -211,22 +208,26 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
     private setupOrchestratorListeners(orchestrator: AgentWorkflowOrchestrator): void {
         // Set up status change listener
         orchestrator.onStatusChange((event) => {
-            this.eventEmitter.emit(AgentWorkflowEventType.STATUS_CHANGE, event);
+            //this.eventEmitter.emit(AgentWorkflowEventType.STATUS_CHANGE, event);
+            console.log('onStatusChange', event);
         });
 
         // Set up phase complete listener
         orchestrator.onPhaseComplete((event) => {
-            this.eventEmitter.emit(AgentWorkflowEventType.PHASE_COMPLETE, event);
+            //this.eventEmitter.emit(AgentWorkflowEventType.PHASE_COMPLETE, event);
+            console.log('onPhaseComplete', event);
         });
 
         // Set up workflow complete listener
         orchestrator.onWorkflowComplete((event) => {
-            this.eventEmitter.emit(AgentWorkflowEventType.WORKFLOW_COMPLETE, event);
+            //this.eventEmitter.emit(AgentWorkflowEventType.WORKFLOW_COMPLETE, event);
+            console.log('onWorkflowComplete', event);
         });
 
         // Set up error listener
         orchestrator.onError((event) => {
-            this.eventEmitter.emit(AgentWorkflowEventType.ERROR, event);
+            // this.eventEmitter.emit(AgentWorkflowEventType.ERROR, event);
+            console.log('onError', event);
         });
 
         // Set up step status update listener

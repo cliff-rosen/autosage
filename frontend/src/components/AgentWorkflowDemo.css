@@ -1,104 +1,96 @@
 .agent-workflow-demo {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 2rem;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 .agent-workflow-demo h2 {
-    font-size: 1.8rem;
-    margin-bottom: 1.5rem;
-    color: #333;
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #1f2937;
+}
+
+.demo-description {
+    font-size: 1rem;
+    color: #6b7280;
+    margin-bottom: 2rem;
 }
 
 /* Workflow Phases - Top Section */
 .workflow-phases {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     margin-bottom: 2rem;
-    padding: 1rem;
-    background-color: #f8f9fa;
+    padding: 1.5rem;
+    background-color: white;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow-x: auto;
+    min-height: 120px;
 }
 
-.phase {
-    flex: 1;
+.phase-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 1rem;
     cursor: pointer;
-    position: relative;
-    transition: all 0.3s ease;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+    flex: 1;
+    text-align: center;
+    max-width: 150px;
 }
 
-.phase:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-    border-radius: 6px;
+.phase-item:hover {
+    background-color: #f3f4f6;
 }
 
-.phase.active {
-    background-color: rgba(59, 130, 246, 0.1);
-    border-radius: 6px;
-}
-
-.phase.complete .phase-icon {
-    background-color: #10b981;
-    color: white;
+.phase-item.active {
+    background-color: #e0f2fe;
 }
 
 .phase-icon {
     width: 36px;
     height: 36px;
-    border-radius: 50%;
-    background-color: #e5e7eb;
-    color: #6b7280;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
+    background-color: #e5e7eb;
+    color: #4b5563;
+    border-radius: 50%;
+    font-weight: 600;
     margin-bottom: 0.5rem;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
 }
 
-.phase.active .phase-icon {
+.phase-item.active .phase-icon {
     background-color: #3b82f6;
     color: white;
 }
 
 .phase-label {
     font-size: 0.875rem;
-    font-weight: 500;
     color: #4b5563;
     text-align: center;
-    margin-bottom: 0.5rem;
+    white-space: nowrap;
 }
 
-.phase.active .phase-label {
+.phase-item.active .phase-label {
     color: #1f2937;
-    font-weight: 600;
-}
-
-.phase-progress-bar {
-    width: 100%;
-    height: 4px;
-    background-color: #e5e7eb;
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.phase-progress {
-    height: 100%;
-    background-color: #3b82f6;
-    transition: width 0.5s ease;
+    font-weight: 500;
 }
 
 .phase-connector {
-    width: 20px;
+    flex: 1;
     height: 2px;
     background-color: #e5e7eb;
-    flex-shrink: 0;
+    margin: 0;
+    min-width: 20px;
+    max-width: 100px;
 }
 
 /* Detail Panel - Bottom Section */
@@ -193,20 +185,106 @@
     transition: width 0.5s ease;
 }
 
+.workflow-steps {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: #f9fafb;
+    border-radius: 6px;
+}
+
+.workflow-steps ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.workflow-steps li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.workflow-steps li:last-child {
+    border-bottom: none;
+}
+
+.workflow-steps p {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.chain-outputs {
+    margin-top: 1.5rem;
+}
+
+.output-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.output-item {
+    background-color: #f9fafb;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.output-item h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.output-value {
+    font-size: 0.875rem;
+}
+
+.output-value pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.output-value p {
+    margin: 0;
+}
+
+.phase-results {
+    margin-top: 1.5rem;
+}
+
+.phase-results pre {
+    background-color: #f9fafb;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow: auto;
+    font-size: 0.875rem;
+}
+
+.chain-outputs-so-far {
+    margin-top: 1.5rem;
+}
+
 .new-question-btn {
+    margin-top: 1rem;
     padding: 0.75rem 1.5rem;
-    background-color: #10b981;
+    background-color: #3b82f6;
     color: white;
     border: none;
     border-radius: 6px;
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.2s ease;
-    margin-top: 1rem;
 }
 
 .new-question-btn:hover {
-    background-color: #059669;
+    background-color: #2563eb;
+}
+
+.new-question-btn:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
 }
 
 /* Dark mode support */
@@ -219,11 +297,11 @@
         background-color: #1f2937;
     }
 
-    .phase:hover {
+    .phase-item:hover {
         background-color: rgba(255, 255, 255, 0.05);
     }
 
-    .phase.active {
+    .phase-item.active {
         background-color: rgba(59, 130, 246, 0.2);
     }
 
@@ -236,12 +314,8 @@
         color: #d1d5db;
     }
 
-    .phase.active .phase-label {
+    .phase-item.active .phase-label {
         color: #f3f4f6;
-    }
-
-    .phase-progress-bar {
-        background-color: #374151;
     }
 
     .phase-connector {
