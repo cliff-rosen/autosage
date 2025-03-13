@@ -35,18 +35,6 @@ const AgentWorkflowDemo: React.FC = () => {
     const [phaseResults, setPhaseResults] = useState<Record<string, any>>({});
     const [chainOutputs, setChainOutputs] = useState<Record<string, any>>({});
 
-    // Get phase label from the workflow chain data
-    const getPhaseLabel = (phaseId: string): string => {
-        if (phaseId === 'input') return 'Input Question';
-        if (phaseId === 'output') return 'Final Output';
-
-        // Find the phase in the workflow chain
-        const phase = activeWorkflowChain.phases.find(p => p.id === phaseId);
-
-        // If found, return its label, otherwise format the ID as a label
-        return phase?.label || phaseId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    };
-
     // Create a ref to the service to avoid recreating it on each render
     const serviceRef = React.useRef<AgentWorkflowService | null>(null);
 

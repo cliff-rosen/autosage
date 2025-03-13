@@ -24,38 +24,47 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 2rem;
-    padding: 1.5rem;
+    padding: 1.5rem 2rem;
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     overflow-x: auto;
     min-height: 120px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .phase-item {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: 0.5rem;
+    padding: 0.75rem 0.5rem;
     border-radius: 8px;
-    transition: background-color 0.2s ease;
-    flex: 1;
+    transition: all 0.2s ease;
+    flex: 0 0 auto;
     text-align: center;
+    min-width: 100px;
     max-width: 150px;
+    position: relative;
+    z-index: 2;
 }
 
 .phase-item:hover {
     background-color: #f3f4f6;
+    transform: translateY(-2px);
 }
 
 .phase-item.active {
     background-color: #e0f2fe;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .phase-icon {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -63,13 +72,15 @@
     color: #4b5563;
     border-radius: 50%;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     transition: all 0.2s ease;
+    font-size: 1rem;
 }
 
 .phase-item.active .phase-icon {
     background-color: #3b82f6;
     color: white;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
 .phase-label {
@@ -77,11 +88,12 @@
     color: #4b5563;
     text-align: center;
     white-space: nowrap;
+    font-weight: 500;
 }
 
 .phase-item.active .phase-label {
     color: #1f2937;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .phase-connector {
@@ -91,6 +103,8 @@
     margin: 0;
     min-width: 20px;
     max-width: 100px;
+    position: relative;
+    z-index: 1;
 }
 
 /* Detail Panel - Bottom Section */
@@ -350,5 +364,33 @@
 
     .progress-bar {
         background-color: #374151;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .workflow-phases {
+        padding: 1rem;
+        justify-content: flex-start;
+    }
+
+    .phase-item {
+        min-width: 80px;
+        padding: 0.5rem 0.25rem;
+    }
+
+    .phase-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 0.875rem;
+    }
+
+    .phase-label {
+        font-size: 0.75rem;
+    }
+
+    .phase-connector {
+        min-width: 10px;
+        max-width: 40px;
     }
 }
