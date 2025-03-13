@@ -14,7 +14,15 @@ const asVarName = (name: string): WorkflowVariableName => name as unknown as Wor
 const asParamName = (name: string): ToolParameterName => name as unknown as ToolParameterName;
 const asOutputName = (name: string): ToolOutputName => name as unknown as ToolOutputName;
 
-// Define the Echo workflow template (previously oneStepWorkflow)
+// Define the interface for workflow templates
+export interface WorkflowTemplate {
+    id: string;
+    name: string;
+    description: string;
+    workflow: Workflow;
+}
+
+// Define the Echo workflow template (1-step workflow)
 export const echoWorkflowTemplate: Workflow = {
     workflow_id: "template-echo",
     name: "Echo Workflow",
@@ -97,7 +105,7 @@ export const echoWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "input",
-            variable_id: "var_1741741493436",
+            variable_id: "echo_var_input_1",
             workflow_id: "template-echo",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -114,7 +122,7 @@ export const echoWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741741495778",
+            variable_id: "echo_var_output_1",
             workflow_id: "template-echo",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -123,7 +131,7 @@ export const echoWorkflowTemplate: Workflow = {
     ]
 };
 
-// Define the Concatenate workflow template (previously twoStepWorkflow)
+// Define the Concatenate workflow template (2-step workflow)
 export const concatenateWorkflowTemplate: Workflow = {
     workflow_id: "template-concatenate",
     name: "Concatenate Workflow",
@@ -266,7 +274,7 @@ export const concatenateWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "input",
-            variable_id: "var_1741741493436",
+            variable_id: "concat_var_input_1",
             workflow_id: "template-concatenate",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -283,7 +291,7 @@ export const concatenateWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741741495778",
+            variable_id: "concat_var_output_1",
             workflow_id: "template-concatenate",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -300,7 +308,7 @@ export const concatenateWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741838655485",
+            variable_id: "concat_var_result_1",
             workflow_id: "template-concatenate",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -309,17 +317,9 @@ export const concatenateWorkflowTemplate: Workflow = {
     ]
 };
 
-// Create an array of all workflow templates
-export interface WorkflowTemplate {
-    id: string;
-    name: string;
-    description: string;
-    workflow: Workflow;
-}
-
-// Define a text processing workflow template (2 steps)
-export const textProcessingWorkflowTemplate: Workflow = {
-    workflow_id: "template-text-processing",
+// Define the Search workflow template (2-step workflow)
+export const searchWorkflowTemplate: Workflow = {
+    workflow_id: "template-search",
     name: "Search Workflow",
     description: "A workflow that searches for information and then echoes the result",
     status: WorkflowStatus.DRAFT,
@@ -338,7 +338,7 @@ export const textProcessingWorkflowTemplate: Workflow = {
                 [asParamName("query")]: asVarName("input")
             },
             output_mappings: {
-                [asOutputName("results")]: asVarName("processed_text")
+                [asOutputName("results")]: asVarName("search_results")
             },
             evaluation_config: {
                 conditions: [],
@@ -346,7 +346,7 @@ export const textProcessingWorkflowTemplate: Workflow = {
                 maximum_jumps: 1
             },
             step_id: asStepId("6b642430-af60-4da5-94e9-1b7aaa8e5d8f"),
-            workflow_id: "template-text-processing",
+            workflow_id: "template-search",
             sequence_number: 0,
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -386,7 +386,7 @@ export const textProcessingWorkflowTemplate: Workflow = {
             tool_id: "echo",
             prompt_template_id: undefined,
             parameter_mappings: {
-                [asParamName("input")]: asVarName("processed_text")
+                [asParamName("input")]: asVarName("search_results")
             },
             output_mappings: {
                 [asOutputName("output")]: asVarName("final_output")
@@ -397,7 +397,7 @@ export const textProcessingWorkflowTemplate: Workflow = {
                 maximum_jumps: 1
             },
             step_id: asStepId("7c753541-bf71-5eb6-a5f0-2c8bbb9e6d9g"),
-            workflow_id: "template-text-processing",
+            workflow_id: "template-search",
             sequence_number: 1,
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -451,25 +451,25 @@ export const textProcessingWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "input",
-            variable_id: "var_1741741493436",
-            workflow_id: "template-text-processing",
+            variable_id: "search_var_input_1",
+            workflow_id: "template-search",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
             value: ""
         },
         {
-            name: asVarName("processed_text"),
+            name: asVarName("search_results"),
             schema: {
                 type: "string",
                 description: "Search results",
-                is_array: true,
+                is_array: false,
                 fields: {},
                 format: undefined,
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741741495778",
-            workflow_id: "template-text-processing",
+            variable_id: "search_var_results_1",
+            workflow_id: "template-search",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
             value: ""
@@ -485,8 +485,8 @@ export const textProcessingWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741838655485",
-            workflow_id: "template-text-processing",
+            variable_id: "search_var_final_1",
+            workflow_id: "template-search",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
             value: ""
@@ -494,7 +494,7 @@ export const textProcessingWorkflowTemplate: Workflow = {
     ]
 };
 
-// Define a data transformation workflow template (3 steps)
+// Define the Data Transformation workflow template (3-step workflow)
 export const dataTransformationWorkflowTemplate: Workflow = {
     workflow_id: "template-data-transformation",
     name: "Data Transformation Workflow",
@@ -688,7 +688,7 @@ export const dataTransformationWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "input",
-            variable_id: "var_1741741493436",
+            variable_id: "transform_var_input_1",
             workflow_id: "template-data-transformation",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -705,7 +705,7 @@ export const dataTransformationWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741741495778",
+            variable_id: "transform_var_processed_1",
             workflow_id: "template-data-transformation",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -722,7 +722,7 @@ export const dataTransformationWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741838655485",
+            variable_id: "transform_var_transformed_1",
             workflow_id: "template-data-transformation",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -739,7 +739,7 @@ export const dataTransformationWorkflowTemplate: Workflow = {
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "var_1741838655486",
+            variable_id: "transform_var_final_1",
             workflow_id: "template-data-transformation",
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -748,6 +748,7 @@ export const dataTransformationWorkflowTemplate: Workflow = {
     ]
 };
 
+// Create an array of all workflow templates
 export const workflowTemplates: WorkflowTemplate[] = [
     {
         id: "echo",
@@ -762,10 +763,10 @@ export const workflowTemplates: WorkflowTemplate[] = [
         workflow: concatenateWorkflowTemplate
     },
     {
-        id: "text-processing",
+        id: "search",
         name: "Search Workflow",
-        description: "A 2-step workflow that processes text with LLM and then echoes the result",
-        workflow: textProcessingWorkflowTemplate
+        description: "A workflow that searches for information and then echoes the result",
+        workflow: searchWorkflowTemplate
     },
     {
         id: "data-transformation",
@@ -808,7 +809,7 @@ export function createWorkflowFromTemplate(templateId: string): Workflow | null 
         return step;
     });
 
-    // Reset state values
+    // Reset state values and update workflow_id
     if (newWorkflow.state) {
         newWorkflow.state = newWorkflow.state.map(variable => {
             return {
