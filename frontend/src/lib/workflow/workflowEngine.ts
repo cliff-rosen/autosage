@@ -36,7 +36,7 @@ export type StepReorderPayload = {
  * - RESET_EXECUTION: Resets the execution state of the workflow
  * - UPDATE_WORKFLOW: Updates the workflow properties
  * - UPDATE_STEP: Updates a step in the workflow
- * - RESET_WORKFLOW_STATE: Resets the workflow state, optionally keeping jump counters
+ * - RESET_WORKFLOW_STATE: Resets the workflow state, optionally keeping evaluation results
  */
 export type WorkflowStateAction = {
     type: 'UPDATE_PARAMETER_MAPPINGS' | 'UPDATE_OUTPUT_MAPPINGS' | 'UPDATE_STEP_TOOL' | 'UPDATE_STEP_TYPE' | 'ADD_STEP' | 'REORDER_STEPS' | 'DELETE_STEP' | 'UPDATE_STATE' | 'RESET_EXECUTION' | 'UPDATE_WORKFLOW' | 'UPDATE_STEP' | 'RESET_WORKFLOW_STATE',
@@ -49,7 +49,7 @@ export type WorkflowStateAction = {
         state?: WorkflowVariable[],
         workflowUpdates?: Partial<Workflow>,
         step?: WorkflowStep,
-        keepJumpCounters?: boolean
+        keepEvaluationResults?: boolean  // Whether to keep evaluation results when resetting workflow state
     }
 };
 
@@ -97,6 +97,8 @@ export class WorkflowEngine {
             prompt_template_id: undefined
         };
     }
+
+    //////////////////// INPUT / OUTPUT ////////////////////
 
     /**
      * Gets input values for a step formatted for UI display
@@ -318,6 +320,7 @@ export class WorkflowEngine {
         }
     }
 
+    //////////////////// EXECUTION ////////////////////
 
     /**
      * Executes a workflow step and returns the updated workflow and execution result
@@ -498,6 +501,7 @@ export class WorkflowEngine {
         const updatedState = [...(workflow.state || [])];
 
         if (!outputs) {
+            console.log(`No outputs to apply for step ${step.step_id}`);
             return updatedState;
         }
 
@@ -508,11 +512,18 @@ export class WorkflowEngine {
         // Check if the output variable already exists
         const outputVarIndex = updatedState.findIndex(v => v.name === outputVarName);
         if (outputVarIndex !== -1) {
+            console.log(`Updating existing evaluation result for step ${step.step_id}`, {
+                previousValue: updatedState[outputVarIndex].value,
+                newValue: outputs
+            });
             updatedState[outputVarIndex] = {
                 ...updatedState[outputVarIndex],
                 value: outputs
             };
         } else {
+            console.log(`Creating new evaluation result for step ${step.step_id}`, {
+                value: outputs
+            });
             updatedState.push({
                 name: outputVarName,
                 variable_id: outputVarName,
@@ -526,30 +537,8 @@ export class WorkflowEngine {
             });
         }
 
-        // Update jump counter if needed
-        if (outputs.next_action === 'jump' && step.evaluation_config) {
-            const jumpCounterName = `jump_count_${step.step_id}` as WorkflowVariableName;
-            const jumpCounterIndex = updatedState.findIndex(v => v.name === jumpCounterName);
-
-            // Get the jump count from the outputs or default to 1
-            const jumpCount = outputs.jump_count ? parseInt(outputs.jump_count) : 1;
-
-            if (jumpCounterIndex !== -1) {
-                updatedState[jumpCounterIndex].value = jumpCount;
-            } else {
-                updatedState.push({
-                    name: jumpCounterName,
-                    variable_id: jumpCounterName,
-                    description: 'Jump counter for evaluation step',
-                    schema: {
-                        type: 'number',
-                        is_array: false
-                    },
-                    value: jumpCount,
-                    io_type: 'evaluation'
-                });
-            }
-        }
+        // Note: We no longer need to create separate jump counter variables
+        // as the jump count is now stored directly in the evaluation result
 
         return updatedState;
     }
@@ -793,12 +782,12 @@ export class WorkflowEngine {
         }
     }
 
-
     //////////////////// MISC ////////////////////
 
     /**
      * Clears outputs for a step before execution
      * Returns the updated state array
+     * For evaluation steps, we preserve the jump count to maintain loop prevention
      */
     static clearStepOutputs(
         step: WorkflowStep,
@@ -812,9 +801,32 @@ export class WorkflowEngine {
                 return { ...variable, value: undefined };
             }
 
-            // Clear evaluation-specific outputs
+            // For evaluation steps, preserve the jump count but clear other evaluation data
             if (step.step_type === WorkflowStepType.EVALUATION &&
                 variable.name === `eval_${step.step_id.slice(0, 8)}`) {
+
+                // If there's an existing evaluation result with a jump count, preserve it
+                if (variable.value && typeof variable.value === 'object') {
+                    const evalValue = variable.value as Record<string, any>;
+                    if (evalValue.jump_count) {
+                        console.log(`Preserving jump count ${evalValue.jump_count} for step ${step.step_id}`);
+                        // Create a new evaluation result with just the jump count
+                        return {
+                            ...variable,
+                            value: {
+                                jump_count: evalValue.jump_count,
+                                max_jumps: evalValue.max_jumps || (step.evaluation_config?.maximum_jumps || 3).toString(),
+                                max_jumps_reached: evalValue.max_jumps_reached || 'false',
+                                next_action: 'continue',
+                                condition_met: 'none',
+                                target_step_index: '',
+                                reason: 'Previous execution data cleared'
+                            }
+                        };
+                    }
+                }
+
+                // If no jump count to preserve, clear the value
                 return { ...variable, value: undefined };
             }
 
@@ -824,6 +836,7 @@ export class WorkflowEngine {
 
     /**
      * Determines the next step to execute based on the current step's result
+     * Now uses the evaluation result directly for jump information instead of separate jump counter variables
      */
     static getNextStepIndex(
         workflow: Workflow,
@@ -834,6 +847,7 @@ export class WorkflowEngine {
         let updatedState = [...(workflow.state || [])];
 
         if (currentStep.step_type != WorkflowStepType.EVALUATION) {
+            console.log(`Step ${currentStep.step_id} is not an evaluation step, continuing to next step ${nextStepIndex}`);
             return { nextStepIndex, updatedState };
         }
 
@@ -844,6 +858,12 @@ export class WorkflowEngine {
 
         if (evalResult?.value) {
             const evalValue = evalResult.value as Record<string, any>;
+            console.log(`Found evaluation result for step ${currentStep.step_id}`, {
+                nextAction: evalValue.next_action,
+                targetStepIndex: evalValue.target_step_index,
+                jumpCount: evalValue.jump_count,
+                maxJumpsReached: evalValue.max_jumps_reached
+            });
 
             // Check if we need to jump
             if (evalValue.next_action === 'jump' && evalValue.target_step_index) {
@@ -851,40 +871,22 @@ export class WorkflowEngine {
                 if (!isNaN(targetIndex) && targetIndex >= 0 && targetIndex < workflow.steps.length) {
                     nextStepIndex = targetIndex;
                     console.log(`Jump to step ${targetIndex} based on evaluation result`);
+                } else {
+                    console.warn(`Invalid target step index: ${evalValue.target_step_index}, continuing to next step ${nextStepIndex}`);
                 }
+            } else {
+                console.log(`No jump needed, continuing to next step ${nextStepIndex}`);
             }
+        } else {
+            console.log(`No evaluation result found for step ${currentStep.step_id}, continuing to next step ${nextStepIndex}`);
         }
 
         return { nextStepIndex, updatedState };
     }
 
     /**
-     * Resets all jump counters in the workflow state
-     * This should be called when starting a new workflow execution
-     * 
-     * @deprecated This method is deprecated. Use the RESET_WORKFLOW_STATE action type instead.
-     */
-    static resetJumpCounters(
-        workflow: Workflow,
-        updateWorkflowByAction: (action: WorkflowStateAction) => void
-    ): void {
-        console.warn('resetJumpCounters is deprecated. Use the RESET_WORKFLOW_STATE action type with keepJumpCounters set to false instead.');
-
-        if (!workflow.state) return;
-
-        updateWorkflowByAction({
-            type: 'RESET_WORKFLOW_STATE',
-            payload: {
-                keepJumpCounters: false
-            }
-        });
-
-        console.log('Reset all jump counters for workflow execution');
-    }
-
-    /**
-     * Updates workflow state based on an action
-     */
+ * Updates workflow state based on an action
+ */
     static updateWorkflowByAction(workflow: Workflow, action: WorkflowStateAction): Workflow {
         switch (action.type) {
             case 'UPDATE_WORKFLOW':
@@ -992,12 +994,11 @@ export class WorkflowEngine {
                     value: undefined
                 }));
 
-                // Then, if we're not keeping jump counters, filter them out
-                if (!action.payload.keepJumpCounters) {
+                // Then, if we're not keeping evaluation results, filter them out
+                if (!action.payload.keepEvaluationResults) {
                     updatedState = updatedState.filter(variable =>
-                        // Remove all evaluation variables including jump counters
+                        // Remove all evaluation variables
                         variable.io_type !== 'evaluation' &&
-                        !variable.name.startsWith('jump_count_') &&
                         !variable.name.startsWith('eval_')
                     );
                 }
@@ -1067,156 +1068,7 @@ export class WorkflowEngine {
         }
     }
 
-    /**
-     * Executes a workflow step and manages workflow state
-     * @deprecated Use executeStepSimple instead for a more straightforward API
-     */
-    static async executeStep(
-        workflow: Workflow,
-        stepIndex: number,
-        updateWorkflowByAction: (action: WorkflowStateAction) => void,
-        statusCallback?: (status: {
-            stepId: string;
-            stepIndex: number;
-            status: 'running' | 'completed' | 'failed';
-            message?: string;
-            progress?: number;
-            result?: Partial<StepExecutionResult>;
-        }) => void
-    ): Promise<StepExecutionResult> {
-        try {
-            console.log(`🔄 [EXECUTE STEP] Executing step ${stepIndex + 1} of workflow ${workflow.workflow_id}`);
-            console.time(`⏱️ Execute Step ${stepIndex + 1} Time`);
-
-            // Use the new simplified implementation
-            const { updatedState, result, nextStepIndex } = await this.executeStepSimple(
-                workflow,
-                stepIndex,
-                statusCallback
-            );
-
-            // Update the workflow using the provided action handler
-            if (updatedState !== workflow.state) {
-                console.log(`📤 [EXECUTE STEP] Updating workflow state after step ${stepIndex + 1}`);
-                updateWorkflowByAction({
-                    type: 'UPDATE_WORKFLOW',
-                    payload: {
-                        workflowUpdates: {
-                            state: updatedState,
-                            steps: workflow.steps
-                        }
-                    }
-                });
-            }
-
-            console.timeEnd(`⏱️ Execute Step ${stepIndex + 1} Time`);
-            console.log(`${result.success ? '✅' : '❌'} [EXECUTE STEP] Step ${stepIndex + 1} ${result.success ? 'succeeded' : 'failed'}, next step: ${nextStepIndex}`);
-
-            return result;
-        } catch (error) {
-            console.error(`❌ [EXECUTE STEP] Error executing step ${stepIndex + 1}:`, error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error occurred'
-            };
-        }
-    }
-
-    /**
-     * Formats a value for display in the UI
-     * Handles truncation and special formatting for different types
-     */
-    static zz_formatValueForDisplay(
-        value: any,
-        schema: Schema | undefined,
-        options: {
-            maxTextLength?: number,
-            maxArrayLength?: number,
-            maxArrayItemLength?: number
-        } = {}
-    ): string {
-        // Default options
-        const {
-            maxTextLength = 200,
-            maxArrayLength = 3,
-            maxArrayItemLength = 100
-        } = options;
-
-        // Handle undefined/null
-        if (value === undefined || value === null) {
-            return 'No value';
-        }
-
-        // Handle arrays
-        if (Array.isArray(value)) {
-            if (value.length === 0) return '[]';
-
-            const items = value.slice(0, maxArrayLength).map(item => {
-                const itemStr = typeof item === 'object'
-                    ? JSON.stringify(item)
-                    : String(item);
-
-                return itemStr.length > maxArrayItemLength
-                    ? `${itemStr.substring(0, maxArrayItemLength)}...`
-                    : itemStr;
-            });
-
-            const hasMore = value.length > maxArrayLength;
-            return `[${items.join(', ')}${hasMore ? `, ... (${value.length - maxArrayLength} more)` : ''}]`;
-        }
-
-        // Handle objects
-        if (typeof value === 'object') {
-            // Handle file objects
-            if (schema?.type === 'file' && value.file_id) {
-                return `File: ${value.name || value.file_id}`;
-            }
-
-            // Handle schema objects with improved field name display
-            if (schema?.type === 'object' && schema.fields) {
-                // Format object with field names clearly visible
-                const formattedEntries = Object.entries(value)
-                    .filter(([key]) => schema.fields && key in schema.fields)
-                    .map(([key, val]) => {
-                        const fieldSchema = schema.fields?.[key];
-                        const fieldValue = this.zz_formatValueForDisplay(
-                            val,
-                            fieldSchema,
-                            {
-                                maxTextLength: Math.min(50, maxTextLength / 2),
-                                maxArrayLength: 2,
-                                maxArrayItemLength: 30
-                            }
-                        );
-                        return `"${key}": ${fieldValue}`;
-                    });
-
-                const formatted = `{ ${formattedEntries.join(', ')} }`;
-                if (formatted.length > maxTextLength) {
-                    return `${formatted.substring(0, maxTextLength)}...`;
-                }
-                return formatted;
-            }
-
-            // Handle other objects
-            const json = JSON.stringify(value, null, 2);
-            if (json.length > maxTextLength) {
-                return `${json.substring(0, maxTextLength)}...`;
-            }
-            return json;
-        }
-
-        // Handle strings
-        if (typeof value === 'string') {
-            if (value.length > maxTextLength) {
-                return `${value.substring(0, maxTextLength)}...`;
-            }
-            return value;
-        }
-
-        // Handle other primitives
-        return String(value);
-    }
+    //////////////////// FORMATTING ////////////////////
 
     /**
      * Gets default value for a schema type
@@ -1414,6 +1266,185 @@ export class WorkflowEngine {
 
         // Default: return the value as is
         return value;
+    }
+
+
+    //////////////////// DEPRECATED ////////////////////
+
+    /**
+     * Executes a workflow step and manages workflow state
+     * @deprecated Use executeStepSimple instead for a more straightforward API
+     */
+    static async zz_executeStep(
+        workflow: Workflow,
+        stepIndex: number,
+        updateWorkflowByAction: (action: WorkflowStateAction) => void,
+        statusCallback?: (status: {
+            stepId: string;
+            stepIndex: number;
+            status: 'running' | 'completed' | 'failed';
+            message?: string;
+            progress?: number;
+            result?: Partial<StepExecutionResult>;
+        }) => void
+    ): Promise<StepExecutionResult> {
+        try {
+            console.log(`🔄 [EXECUTE STEP] Executing step ${stepIndex + 1} of workflow ${workflow.workflow_id}`);
+            console.time(`⏱️ Execute Step ${stepIndex + 1} Time`);
+
+            // Use the new simplified implementation
+            const { updatedState, result, nextStepIndex } = await this.executeStepSimple(
+                workflow,
+                stepIndex,
+                statusCallback
+            );
+
+            // Update the workflow using the provided action handler
+            if (updatedState !== workflow.state) {
+                console.log(`📤 [EXECUTE STEP] Updating workflow state after step ${stepIndex + 1}`);
+                updateWorkflowByAction({
+                    type: 'UPDATE_WORKFLOW',
+                    payload: {
+                        workflowUpdates: {
+                            state: updatedState,
+                            steps: workflow.steps
+                        }
+                    }
+                });
+            }
+
+            console.timeEnd(`⏱️ Execute Step ${stepIndex + 1} Time`);
+            console.log(`${result.success ? '✅' : '❌'} [EXECUTE STEP] Step ${stepIndex + 1} ${result.success ? 'succeeded' : 'failed'}, next step: ${nextStepIndex}`);
+
+            return result;
+        } catch (error) {
+            console.error(`❌ [EXECUTE STEP] Error executing step ${stepIndex + 1}:`, error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error occurred'
+            };
+        }
+    }
+
+    /**
+     * Formats a value for display in the UI
+     * Handles truncation and special formatting for different types
+     */
+    static zz_formatValueForDisplay(
+        value: any,
+        schema: Schema | undefined,
+        options: {
+            maxTextLength?: number,
+            maxArrayLength?: number,
+            maxArrayItemLength?: number
+        } = {}
+    ): string {
+        // Default options
+        const {
+            maxTextLength = 200,
+            maxArrayLength = 3,
+            maxArrayItemLength = 100
+        } = options;
+
+        // Handle undefined/null
+        if (value === undefined || value === null) {
+            return 'No value';
+        }
+
+        // Handle arrays
+        if (Array.isArray(value)) {
+            if (value.length === 0) return '[]';
+
+            const items = value.slice(0, maxArrayLength).map(item => {
+                const itemStr = typeof item === 'object'
+                    ? JSON.stringify(item)
+                    : String(item);
+
+                return itemStr.length > maxArrayItemLength
+                    ? `${itemStr.substring(0, maxArrayItemLength)}...`
+                    : itemStr;
+            });
+
+            const hasMore = value.length > maxArrayLength;
+            return `[${items.join(', ')}${hasMore ? `, ... (${value.length - maxArrayLength} more)` : ''}]`;
+        }
+
+        // Handle objects
+        if (typeof value === 'object') {
+            // Handle file objects
+            if (schema?.type === 'file' && value.file_id) {
+                return `File: ${value.name || value.file_id}`;
+            }
+
+            // Handle schema objects with improved field name display
+            if (schema?.type === 'object' && schema.fields) {
+                // Format object with field names clearly visible
+                const formattedEntries = Object.entries(value)
+                    .filter(([key]) => schema.fields && key in schema.fields)
+                    .map(([key, val]) => {
+                        const fieldSchema = schema.fields?.[key];
+                        const fieldValue = this.zz_formatValueForDisplay(
+                            val,
+                            fieldSchema,
+                            {
+                                maxTextLength: Math.min(50, maxTextLength / 2),
+                                maxArrayLength: 2,
+                                maxArrayItemLength: 30
+                            }
+                        );
+                        return `"${key}": ${fieldValue}`;
+                    });
+
+                const formatted = `{ ${formattedEntries.join(', ')} }`;
+                if (formatted.length > maxTextLength) {
+                    return `${formatted.substring(0, maxTextLength)}...`;
+                }
+                return formatted;
+            }
+
+            // Handle other objects
+            const json = JSON.stringify(value, null, 2);
+            if (json.length > maxTextLength) {
+                return `${json.substring(0, maxTextLength)}...`;
+            }
+            return json;
+        }
+
+        // Handle strings
+        if (typeof value === 'string') {
+            if (value.length > maxTextLength) {
+                return `${value.substring(0, maxTextLength)}...`;
+            }
+            return value;
+        }
+
+        // Handle other primitives
+        return String(value);
+    }
+
+
+    /**
+     * Resets all evaluation results in the workflow state
+     * This should be called when starting a new workflow execution
+     * 
+     * @deprecated This method is deprecated. Use the RESET_WORKFLOW_STATE action type instead.
+     */
+    static zz_resetJumpCounters(
+        workflow: Workflow,
+        updateWorkflowByAction: (action: WorkflowStateAction) => void
+    ): void {
+        console.warn('resetJumpCounters is deprecated. Use the RESET_WORKFLOW_STATE action type with keepEvaluationResults set to false instead.');
+
+        if (!workflow.state) return;
+
+        updateWorkflowByAction({
+            type: 'RESET_WORKFLOW_STATE',
+            payload: {
+                keepEvaluationResults: false
+            }
+        });
+
+        console.log('Reset all evaluation results for workflow execution');
     }
 
 }

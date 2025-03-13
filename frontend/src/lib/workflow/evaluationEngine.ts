@@ -149,12 +149,20 @@ export class EvaluationEngine {
 
         // If a condition was met and it has a target step, prepare for jump
         if (metCondition && metCondition.condition.target_step_index !== undefined) {
-            // Check jump counter to prevent infinite loops
-            const jumpCounterName = `jump_count_${step.step_id}`;
-            const jumpCountVar = state?.find(v => v.name === jumpCounterName);
+            // Check jump count from previous evaluation result to prevent infinite loops
+            const shortStepId = step.step_id.slice(0, 8);
+            const evalVarName = `eval_${shortStepId}`;
+            const prevEvalResult = state?.find(v => v.name === evalVarName);
 
-            if (jumpCountVar?.value !== undefined) {
-                jumpCount = Number(jumpCountVar.value);
+            // Get jump count from previous evaluation result if it exists
+            if (prevEvalResult?.value && typeof prevEvalResult.value === 'object') {
+                const prevOutputs = prevEvalResult.value as Record<string, any>;
+                if (prevOutputs.jump_count) {
+                    jumpCount = Number(prevOutputs.jump_count);
+                    console.log(`Found previous jump count: ${jumpCount} for step ${step.step_id}`);
+                }
+            } else {
+                console.log(`No previous jump count found for step ${step.step_id}, starting at 0`);
             }
 
             const maxJumps = step.evaluation_config?.maximum_jumps || 3;
@@ -165,6 +173,7 @@ export class EvaluationEngine {
                 targetStepIndex = metCondition.condition.target_step_index;
                 nextStepIndex = targetStepIndex;
                 jumpCount++; // Increment for the output
+                console.log(`Jump count incremented to ${jumpCount} for step ${step.step_id}`);
             } else {
                 console.warn(`Maximum jumps (${maxJumps}) reached for step ${step.step_id}, continuing to next step`);
             }
@@ -207,104 +216,6 @@ export class EvaluationEngine {
                 outputs
             },
             nextStepIndex
-        };
-    }
-
-    /**
-     * Manages jump count for an evaluation step
-     */
-    static manageJumpCount(
-        step: WorkflowStep,
-        currentState: WorkflowVariable[],
-        fromStepIndex: number,
-        toStepIndex: number | undefined,
-        reason?: string
-    ): {
-        jumpCount: number,
-        canJump: boolean,
-        updatedState: WorkflowVariable[],
-        jumpInfo: any
-    } {
-        // Default to next step if toStepIndex is undefined
-        const targetStepIndex = toStepIndex !== undefined ? toStepIndex : fromStepIndex + 1;
-
-        const shortStepId = step.step_id.slice(0, 8);
-        const jumpCounterName = `jump_count_${shortStepId}` as WorkflowVariableName;
-        let jumpCount = 0;
-
-        // Look for existing jump counter
-        const jumpCountVar = currentState.find(v => v.name === jumpCounterName);
-        if (jumpCountVar?.value !== undefined) {
-            jumpCount = Number(jumpCountVar.value);
-        }
-
-        // Get maximum allowed jumps
-        const maxJumps = step.evaluation_config?.maximum_jumps || 3;
-
-        // Check if we can jump (jumpCount is less than maxJumps)
-        const canJump = jumpCount < maxJumps;
-
-        console.log('Jump Count Management:', {
-            stepId: step.step_id,
-            jumpCounterName,
-            jumpCountVar: jumpCountVar ? JSON.stringify(jumpCountVar) : 'not found',
-            currentJumpCount: jumpCount,
-            maxJumps,
-            canJump,
-            fromStep: fromStepIndex,
-            toStep: targetStepIndex,
-            stateVarCount: currentState.length,
-            allJumpCounters: currentState.filter(v => v.name.startsWith('jump_count_')).map(v => `${v.name}=${v.value}`)
-        });
-
-        // Create updated state with new jump count
-        const updatedState = [...currentState];
-        const jumpCountVarIndex = updatedState.findIndex(v => v.name === jumpCounterName);
-
-        // Always increment counter if we can jump
-        if (canJump) {
-            if (jumpCountVarIndex !== -1) {
-                updatedState[jumpCountVarIndex] = {
-                    ...updatedState[jumpCountVarIndex],
-                    value: jumpCount + 1
-                };
-            } else {
-                updatedState.push({
-                    name: jumpCounterName,
-                    variable_id: jumpCounterName,
-                    description: 'Jump counter for evaluation step',
-                    schema: {
-                        type: 'number',
-                        is_array: false
-                    },
-                    value: 1,
-                    io_type: 'evaluation'
-                });
-            }
-        }
-
-        // Create jump info object
-        const jumpInfo = {
-            is_jump: canJump,
-            from_step: fromStepIndex,
-            to_step: canJump ? targetStepIndex : fromStepIndex + 1,
-            reason: canJump
-                ? (reason || 'Jump condition met')
-                : `Maximum jumps (${maxJumps}) reached. Continuing to next step.`
-        };
-
-        console.log('Jump Decision:', {
-            canJump,
-            newJumpCount: canJump ? jumpCount + 1 : jumpCount,
-            nextStep: jumpInfo.to_step,
-            reason: jumpInfo.reason
-        });
-
-        return {
-            jumpCount,
-            canJump,
-            updatedState,
-            jumpInfo
         };
     }
 

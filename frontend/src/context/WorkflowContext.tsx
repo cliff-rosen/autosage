@@ -441,11 +441,11 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (!workflow?.state) return;
 
         // Use the new RESET_WORKFLOW_STATE action to reset workflow state
-        // This will clear all values and remove evaluation variables including jump counters
+        // This will clear all values and remove evaluation results
         updateWorkflowByAction({
             type: 'RESET_WORKFLOW_STATE',
             payload: {
-                keepJumpCounters: false
+                keepEvaluationResults: false
             }
         });
 
@@ -460,11 +460,11 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (!workflow?.state) return;
 
         // Use the new RESET_WORKFLOW_STATE action to reset workflow state
-        // This will clear all values and remove evaluation variables including jump counters
+        // This will clear all values and remove evaluation results
         updateWorkflowByAction({
             type: 'RESET_WORKFLOW_STATE',
             payload: {
-                keepJumpCounters: false
+                keepEvaluationResults: false
             }
         });
 
