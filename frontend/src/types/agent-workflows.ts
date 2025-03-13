@@ -1,4 +1,4 @@
-import { Workflow, WorkflowVariableName, } from './workflows';
+import { Workflow, WorkflowVariableName, WorkflowVariableRole } from './workflows';
 import { createWorkflowFromTemplate, workflowTemplates as templates, workflowTemplates, asVarName } from './workflow-templates';
 
 /**
@@ -63,11 +63,11 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             workflow: () => createWorkflowFromTemplate('develop-question') as AgentWorkflow,
             inputs_mappings: {
                 // Map initial_question from chain state to workflow input
-                [asVarName('initial_question')]: asVarName('input1')
+                [asVarName('wfc_initial_question')]: asVarName('input1')
             },
             outputs_mappings: {
                 // Map improved_question from workflow output to chain state
-                [asVarName('output1')]: asVarName('improved_question')
+                [asVarName('output1')]: asVarName('wfc_improved_question')
             }
         },
         {
@@ -78,11 +78,11 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             workflow: () => createWorkflowFromTemplate('develop-kb') as AgentWorkflow,
             inputs_mappings: {
                 // Map improved_question from chain state to workflow input
-                [asVarName('improved_question')]: asVarName('output1')
+                [asVarName('wfc_improved_question')]: asVarName('output1')
             },
             outputs_mappings: {
                 // Map kb from workflow output to chain state
-                [asVarName('output2')]: asVarName('kb')
+                [asVarName('output2')]: asVarName('wfc_kb')
             }
         },
         {
@@ -93,20 +93,20 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             workflow: () => createWorkflowFromTemplate('develop-answer') as AgentWorkflow,
             inputs_mappings: {
                 // Map improved_question and kb from chain state to workflow inputs
-                [asVarName('improved_question')]: asVarName('output1'),
-                [asVarName('kb')]: asVarName('output2')
+                [asVarName('wfc_improved_question')]: asVarName('output1'),
+                [asVarName('wfc_kb')]: asVarName('output2')
             },
             outputs_mappings: {
                 // Map final_answer from workflow output to chain state
-                [asVarName('output3')]: asVarName('final_answer')
+                [asVarName('output3')]: asVarName('wfc_final_answer')
             }
         }
     ],
     state: [
         // Input variable - question from user
         {
-            variable_id: 'input1',
-            name: 'input1',
+            variable_id: 'wfc_input1',
+            name: 'wfc_initial_question',
             schema: {
                 type: 'string',
                 is_array: false,
@@ -114,43 +114,47 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             },
             value: '',
             io_type: 'input',
-            required: true
+            required: true,
+            variable_role: WorkflowVariableRole.USER_INPUT
         },
         // Improved question from first phase
         {
-            variable_id: 'output1',
-            name: 'output1',
+            variable_id: 'wfc_output1',
+            name: 'wfc_improved_question',
             schema: {
                 type: 'string',
                 is_array: false,
                 description: 'The improved question from the first phase'
             },
             value: '',
-            io_type: 'output'
+            io_type: 'output',
+            variable_role: WorkflowVariableRole.FINAL
         },
         // Knowledge base from second phase
         {
-            variable_id: 'output2',
-            name: 'output2',
+            variable_id: 'wfc_output2',
+            name: 'wfc_kb',
             schema: {
                 type: 'string',
                 is_array: false,
                 description: 'The knowledge base from the second phase'
             },
             value: '',
-            io_type: 'output'
+            io_type: 'output',
+            variable_role: WorkflowVariableRole.FINAL
         },
         // Final answer from third phase
         {
-            variable_id: 'output3',
-            name: 'output3',
+            variable_id: 'wfc_output3',
+            name: 'wfc_final_answer',
             schema: {
                 type: 'string',
                 is_array: false,
                 description: 'The final answer from the third phase'
             },
             value: '',
-            io_type: 'output'
+            io_type: 'output',
+            variable_role: WorkflowVariableRole.FINAL
         }
     ]
 }; 

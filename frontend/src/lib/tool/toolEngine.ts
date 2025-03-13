@@ -7,7 +7,7 @@ import {
 } from '../../types/tools';
 import { SchemaValueType, SchemaObjectType } from '../../types/schema';
 import { executeTool } from './toolRegistry';
-import { WorkflowStep, StepExecutionResult } from '../../types/workflows';
+import { WorkflowStep, StepExecutionResult, WorkflowVariableRole } from '../../types/workflows';
 
 export class ToolEngine {
     /**
@@ -92,7 +92,10 @@ export class ToolEngine {
                         status: 'running',
                         message: `Tool execution successful`,
                         progress: 80,
-                        result: { success: true, outputs: toolResult }
+                        result: {
+                            success: true,
+                            outputs: toolResult
+                        }
                     });
                 }
             } else {

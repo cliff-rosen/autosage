@@ -3,10 +3,10 @@ import {
     WorkflowStatus,
     WorkflowStepType,
     WorkflowStepId,
-    WorkflowVariableName
+    WorkflowVariableName,
+    WorkflowVariableRole
 } from './workflows';
 import { ToolParameterName, ToolOutputName } from './tools';
-import { AgentWorkflow, AgentWorkflowType } from './agent-workflows';
 
 // Helper function to create typed string literals for branded types
 const asStepId = (id: string): WorkflowStepId => id as unknown as WorkflowStepId;
@@ -310,7 +310,8 @@ export const developAnswerWorkflowTemplate: Workflow = {
             },
             io_type: "input",
             variable_id: "answer_var_input_1",
-            value: ""
+            value: "",
+            variable_role: WorkflowVariableRole.USER_INPUT
         },
         {
             name: asVarName("kb"),
@@ -324,7 +325,8 @@ export const developAnswerWorkflowTemplate: Workflow = {
             },
             io_type: "input",
             variable_id: "answer_var_input_2",
-            value: ""
+            value: "",
+            variable_role: WorkflowVariableRole.INTERMEDIATE
         },
         {
             name: asVarName("final_answer"),
@@ -338,7 +340,8 @@ export const developAnswerWorkflowTemplate: Workflow = {
             },
             io_type: "output",
             variable_id: "answer_var_output_1",
-            value: ""
+            value: "",
+            variable_role: WorkflowVariableRole.FINAL
         }
     ]
 };

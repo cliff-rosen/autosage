@@ -1,7 +1,42 @@
 import { EventEmitter } from '../../../lib/utils/EventEmitter';
 import { AgentWorkflowChain } from '../../../types/agent-workflows';
-import { WorkflowVariable } from '../../../types/workflows';
+import {
+    WorkflowVariable,
+    WorkflowVariableRole,
+    validateWorkflowInputs,
+    getWorkflowSignature
+} from '../../../types/workflows';
 import { AgentWorkflowOrchestrator } from './AgentWorkflowOrchestrator';
+
+// Define the missing interfaces
+interface OrchestrationStatus {
+    sessionId: string;
+    // Add other properties as needed
+}
+
+interface StatusChangeEvent {
+    // Define properties as needed
+}
+
+interface PhaseCompleteEvent {
+    // Define properties as needed
+}
+
+interface WorkflowCompleteEvent {
+    // Define properties as needed
+}
+
+interface ErrorEvent {
+    // Define properties as needed
+}
+
+interface AgentWorkflowOrchestratorInterface {
+    // Define methods as needed
+}
+
+interface WorkflowExecutionConfig {
+    // Define properties as needed
+}
 
 /**
  * Service for interacting with the Agent Workflow system
@@ -58,6 +93,7 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
     async executeWorkflowChain(
         inputValues: WorkflowVariable[],
         workflowChain: AgentWorkflowChain,
+        config?: WorkflowExecutionConfig
     ): Promise<string> {
         try {
             // Create a new orchestrator
@@ -73,8 +109,53 @@ export class AgentWorkflowService implements AgentWorkflowOrchestratorInterface 
             // Store the orchestrator
             this.activeOrchestrators.set(sessionId, orchestrator);
 
+            // Process input values to ensure they have appropriate roles
+            const processedInputs = inputValues.map(input => {
+                // If no role is specified, assign a default role
+                if (!input.variable_role) {
+                    return { ...input, variable_role: WorkflowVariableRole.USER_INPUT };
+                }
+                return input;
+            });
+
+            // Validate inputs against the workflow signature
+            // This is a simplified validation since we're working with WorkflowVariable objects
+            // rather than raw input values
+            if (workflowChain.phases.length > 0) {
+                try {
+                    // Get the first phase's workflow
+                    const firstPhase = workflowChain.phases[0];
+                    const workflowResult = firstPhase.workflow();
+
+                    // Handle both synchronous and asynchronous workflow results
+                    const firstWorkflow = workflowResult instanceof Promise
+                        ? await workflowResult
+                        : workflowResult;
+
+                    const signature = getWorkflowSignature(firstWorkflow);
+
+                    // Check if all required inputs are provided
+                    const missingInputs = signature.requiredInputs.filter(requiredInput => {
+                        return !processedInputs.some(input =>
+                            input.name.toString() === requiredInput.name.toString()
+                        );
+                    });
+
+                    if (missingInputs.length > 0) {
+                        const missingNames = missingInputs.map(input => input.name.toString()).join(', ');
+                        throw new Error(`Missing required inputs for workflow: ${missingNames}`);
+                    }
+                } catch (error: unknown) {
+                    console.error('Error validating workflow inputs:', error);
+                    const errorMessage = error instanceof Error
+                        ? error.message
+                        : 'Unknown validation error';
+                    throw new Error(`Failed to validate workflow inputs: ${errorMessage}`);
+                }
+            }
+
             // Execute the workflow
-            const result = await orchestrator.executeWorkflowChain(inputValues, workflowChain, config);
+            const result = await orchestrator.executeWorkflowChain(processedInputs, workflowChain, config);
 
             // Clean up the orchestrator after a delay
             setTimeout(() => {
