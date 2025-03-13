@@ -337,7 +337,7 @@ export const JobsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [state.currentJob, state.inputValues]);
 
     /**
-     * Prepares input variables from the current input values
+     * Populates state.inputValues with input variables from the current job
      */
     const prepareInputVariables = useCallback((): Record<WorkflowVariableName, SchemaValueType> => {
         const variables: Record<WorkflowVariableName, SchemaValueType> = {};

@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflows } from '../context/WorkflowContext';
 import { workflowApi } from '../lib/api';
 import AssetList from '../components/common/AssetList';
+import WorkflowTemplateDialog from '../components/WorkflowTemplateDialog';
 import {
     Workflow,
     getWorkflowInputs,
@@ -18,6 +19,7 @@ const WorkflowsManager: React.FC = () => {
         loadWorkflows,
         createWorkflow
     } = useWorkflows();
+    const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
 
     useEffect(() => {
         if (currentWorkflow) {
@@ -26,7 +28,18 @@ const WorkflowsManager: React.FC = () => {
     }, [currentWorkflow, navigate]);
 
     const handleCreateWorkflow = () => {
+        setIsTemplateDialogOpen(true);
+    };
+
+    const handleCreateEmptyWorkflow = () => {
         createWorkflow();
+        setIsTemplateDialogOpen(false);
+        navigate('/workflow/new');
+    };
+
+    const handleSelectTemplate = (templateId: string) => {
+        createWorkflow(templateId);
+        setIsTemplateDialogOpen(false);
         navigate('/workflow/new');
     };
 
@@ -67,32 +80,58 @@ const WorkflowsManager: React.FC = () => {
     }
 
     return (
-        <AssetList
-            title="Workflows"
-            subtitle="Design and author sequences of steps to accomplish your goals"
-            assets={assets}
-            onCreateNew={handleCreateWorkflow}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            createButtonText="New Workflow"
-            emptyStateMessage="Get started by creating a new workflow."
-        />
+        <>
+            <AssetList
+                title="Workflows"
+                subtitle="Design and author sequences of steps to accomplish your goals"
+                assets={assets}
+                onCreateNew={handleCreateWorkflow}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                createButtonText="New Workflow"
+                emptyStateMessage="Get started by creating a new workflow."
+            />
+
+            <WorkflowTemplateDialog
+                isOpen={isTemplateDialogOpen}
+                onClose={() => setIsTemplateDialogOpen(false)}
+                onSelectTemplate={handleSelectTemplate}
+                onCreateEmpty={handleCreateEmptyWorkflow}
+            />
+        </>
     );
 };
 
-const getWorkflowStats = (workflow: Workflow) => [
-    {
-        label: 'Steps',
-        value: workflow.steps.length
-    },
-    {
-        label: 'Inputs',
-        value: getWorkflowInputs(workflow).length
-    },
-    {
-        label: 'Outputs',
-        value: getWorkflowOutputs(workflow).length
+// Helper function to get workflow statistics for display
+function getWorkflowStats(workflow: Workflow) {
+    const stats = [];
+
+    // Count steps
+    const stepCount = workflow.steps?.length || 0;
+    stats.push({
+        label: stepCount === 1 ? 'step' : 'steps',
+        value: stepCount
+    });
+
+    // Count inputs
+    const inputs = getWorkflowInputs(workflow);
+    if (inputs.length > 0) {
+        stats.push({
+            label: inputs.length === 1 ? 'input' : 'inputs',
+            value: inputs.length
+        });
     }
-];
+
+    // Count outputs
+    const outputs = getWorkflowOutputs(workflow);
+    if (outputs.length > 0) {
+        stats.push({
+            label: outputs.length === 1 ? 'output' : 'outputs',
+            value: outputs.length
+        });
+    }
+
+    return stats;
+}
 
 export default WorkflowsManager; 

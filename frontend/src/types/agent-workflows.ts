@@ -1,4 +1,4 @@
-import { Workflow, WorkflowStatus, WorkflowStepId, WorkflowVariableName, WorkflowVariable } from './workflows';
+import { Workflow, WorkflowStepId, WorkflowVariableName, WorkflowVariable } from './workflows';
 
 /**
  * Enum defining the types of agent workflows

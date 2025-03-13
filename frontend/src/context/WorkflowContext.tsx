@@ -7,6 +7,7 @@ import {
 import { workflowApi } from '../lib/api';
 import { WorkflowEngine, WorkflowStateAction } from '../lib/workflow/workflowEngine';
 import { createQuestionDevelopmentWorkflow } from '@/lib/workflow/agent/definitions/questionDevelopmentWorkflow';
+import { createWorkflowFromTemplate } from '../types/workflow-templates';
 
 
 interface WorkflowContextType {
@@ -24,7 +25,7 @@ interface WorkflowContextType {
     // User Operations
     loadWorkflows(): Promise<void>
     loadWorkflow(id: string): Promise<void>
-    createWorkflow(): void
+    createWorkflow(templateId?: string): void
     saveWorkflow(): Promise<string | undefined>
     exitWorkflow(): void
     // New granular update method
@@ -97,8 +98,23 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, []);
 
     // User Operations
-    const createWorkflow = useCallback(() => {
-        const newWorkflow = WorkflowEngine.createNewWorkflow();
+    const createWorkflow = useCallback((templateId?: string) => {
+        let newWorkflow: Workflow;
+
+        if (templateId) {
+            // Create from template if templateId is provided
+            const templateWorkflow = createWorkflowFromTemplate(templateId);
+            if (templateWorkflow) {
+                newWorkflow = templateWorkflow;
+            } else {
+                // Fall back to empty workflow if template not found
+                newWorkflow = WorkflowEngine.createNewWorkflow();
+            }
+        } else {
+            // Create empty workflow if no templateId
+            newWorkflow = WorkflowEngine.createNewWorkflow();
+        }
+
         setWorkflow(newWorkflow);
         setHasUnsavedChanges(true);
         setActiveStep(0);
@@ -121,6 +137,7 @@ export const WorkflowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const loadWorkflow = useCallback(async (id: string) => {
         console.log('loadWorkflow', id);
+
 
         if (id === 'question-development') {
             const questionDevelopmentWorkflow = createQuestionDevelopmentWorkflow();
