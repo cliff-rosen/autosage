@@ -1,5 +1,5 @@
 import { Workflow, WorkflowVariableName, } from './workflows';
-import { createWorkflowFromTemplate, workflowTemplates as templates, workflowTemplates } from './workflow-templates';
+import { createWorkflowFromTemplate, workflowTemplates as templates, workflowTemplates, asVarName } from './workflow-templates';
 
 /**
  * Enum defining the types of agent workflows
@@ -56,36 +56,49 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
     description: 'Simple workflow chain using our sample workflow templates',
     phases: [
         {
-            id: 'echo_phase',
+            id: 'question_development_phase',
             type: AgentWorkflowType.QUESTION_DEVELOPMENT,
-            label: 'Echo Input',
-            description: 'Simple echo of the input',
-            workflow: () => createWorkflowFromTemplate('echo') as AgentWorkflow,
+            label: 'Question Development',
+            description: 'Develop a question based on the input',
+            workflow: () => createWorkflowFromTemplate('develop-question') as AgentWorkflow,
             inputs_mappings: {
+                // Map initial_question from chain state to workflow input
+                [asVarName('initial_question')]: asVarName('input1')
             },
             outputs_mappings: {
+                // Map improved_question from workflow output to chain state
+                [asVarName('output1')]: asVarName('improved_question')
             }
         },
         {
-            id: 'search_phase',
+            id: 'knowledge_base_development_phase',
             type: AgentWorkflowType.KNOWLEDGE_BASE_DEVELOPMENT,
-            label: 'Search Information',
-            description: 'Search for information based on the input',
-            workflow: () => createWorkflowFromTemplate('search') as AgentWorkflow,
+            label: 'Knowledge Base Development',
+            description: 'Develop a knowledge base based on the improved question',
+            workflow: () => createWorkflowFromTemplate('develop-kb') as AgentWorkflow,
             inputs_mappings: {
+                // Map improved_question from chain state to workflow input
+                [asVarName('improved_question')]: asVarName('output1')
             },
             outputs_mappings: {
+                // Map kb from workflow output to chain state
+                [asVarName('output2')]: asVarName('kb')
             }
         },
         {
-            id: 'transform_phase',
+            id: 'answer_generation_phase',
             type: AgentWorkflowType.ANSWER_GENERATION,
-            label: 'Transform Data',
-            description: 'Process and transform the data from previous phases',
-            workflow: () => createWorkflowFromTemplate('data-transformation') as AgentWorkflow,
+            label: 'Answer Generation',
+            description: 'Generate an answer based on the improved question and knowledge base',
+            workflow: () => createWorkflowFromTemplate('develop-answer') as AgentWorkflow,
             inputs_mappings: {
+                // Map improved_question and kb from chain state to workflow inputs
+                [asVarName('improved_question')]: asVarName('output1'),
+                [asVarName('kb')]: asVarName('output2')
             },
             outputs_mappings: {
+                // Map final_answer from workflow output to chain state
+                [asVarName('output3')]: asVarName('final_answer')
             }
         }
     ],
@@ -97,44 +110,44 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             schema: {
                 type: 'string',
                 is_array: false,
-                description: 'The input question from the user'
+                description: 'The initial question from the user'
             },
             value: '',
             io_type: 'input',
             required: true
         },
-        // Echo output
+        // Improved question from first phase
         {
             variable_id: 'output1',
             name: 'output1',
             schema: {
                 type: 'string',
                 is_array: false,
-                description: 'The echoed output from the first phase'
+                description: 'The improved question from the first phase'
             },
             value: '',
             io_type: 'output'
         },
-        // Search results
+        // Knowledge base from second phase
         {
             variable_id: 'output2',
             name: 'output2',
             schema: {
                 type: 'string',
                 is_array: false,
-                description: 'The search results from the second phase'
+                description: 'The knowledge base from the second phase'
             },
             value: '',
             io_type: 'output'
         },
-        // Final output
+        // Final answer from third phase
         {
             variable_id: 'output3',
             name: 'output3',
             schema: {
                 type: 'string',
                 is_array: false,
-                description: 'The final processed result from the third phase'
+                description: 'The final answer from the third phase'
             },
             value: '',
             io_type: 'output'

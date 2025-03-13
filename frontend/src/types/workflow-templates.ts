@@ -10,7 +10,7 @@ import { AgentWorkflow, AgentWorkflowType } from './agent-workflows';
 
 // Helper function to create typed string literals for branded types
 const asStepId = (id: string): WorkflowStepId => id as unknown as WorkflowStepId;
-const asVarName = (name: string): WorkflowVariableName => name as unknown as WorkflowVariableName;
+export const asVarName = (name: string): WorkflowVariableName => name as unknown as WorkflowVariableName;
 const asParamName = (name: string): ToolParameterName => name as unknown as ToolParameterName;
 const asOutputName = (name: string): ToolOutputName => name as unknown as ToolOutputName;
 
@@ -22,30 +22,27 @@ export interface WorkflowTemplate {
     workflow: Workflow;
 }
 
-// Define the Echo workflow template (1-step workflow)
-export const echoWorkflowTemplate: AgentWorkflow = {
-    workflow_id: "template-echo",
-    agent_workflow_type: "QUESTION DEVELOPMENT",
-    max_iterations: 1,
-    confidence_threshold: 0.9,
-    name: "Echo Workflow",
-    description: "A simple workflow that echoes the input",
+// Define the Develop Question workflow template
+export const developQuestionWorkflowTemplate: Workflow = {
+    workflow_id: "template-develop-question",
+    name: "Develop Question Workflow",
+    description: "A workflow that improves the initial question",
     status: WorkflowStatus.DRAFT,
     error: undefined,
     created_at: "2025-03-12T01:04:58",
     updated_at: "2025-03-13T04:04:19",
     steps: [
         {
-            label: "Echo",
-            description: "Echoes back the input",
+            label: "Improve Question",
+            description: "Improves the initial question",
             step_type: WorkflowStepType.ACTION,
             tool_id: "echo",
             prompt_template_id: undefined,
             parameter_mappings: {
-                [asParamName("input")]: asVarName("input")
+                [asParamName("input")]: asVarName("initial_question")
             },
             output_mappings: {
-                [asOutputName("output")]: asVarName("output")
+                [asOutputName("output")]: asVarName("improved_question")
             },
             evaluation_config: {
                 conditions: [],
@@ -53,7 +50,7 @@ export const echoWorkflowTemplate: AgentWorkflow = {
                 maximum_jumps: 1
             },
             step_id: asStepId("5a531329-3aad-4dd5-9012-eaae18eeb7f8"),
-            workflow_id: "template-echo",
+            workflow_id: "template-develop-question",
             sequence_number: 0,
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
@@ -97,244 +94,57 @@ export const echoWorkflowTemplate: AgentWorkflow = {
     ],
     state: [
         {
-            name: asVarName("input"),
+            name: asVarName("initial_question"),
             schema: {
                 type: "string",
-                description: "Input text",
+                description: "Initial question from user",
                 is_array: false,
                 fields: {},
                 format: undefined,
                 content_types: undefined
             },
             io_type: "input",
-            variable_id: "echo_var_input_1",
+            variable_id: "question_var_input_1",
             value: ""
         },
         {
-            name: asVarName("output"),
+            name: asVarName("improved_question"),
             schema: {
                 type: "string",
-                description: "Output text",
+                description: "Improved question",
                 is_array: false,
                 fields: {},
                 format: undefined,
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "echo_var_output_1",
+            variable_id: "question_var_output_1",
             value: ""
         }
     ]
 };
 
-// Define the Concatenate workflow template (2-step workflow)
-export const concatenateWorkflowTemplate: Workflow = {
-    workflow_id: "template-concatenate",
-    name: "Concatenate Workflow",
-    description: "A workflow that echoes the input and then concatenates it with itself",
+// Define the Develop KB workflow template
+export const developKBWorkflowTemplate: Workflow = {
+    workflow_id: "template-develop-kb",
+    name: "Develop Knowledge Base Workflow",
+    description: "A workflow that develops a knowledge base from the improved question",
     status: WorkflowStatus.DRAFT,
-    user_id: 1,
     error: undefined,
     created_at: "2025-03-12T01:04:58",
     updated_at: "2025-03-13T04:04:19",
     steps: [
         {
-            label: "Echo",
-            description: "First step - echo the input",
+            label: "Develop Knowledge Base",
+            description: "Develops a knowledge base from the improved question",
             step_type: WorkflowStepType.ACTION,
             tool_id: "echo",
             prompt_template_id: undefined,
             parameter_mappings: {
-                [asParamName("input")]: asVarName("input")
+                [asParamName("input")]: asVarName("improved_question")
             },
             output_mappings: {
-                [asOutputName("output")]: asVarName("output")
-            },
-            evaluation_config: {
-                conditions: [],
-                default_action: "continue",
-                maximum_jumps: 1
-            },
-            step_id: asStepId("5a531329-3aad-4dd5-9012-eaae18eeb7f8"),
-            workflow_id: "template-concatenate",
-            sequence_number: 0,
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            tool: {
-                tool_id: "echo",
-                name: "Echo Tool",
-                description: "Echoes back the input with a prefix",
-                tool_type: "utility",
-                signature: {
-                    parameters: [
-                        {
-                            name: asParamName("input"),
-                            description: "The input to echo",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        },
-                        {
-                            name: asParamName("stringify"),
-                            description: "Whether to convert objects to JSON strings",
-                            schema: {
-                                type: "boolean",
-                                is_array: false
-                            }
-                        }
-                    ],
-                    outputs: [
-                        {
-                            name: asOutputName("output"),
-                            description: "The echoed output",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            label: "Concatenate",
-            description: "Second step - concatenate the input with the output from the first step",
-            step_type: WorkflowStepType.ACTION,
-            tool_id: "concatenate",
-            prompt_template_id: undefined,
-            parameter_mappings: {
-                [asParamName("first")]: asVarName("input"),
-                [asParamName("second")]: asVarName("output")
-            },
-            output_mappings: {
-                [asOutputName("result")]: asVarName("result")
-            },
-            evaluation_config: {
-                conditions: [],
-                default_action: "continue",
-                maximum_jumps: 1
-            },
-            step_id: asStepId("280caa38-af60-4da5-94e9-1b7aaa8e5d8f"),
-            workflow_id: "template-concatenate",
-            sequence_number: 1,
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            tool: {
-                tool_id: "concatenate",
-                name: "Concatenate Tool",
-                description: "Concatenates two strings",
-                tool_type: "utility",
-                signature: {
-                    parameters: [
-                        {
-                            name: asParamName("first"),
-                            description: "First string",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        },
-                        {
-                            name: asParamName("second"),
-                            description: "Second string",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ],
-                    outputs: [
-                        {
-                            name: asOutputName("result"),
-                            description: "Concatenated result",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-    ],
-    state: [
-        {
-            name: asVarName("input"),
-            schema: {
-                type: "string",
-                description: "Input text",
-                is_array: false,
-                fields: {},
-                format: undefined,
-                content_types: undefined
-            },
-            io_type: "input",
-            variable_id: "concat_var_input_1",
-            workflow_id: "template-concatenate",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            value: ""
-        },
-        {
-            name: asVarName("output"),
-            schema: {
-                type: "string",
-                description: "Output from echo step",
-                is_array: false,
-                fields: {},
-                format: undefined,
-                content_types: undefined
-            },
-            io_type: "output",
-            variable_id: "concat_var_output_1",
-            workflow_id: "template-concatenate",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            value: ""
-        },
-        {
-            name: asVarName("result"),
-            schema: {
-                type: "string",
-                description: "Final concatenated result",
-                is_array: false,
-                fields: {},
-                format: undefined,
-                content_types: undefined
-            },
-            io_type: "output",
-            variable_id: "concat_var_result_1",
-            workflow_id: "template-concatenate",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            value: ""
-        }
-    ]
-};
-
-// Define the Search workflow template (2-step workflow)
-export const searchWorkflowTemplate: Workflow = {
-    workflow_id: "template-search",
-    name: "Search Workflow",
-    description: "A workflow that searches for information and then echoes the result",
-    status: WorkflowStatus.DRAFT,
-    user_id: 1,
-    error: undefined,
-    created_at: "2025-03-12T01:04:58",
-    updated_at: "2025-03-13T04:04:19",
-    steps: [
-        {
-            label: "Search for Information",
-            description: "First step - search for information based on the input",
-            step_type: WorkflowStepType.ACTION,
-            tool_id: "search",
-            prompt_template_id: undefined,
-            parameter_mappings: {
-                [asParamName("query")]: asVarName("input")
-            },
-            output_mappings: {
-                [asOutputName("results")]: asVarName("search_results")
+                [asOutputName("output")]: asVarName("kb")
             },
             evaluation_config: {
                 conditions: [],
@@ -342,59 +152,8 @@ export const searchWorkflowTemplate: Workflow = {
                 maximum_jumps: 1
             },
             step_id: asStepId("6b642430-af60-4da5-94e9-1b7aaa8e5d8f"),
-            workflow_id: "template-search",
+            workflow_id: "template-develop-kb",
             sequence_number: 0,
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            tool: {
-                tool_id: "search",
-                name: "Search Tool",
-                description: "Search for information on the web",
-                tool_type: "search",
-                signature: {
-                    parameters: [
-                        {
-                            name: asParamName("query"),
-                            description: "The search query",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ],
-                    outputs: [
-                        {
-                            name: asOutputName("results"),
-                            description: "The search results",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            label: "Echo Result",
-            description: "Second step - echo the search results",
-            step_type: WorkflowStepType.ACTION,
-            tool_id: "echo",
-            prompt_template_id: undefined,
-            parameter_mappings: {
-                [asParamName("input")]: asVarName("search_results")
-            },
-            output_mappings: {
-                [asOutputName("output")]: asVarName("final_output")
-            },
-            evaluation_config: {
-                conditions: [],
-                default_action: "continue",
-                maximum_jumps: 1
-            },
-            step_id: asStepId("7c753541-bf71-5eb6-a5f0-2c8bbb9e6d9g"),
-            workflow_id: "template-search",
-            sequence_number: 1,
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
             tool: {
@@ -437,213 +196,79 @@ export const searchWorkflowTemplate: Workflow = {
     ],
     state: [
         {
-            name: asVarName("input"),
+            name: asVarName("improved_question"),
             schema: {
                 type: "string",
-                description: "Search query",
+                description: "Improved question from previous step",
                 is_array: false,
                 fields: {},
                 format: undefined,
                 content_types: undefined
             },
             io_type: "input",
-            variable_id: "search_var_input_1",
-            workflow_id: "template-search",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
+            variable_id: "kb_var_input_1",
             value: ""
         },
         {
-            name: asVarName("search_results"),
+            name: asVarName("kb"),
             schema: {
                 type: "string",
-                description: "Search results",
+                description: "Knowledge base",
                 is_array: false,
                 fields: {},
                 format: undefined,
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "search_var_results_1",
-            workflow_id: "template-search",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            value: ""
-        },
-        {
-            name: asVarName("final_output"),
-            schema: {
-                type: "string",
-                description: "Final output text",
-                is_array: false,
-                fields: {},
-                format: undefined,
-                content_types: undefined
-            },
-            io_type: "output",
-            variable_id: "search_var_final_1",
-            workflow_id: "template-search",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
+            variable_id: "kb_var_output_1",
             value: ""
         }
     ]
 };
 
-// Define the Data Transformation workflow template (3-step workflow)
-export const dataTransformationWorkflowTemplate: Workflow = {
-    workflow_id: "template-data-transformation",
-    name: "Data Transformation Workflow",
-    description: "A 3-step workflow that processes, transforms, and formats data",
+// Define the Develop Answer workflow template
+export const developAnswerWorkflowTemplate: Workflow = {
+    workflow_id: "template-develop-answer",
+    name: "Develop Answer Workflow",
+    description: "A workflow that develops an answer from the improved question and knowledge base",
     status: WorkflowStatus.DRAFT,
-    user_id: 1,
     error: undefined,
     created_at: "2025-03-12T01:04:58",
     updated_at: "2025-03-13T04:04:19",
     steps: [
         {
-            label: "Process Input",
-            description: "First step - process the input data",
-            step_type: WorkflowStepType.ACTION,
-            tool_id: "echo",
-            prompt_template_id: undefined,
-            parameter_mappings: {
-                [asParamName("input")]: asVarName("input")
-            },
-            output_mappings: {
-                [asOutputName("output")]: asVarName("processed_data")
-            },
-            evaluation_config: {
-                conditions: [],
-                default_action: "continue",
-                maximum_jumps: 1
-            },
-            step_id: asStepId("8d864652-cf82-6fc7-b6g1-3d9ccc0f7e0h"),
-            workflow_id: "template-data-transformation",
-            sequence_number: 0,
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            tool: {
-                tool_id: "echo",
-                name: "Echo Tool",
-                description: "Echoes back the input with a prefix",
-                tool_type: "utility",
-                signature: {
-                    parameters: [
-                        {
-                            name: asParamName("input"),
-                            description: "The input to echo",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        },
-                        {
-                            name: asParamName("stringify"),
-                            description: "Whether to convert objects to JSON strings",
-                            schema: {
-                                type: "boolean",
-                                is_array: false
-                            }
-                        }
-                    ],
-                    outputs: [
-                        {
-                            name: asOutputName("output"),
-                            description: "The echoed output",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            label: "Search for Related Data",
-            description: "Second step - search for related information",
-            step_type: WorkflowStepType.ACTION,
-            tool_id: "search",
-            prompt_template_id: undefined,
-            parameter_mappings: {
-                [asParamName("query")]: asVarName("processed_data")
-            },
-            output_mappings: {
-                [asOutputName("results")]: asVarName("transformed_data")
-            },
-            evaluation_config: {
-                conditions: [],
-                default_action: "continue",
-                maximum_jumps: 1
-            },
-            step_id: asStepId("9e975763-dg93-7gd8-c7h2-4e0ddd1g8f1i"),
-            workflow_id: "template-data-transformation",
-            sequence_number: 1,
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            tool: {
-                tool_id: "search",
-                name: "Search Tool",
-                description: "Search for information on the web",
-                tool_type: "search",
-                signature: {
-                    parameters: [
-                        {
-                            name: asParamName("query"),
-                            description: "The search query",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ],
-                    outputs: [
-                        {
-                            name: asOutputName("results"),
-                            description: "The search results",
-                            schema: {
-                                type: "string",
-                                is_array: false
-                            }
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            label: "Format Result",
-            description: "Third step - format the transformed data",
+            label: "Develop Answer",
+            description: "Develops an answer from the improved question and knowledge base",
             step_type: WorkflowStepType.ACTION,
             tool_id: "concatenate",
             prompt_template_id: undefined,
             parameter_mappings: {
-                [asParamName("first")]: asVarName("processed_data"),
-                [asParamName("second")]: asVarName("transformed_data")
+                [asParamName("first")]: asVarName("improved_question"),
+                [asParamName("second")]: asVarName("kb")
             },
             output_mappings: {
-                [asOutputName("result")]: asVarName("final_result")
+                [asOutputName("result")]: asVarName("final_answer")
             },
             evaluation_config: {
                 conditions: [],
                 default_action: "continue",
                 maximum_jumps: 1
             },
-            step_id: asStepId("0f086874-eh04-8he9-d8i3-5f1eee2h9g2j"),
-            workflow_id: "template-data-transformation",
-            sequence_number: 2,
+            step_id: asStepId("7c753541-bf71-5eb6-a5f0-2c8bbb9e6d9g"),
+            workflow_id: "template-develop-answer",
+            sequence_number: 0,
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
             tool: {
                 tool_id: "concatenate",
                 name: "Concatenate Tool",
-                description: "Concatenates two strings",
+                description: "Concatenates two strings together",
                 tool_type: "utility",
                 signature: {
                     parameters: [
                         {
                             name: asParamName("first"),
-                            description: "First string",
+                            description: "First string to concatenate",
                             schema: {
                                 type: "string",
                                 is_array: false
@@ -651,7 +276,7 @@ export const dataTransformationWorkflowTemplate: Workflow = {
                         },
                         {
                             name: asParamName("second"),
-                            description: "Second string",
+                            description: "Second string to concatenate",
                             schema: {
                                 type: "string",
                                 is_array: false
@@ -661,7 +286,7 @@ export const dataTransformationWorkflowTemplate: Workflow = {
                     outputs: [
                         {
                             name: asOutputName("result"),
-                            description: "Concatenated result",
+                            description: "The concatenated result",
                             schema: {
                                 type: "string",
                                 is_array: false
@@ -674,71 +299,45 @@ export const dataTransformationWorkflowTemplate: Workflow = {
     ],
     state: [
         {
-            name: asVarName("input"),
+            name: asVarName("improved_question"),
             schema: {
                 type: "string",
-                description: "Input data",
+                description: "Improved question from previous step",
                 is_array: false,
                 fields: {},
                 format: undefined,
                 content_types: undefined
             },
             io_type: "input",
-            variable_id: "transform_var_input_1",
-            workflow_id: "template-data-transformation",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
+            variable_id: "answer_var_input_1",
             value: ""
         },
         {
-            name: asVarName("processed_data"),
+            name: asVarName("kb"),
             schema: {
                 type: "string",
-                description: "Processed data from first step",
+                description: "Knowledge base from previous step",
+                is_array: false,
+                fields: {},
+                format: undefined,
+                content_types: undefined
+            },
+            io_type: "input",
+            variable_id: "answer_var_input_2",
+            value: ""
+        },
+        {
+            name: asVarName("final_answer"),
+            schema: {
+                type: "string",
+                description: "Final answer",
                 is_array: false,
                 fields: {},
                 format: undefined,
                 content_types: undefined
             },
             io_type: "output",
-            variable_id: "transform_var_processed_1",
-            workflow_id: "template-data-transformation",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            value: ""
-        },
-        {
-            name: asVarName("transformed_data"),
-            schema: {
-                type: "string",
-                description: "Search results from second step",
-                is_array: false,
-                fields: {},
-                format: undefined,
-                content_types: undefined
-            },
-            io_type: "output",
-            variable_id: "transform_var_transformed_1",
-            workflow_id: "template-data-transformation",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
-            value: ""
-        },
-        {
-            name: asVarName("final_result"),
-            schema: {
-                type: "string",
-                description: "Final formatted result",
-                is_array: false,
-                fields: {},
-                format: undefined,
-                content_types: undefined
-            },
-            io_type: "output",
-            variable_id: "transform_var_final_1",
-            workflow_id: "template-data-transformation",
-            created_at: "2025-03-13T04:04:19",
-            updated_at: "2025-03-13T04:04:19",
+            variable_id: "answer_var_output_1",
             value: ""
         }
     ]
@@ -747,28 +346,22 @@ export const dataTransformationWorkflowTemplate: Workflow = {
 // Create an array of all workflow templates
 export const workflowTemplates: WorkflowTemplate[] = [
     {
-        id: "echo",
-        name: "Echo Workflow",
-        description: "A simple workflow that echoes the input",
-        workflow: echoWorkflowTemplate
+        id: "develop-question",
+        name: "Develop Question Workflow",
+        description: "A workflow that improves the initial question",
+        workflow: developQuestionWorkflowTemplate
     },
     {
-        id: "concatenate",
-        name: "Concatenate Workflow",
-        description: "A workflow that echoes the input and then concatenates it with itself",
-        workflow: concatenateWorkflowTemplate
+        id: "develop-kb",
+        name: "Develop Knowledge Base Workflow",
+        description: "A workflow that develops a knowledge base from the improved question",
+        workflow: developKBWorkflowTemplate
     },
     {
-        id: "search",
-        name: "Search Workflow",
-        description: "A workflow that searches for information and then echoes the result",
-        workflow: searchWorkflowTemplate
-    },
-    {
-        id: "data-transformation",
-        name: "Data Transformation Workflow",
-        description: "A 3-step workflow that processes, transforms, and formats data",
-        workflow: dataTransformationWorkflowTemplate
+        id: "develop-answer",
+        name: "Develop Answer Workflow",
+        description: "A workflow that develops an answer from the improved question and knowledge base",
+        workflow: developAnswerWorkflowTemplate
     }
 ];
 
@@ -810,7 +403,6 @@ export function createWorkflowFromTemplate(templateId: string): Workflow | null 
         newWorkflow.state = newWorkflow.state.map(variable => {
             return {
                 ...variable,
-                workflow_id: 'new',
                 value: undefined
             };
         });
