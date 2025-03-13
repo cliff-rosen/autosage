@@ -331,250 +331,283 @@ const AgentWorkflowDemo: React.FC = () => {
 
     // New function to render workflow signature details
     const renderWorkflowSignature = () => {
-        if (!workflowSignature || !activeWorkflowChain) {
+        if (!workflowSignature || !activeWorkflowChain || !activeWorkflowChain.state) {
             return null;
         }
 
-        // Find mappings between workflow signature variables and chain state variables
-        const findChainMappings = (varName: string) => {
-            if (!activeWorkflowChain.state) return [];
+        // Get all chain variables from the activeWorkflowChain.state
+        const chainVariables = activeWorkflowChain.state || [];
 
-            // Find all chain state variables that map to/from this signature variable
-            return activeWorkflowChain.state.filter(chainVar => {
-                // Check if the variable names match or if there's a mapping relationship
-                return chainVar.name.toString() === varName;
-            });
+        // Direct inspection of the data structures
+        console.log('Workflow Signature:', workflowSignature);
+        console.log('Chain Variables:', chainVariables);
+
+        // Check if the names are actually objects rather than strings
+        const inputNames = workflowSignature.inputs.map(input => ({
+            name: input.name,
+            nameType: typeof input.name,
+            nameString: input.name?.toString()
+        }));
+        console.log('Input Names:', inputNames);
+
+        const chainVarNames = chainVariables.map((v: WorkflowVariable) => ({
+            name: v.name,
+            nameType: typeof v.name,
+            nameString: v.name?.toString()
+        }));
+        console.log('Chain Variable Names:', chainVarNames);
+
+        // Helper function to find matching chain variable by name
+        const findMatchingChainVar = (name: any) => {
+            // Convert the input name to string for comparison
+            const nameStr = String(name);
+
+            console.log('Looking for match for:', nameStr);
+
+            // Special case for "question" input that should map to "wfc_initial_question"
+            if (nameStr.toLowerCase() === 'question') {
+                const initialQuestionVar = chainVariables.find((v: WorkflowVariable) =>
+                    String(v.name).toLowerCase() === 'wfc_initial_question'
+                );
+                if (initialQuestionVar) return initialQuestionVar;
+            }
+
+            // Try exact string match first
+            const exactMatch = chainVariables.find((v: WorkflowVariable) =>
+                String(v.name) === nameStr
+            );
+
+            if (exactMatch) return exactMatch;
+
+            // Try case-insensitive match
+            const caseInsensitiveMatch = chainVariables.find((v: WorkflowVariable) =>
+                String(v.name).toLowerCase() === nameStr.toLowerCase()
+            );
+
+            if (caseInsensitiveMatch) return caseInsensitiveMatch;
+
+            // Try partial match (if the chain variable contains the input name or vice versa)
+            const partialMatch = chainVariables.find((v: WorkflowVariable) =>
+                String(v.name).toLowerCase().includes(nameStr.toLowerCase()) ||
+                nameStr.toLowerCase().includes(String(v.name).toLowerCase())
+            );
+
+            return partialMatch || null;
         };
 
         return (
             <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <h4 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-3">Workflow Signature:</h4>
-                <div className="flex flex-wrap gap-3 mb-4 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <div className="flex items-baseline gap-2">
-                        <span className="font-medium text-gray-600 dark:text-gray-400">ID:</span>
-                        <span className="text-gray-800 dark:text-gray-200">{workflowSignature.id}</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                        <span className="font-medium text-gray-600 dark:text-gray-400">Name:</span>
-                        <span className="text-gray-800 dark:text-gray-200">{workflowSignature.name}</span>
-                    </div>
-                    {workflowSignature.description && (
-                        <div className="flex items-baseline gap-2">
-                            <span className="font-medium text-gray-600 dark:text-gray-400">Description:</span>
-                            <span className="text-gray-800 dark:text-gray-200">{workflowSignature.description}</span>
-                        </div>
-                    )}
-                    <div className="flex items-baseline gap-2">
-                        <span className="font-medium text-gray-600 dark:text-gray-400">Steps:</span>
-                        <span className="text-gray-800 dark:text-gray-200">{workflowSignature.stepCount}</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                        <span className="font-medium text-gray-600 dark:text-gray-400">Has Evaluation Steps:</span>
-                        <span className="text-gray-800 dark:text-gray-200">{workflowSignature.hasEvaluationSteps ? 'Yes' : 'No'}</span>
-                    </div>
-                </div>
+                <h4 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-3">Workflow Variable Mappings:</h4>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
+                    {/* Workflow Input Mappings Section */}
+                    <div className="mb-6">
                         <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2 mb-3">
-                            Inputs ({workflowSignature.inputs.length})
+                            Chain Variables → Workflow Inputs
                         </h5>
+
                         {workflowSignature.inputs.length > 0 ? (
-                            <ul className="list-none p-0 m-0">
-                                {workflowSignature.inputs.map(input => {
-                                    const varName = input.name.toString();
-                                    const chainMappings = findChainMappings(varName);
+                            <ul className="list-none p-0 m-0 space-y-3">
+                                {workflowSignature.inputs.map((input) => {
+                                    // Pass the actual name object instead of just the string
+                                    const matchingChainVar = findMatchingChainVar(input.name);
+                                    const inputName = input.name.toString();
+
+                                    // If no match found, find all chain variables with io_type = 'input'
+                                    const potentialMatches = !matchingChainVar ?
+                                        chainVariables.filter((v: WorkflowVariable) => v.io_type === 'input') :
+                                        [];
 
                                     return (
-                                        <li key={varName} className="py-2 px-1 border-b border-gray-100 dark:border-gray-800 last:border-0 mb-2">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <strong className="text-gray-800 dark:text-gray-200">{varName}</strong>
-                                                {input.required && (
-                                                    <span className="px-1.5 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs font-medium rounded">Required</span>
-                                                )}
-                                                {input.variable_role && (
-                                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded">
-                                                        {input.variable_role}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                                Type: {input.schema.is_array ? `${input.schema.type}[]` : input.schema.type}
-                                            </div>
-                                            {input.schema.description && (
-                                                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                                    Description: {input.schema.description}
-                                                </div>
-                                            )}
-
-                                            {/* Show chain state mappings */}
-                                            {chainMappings.length > 0 && (
-                                                <div className="mt-2 bg-gray-50 dark:bg-gray-800 p-2 rounded">
-                                                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                        Chain State Mappings:
-                                                    </div>
-                                                    <ul className="list-none p-0 m-0 space-y-1">
-                                                        {chainMappings.map((chainVar, idx) => (
-                                                            <li key={idx} className="flex items-center text-xs">
-                                                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
-                                                                    {varName}
-                                                                </span>
-                                                                <span className="text-gray-500 dark:text-gray-400 mx-1">→</span>
-                                                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
-                                                                    Chain: {chainVar.name.toString()}
-                                                                </span>
-                                                                {chainVar.variable_role && (
-                                                                    <span className="ml-1 px-1.5 py-0.5 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs rounded">
-                                                                        {chainVar.variable_role}
-                                                                    </span>
-                                                                )}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        ) : (
-                            <p className="text-gray-600 dark:text-gray-400 text-sm">No inputs defined</p>
-                        )}
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
-                        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2 mb-3">
-                            Outputs ({workflowSignature.outputs.length})
-                        </h5>
-                        {workflowSignature.outputs.length > 0 ? (
-                            <ul className="list-none p-0 m-0">
-                                {workflowSignature.outputs.map(output => {
-                                    const varName = output.name.toString();
-                                    const chainMappings = findChainMappings(varName);
-
-                                    return (
-                                        <li key={varName} className="py-2 px-1 border-b border-gray-100 dark:border-gray-800 last:border-0 mb-2">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <strong className="text-gray-800 dark:text-gray-200">{varName}</strong>
-                                                {output.variable_role === 'final' && (
-                                                    <span className="px-1.5 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs font-medium rounded">Final</span>
-                                                )}
-                                                {output.variable_role && output.variable_role !== 'final' && (
-                                                    <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs font-medium rounded">
-                                                        {output.variable_role}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                                Type: {output.schema.is_array ? `${output.schema.type}[]` : output.schema.type}
-                                            </div>
-                                            {output.schema.description && (
-                                                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                                    Description: {output.schema.description}
-                                                </div>
-                                            )}
-
-                                            {/* Show chain state mappings */}
-                                            {chainMappings.length > 0 && (
-                                                <div className="mt-2 bg-gray-50 dark:bg-gray-800 p-2 rounded">
-                                                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                        Chain State Mappings:
-                                                    </div>
-                                                    <ul className="list-none p-0 m-0 space-y-1">
-                                                        {chainMappings.map((chainVar, idx) => (
-                                                            <li key={idx} className="flex items-center text-xs">
-                                                                <span className="px-1.5 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">
-                                                                    {varName}
-                                                                </span>
-                                                                <span className="text-gray-500 dark:text-gray-400 mx-1">→</span>
-                                                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
-                                                                    Chain: {chainVar.name.toString()}
-                                                                </span>
-                                                                {chainVar.variable_role && (
-                                                                    <span className="ml-1 px-1.5 py-0.5 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs rounded">
-                                                                        {chainVar.variable_role}
-                                                                    </span>
-                                                                )}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        ) : (
-                            <p className="text-gray-600 dark:text-gray-400 text-sm">No outputs defined</p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Chain State Variables Section */}
-                {activeWorkflowChain.state && activeWorkflowChain.state.length > 0 && (
-                    <div className="mt-4 bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
-                        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2 mb-3">
-                            Workflow Chain State Variables
-                        </h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {activeWorkflowChain.state.map((chainVar, idx) => {
-                                const varName = chainVar.name.toString();
-                                const ioType = chainVar.io_type;
-                                const role = chainVar.variable_role;
-
-                                // Find if this chain variable maps to any signature variable
-                                const matchingSignatureVar = [...workflowSignature.inputs, ...workflowSignature.outputs]
-                                    .find(sigVar => sigVar.name.toString() === varName);
-
-                                return (
-                                    <div key={idx} className="p-2 border border-gray-100 dark:border-gray-800 rounded">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <strong className="text-gray-800 dark:text-gray-200">{varName}</strong>
-                                            <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${ioType === 'input'
-                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                }`}>
-                                                {ioType}
-                                            </span>
-                                            {role && (
-                                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs font-medium rounded">
-                                                    {role}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                            Type: {chainVar.schema.is_array ? `${chainVar.schema.type}[]` : chainVar.schema.type}
-                                        </div>
-
-                                        {/* Show mapping to signature if exists */}
-                                        {matchingSignatureVar && (
-                                            <div className="mt-2 bg-gray-50 dark:bg-gray-800 p-2 rounded">
-                                                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Maps to Signature:
-                                                </div>
-                                                <div className="flex items-center text-xs">
-                                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
-                                                        Chain: {varName}
-                                                    </span>
-                                                    <span className="text-gray-500 dark:text-gray-400 mx-1">→</span>
-                                                    <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
-                                                        Signature: {matchingSignatureVar.name.toString()}
-                                                    </span>
-                                                    {matchingSignatureVar.variable_role && (
-                                                        <span className="ml-1 px-1.5 py-0.5 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs rounded">
-                                                            {matchingSignatureVar.variable_role}
+                                        <li key={inputName} className="p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-sm font-medium rounded-md">
+                                                            Chain Variable: {matchingChainVar ? matchingChainVar.name.toString() : 'None'}
                                                         </span>
+
+                                                        {matchingChainVar && matchingChainVar.variable_role && (
+                                                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs font-medium rounded">
+                                                                Role: {matchingChainVar.variable_role}
+                                                            </span>
+                                                        )}
+
+                                                        {matchingChainVar && (
+                                                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded">
+                                                                {matchingChainVar.schema.is_array ? `${matchingChainVar.schema.type}[]` : matchingChainVar.schema.type}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {matchingChainVar && matchingChainVar.schema.description && (
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{matchingChainVar.schema.description}</p>
+                                                    )}
+
+                                                    {/* Show potential matches if no exact match found */}
+                                                    {!matchingChainVar && potentialMatches.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Potential chain variables:</p>
+                                                            <ul className="list-none p-0 m-0 mt-1 space-y-1">
+                                                                {potentialMatches.map((v: WorkflowVariable) => (
+                                                                    <li key={v.name.toString()} className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 p-1 border border-gray-200 dark:border-gray-700 rounded">
+                                                                        <span>
+                                                                            • {v.name.toString()} ({v.schema.type}{v.schema.is_array ? '[]' : ''})
+                                                                            {v.variable_role ? ` - ${v.variable_role}` : ''}
+                                                                        </span>
+                                                                        <button
+                                                                            className="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-800"
+                                                                            onClick={() => {
+                                                                                // This would be implemented in a real app to manually set the mapping
+                                                                                console.log(`Selected mapping: ${input.name.toString()} → ${v.name.toString()}`);
+                                                                            }}
+                                                                        >
+                                                                            Select
+                                                                        </button>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center">
+                                                    <span className="text-gray-500 dark:text-gray-400 mx-2 text-lg">→</span>
+                                                </div>
+
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-sm font-medium rounded-md">
+                                                            Workflow Input: {inputName}
+                                                        </span>
+
+                                                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded">
+                                                            {input.schema.is_array ? `${input.schema.type}[]` : input.schema.type}
+                                                        </span>
+
+                                                        {input.required && (
+                                                            <span className="px-1.5 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs font-medium rounded">Required</span>
+                                                        )}
+                                                    </div>
+
+                                                    {input.schema.description && (
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{input.schema.description}</p>
                                                     )}
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <p className="text-gray-600 dark:text-gray-400 text-sm">No input mappings defined</p>
+                        )}
                     </div>
-                )}
+
+                    {/* Workflow Output Mappings Section */}
+                    <div>
+                        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2 mb-3">
+                            Workflow Outputs → Chain Variables
+                        </h5>
+
+                        {workflowSignature.outputs.length > 0 ? (
+                            <ul className="list-none p-0 m-0 space-y-3">
+                                {workflowSignature.outputs.map((output) => {
+                                    // Pass the actual name object instead of just the string
+                                    const matchingChainVar = findMatchingChainVar(output.name);
+                                    const outputName = output.name.toString();
+
+                                    // If no match found, find all chain variables with io_type = 'output'
+                                    const potentialMatches = !matchingChainVar ?
+                                        chainVariables.filter((v: WorkflowVariable) => v.io_type === 'output') :
+                                        [];
+
+                                    return (
+                                        <li key={outputName} className="p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-sm font-medium rounded-md">
+                                                            Workflow Output: {outputName}
+                                                        </span>
+
+                                                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded">
+                                                            {output.schema.is_array ? `${output.schema.type}[]` : output.schema.type}
+                                                        </span>
+
+                                                        {output.variable_role === WorkflowVariableRole.FINAL && (
+                                                            <span className="px-1.5 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs font-medium rounded">Final</span>
+                                                        )}
+                                                    </div>
+
+                                                    {output.schema.description && (
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{output.schema.description}</p>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center">
+                                                    <span className="text-gray-500 dark:text-gray-400 mx-2 text-lg">→</span>
+                                                </div>
+
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-sm font-medium rounded-md">
+                                                            Chain Variable: {matchingChainVar ? matchingChainVar.name.toString() : 'None'}
+                                                        </span>
+
+                                                        {matchingChainVar && matchingChainVar.variable_role && (
+                                                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs font-medium rounded">
+                                                                Role: {matchingChainVar.variable_role}
+                                                            </span>
+                                                        )}
+
+                                                        {matchingChainVar && (
+                                                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded">
+                                                                {matchingChainVar.schema.is_array ? `${matchingChainVar.schema.type}[]` : matchingChainVar.schema.type}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {matchingChainVar && matchingChainVar.schema.description && (
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{matchingChainVar.schema.description}</p>
+                                                    )}
+
+                                                    {/* Show potential matches if no exact match found */}
+                                                    {!matchingChainVar && potentialMatches.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Potential chain variables:</p>
+                                                            <ul className="list-none p-0 m-0 mt-1 space-y-1">
+                                                                {potentialMatches.map((v: WorkflowVariable) => (
+                                                                    <li key={v.name.toString()} className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 p-1 border border-gray-200 dark:border-gray-700 rounded">
+                                                                        <span>
+                                                                            • {v.name.toString()} ({v.schema.type}{v.schema.is_array ? '[]' : ''})
+                                                                            {v.variable_role ? ` - ${v.variable_role}` : ''}
+                                                                        </span>
+                                                                        <button
+                                                                            className="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-800"
+                                                                            onClick={() => {
+                                                                                // This would be implemented in a real app to manually set the mapping
+                                                                                console.log(`Selected mapping: ${output.name.toString()} → ${v.name.toString()}`);
+                                                                            }}
+                                                                        >
+                                                                            Select
+                                                                        </button>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <p className="text-gray-600 dark:text-gray-400 text-sm">No output mappings defined</p>
+                        )}
+                    </div>
+                </div>
 
                 {/* Developer section with raw signature description */}
                 <div className="mt-4 border-t border-dashed border-gray-300 dark:border-gray-700 pt-4">
