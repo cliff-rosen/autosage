@@ -9,7 +9,7 @@ import {
     OrchestrationStatus
 } from '../lib/workflow/agent/AgentWorkflowOrchestrator';
 import { AgentWorkflowEngine } from '../lib/workflow/agent/AgentWorkflowEngine';
-import AgentWorkflowStatusDisplay from './AgentWorkflowStatusDisplay';
+import AgentWorkflowStatusDisplay, { AgentWorkflowStatusDisplayRef, StatusMessage } from './AgentWorkflowStatusDisplay';
 import {
     AgentWorkflowChain,
     SAMPLE_WORKFLOW_CHAIN,
@@ -68,8 +68,17 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
     // State for any errors
     const [error, setError] = useState<string | null>(null);
 
+    // State for the selected status message
+    const [selectedStatus, setSelectedStatus] = useState<OrchestrationStatus | any | null>(null);
+
+    // State for the selected status index
+    const [selectedStatusIndex, setSelectedStatusIndex] = useState<number | undefined>(undefined);
+
     // Create a ref to the orchestrator to avoid recreating it on each render
     const orchestratorRef = useRef<AgentWorkflowOrchestratorInterface | null>(null);
+
+    // Ref for the status display component
+    const statusDisplayRef = useRef<AgentWorkflowStatusDisplayRef>(null);
 
     // Initialize the orchestrator if it doesn't exist
     if (!orchestratorRef.current) {
@@ -87,6 +96,29 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
 
     // Get the orchestrator from the ref
     const orchestrator = orchestratorRef.current;
+
+    // Handle status selection
+    const handleSelectStatus = (status: any, index: number) => {
+        setSelectedStatus(status);
+        setSelectedStatusIndex(index);
+    };
+
+    // Process new status updates
+    useEffect(() => {
+        if (status || stepStatus) {
+            const currentStatus = status || stepStatus;
+            setSelectedStatus(currentStatus);
+
+            // Update the selected index to the last one after a short delay
+            // to ensure the status messages array has been updated
+            setTimeout(() => {
+                if (statusDisplayRef.current) {
+                    const messages = statusDisplayRef.current.getMessages();
+                    setSelectedStatusIndex(messages.length - 1);
+                }
+            }, 50);
+        }
+    }, [status, stepStatus]);
 
     // Handle status change events
     const handleStatusChange = (event: StatusChangeEvent) => {
@@ -153,6 +185,14 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
             setIsRunning(true);
             setFinalAnswer('');
             setStatus(null);
+            setStepStatus(null);
+            setSelectedStatus(null);
+            setSelectedStatusIndex(undefined);
+
+            // Clear previous status messages
+            if (statusDisplayRef.current) {
+                statusDisplayRef.current.clearMessages();
+            }
 
             // Create the input variable
             const inputVariables: WorkflowVariable[] = [
@@ -195,11 +235,7 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-6">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Agent Workflow Orchestrator Test
-            </h2>
-
+        <div>
             <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
                 <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
                     Input
@@ -250,9 +286,14 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
             </div>
 
             {/* Status Display */}
-            <div className="mb-6">
+            <div className="mt-4">
+                <h3 className="text-lg font-semibold mb-2">Status Updates</h3>
                 <AgentWorkflowStatusDisplay
-                    status={status || stepStatus}
+                    ref={statusDisplayRef}
+                    status={status}
+                    stepStatus={stepStatus}
+                    onSelectStatus={handleSelectStatus}
+                    selectedIndex={selectedStatusIndex}
                     maxHeight="300px"
                 />
             </div>
@@ -264,22 +305,18 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
                         Final Answer
                     </h3>
                     <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <p className="whitespace-pre-wrap">{finalAnswer}</p>
+                        <p className="whitespace-pre-wrap text-gray-800 dark:text-gray-200">{finalAnswer}</p>
                     </div>
                 </div>
             )}
 
-            {/* Current Status Details */}
-            {status && (
-                <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
-                        Current Status Details
-                    </h3>
-                    <div className="overflow-auto">
-                        <pre className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 text-sm">
-                            {JSON.stringify(status, null, 2)}
-                        </pre>
-                    </div>
+            {/* Selected Status Details */}
+            {selectedStatus && (
+                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold mb-2">Selected Status Details</h3>
+                    <pre className="whitespace-pre-wrap overflow-auto max-h-96 p-2 bg-gray-100 dark:bg-gray-900 rounded">
+                        {JSON.stringify(selectedStatus, null, 2)}
+                    </pre>
                 </div>
             )}
         </div>
