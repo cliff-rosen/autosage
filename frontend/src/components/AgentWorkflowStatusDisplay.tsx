@@ -156,6 +156,7 @@ const AgentWorkflowStatusDisplay = forwardRef<AgentWorkflowStatusDisplayRef, Age
             <div
                 ref={statusContainerRef}
                 className="p-3 overflow-y-auto font-mono text-sm"
+                style={{ maxHeight: maxHeight || '300px' }}
             >
                 {statusMessages.length === 0 ? (
                     <div className="text-gray-500 dark:text-gray-400 italic">No status updates yet</div>
@@ -170,8 +171,11 @@ const AgentWorkflowStatusDisplay = forwardRef<AgentWorkflowStatusDisplayRef, Age
                                         msg.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
                                             'text-gray-700 dark:text-gray-300'
                                 }
-                                ${selectedIndex === index ? 'bg-blue-50 dark:bg-blue-900/20 rounded' : ''}
-                                cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 p-1 rounded transition-colors`}
+                                ${selectedIndex === index ?
+                                    'bg-blue-100 dark:bg-blue-900/40 border-l-4 border-blue-500 dark:border-blue-400 pl-2 rounded-l' :
+                                    'hover:bg-gray-50 dark:hover:bg-gray-700/30'
+                                }
+                                cursor-pointer p-1 rounded transition-colors`}
                         >
                             <span className="text-gray-500 dark:text-gray-400 mr-2">[{formatTimestamp(msg.timestamp)}]</span>
                             {msg.text}

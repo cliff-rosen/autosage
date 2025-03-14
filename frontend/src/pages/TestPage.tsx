@@ -40,8 +40,8 @@ const TestPage: React.FC = () => {
                     <button
                         onClick={() => setSelectedTest(TestComponentType.WORKFLOW_ENGINE)}
                         className={`px-4 py-2 rounded-md font-medium transition-colors ${selectedTest === TestComponentType.WORKFLOW_ENGINE
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
                             }`}
                     >
                         Workflow Engine Test
@@ -49,8 +49,8 @@ const TestPage: React.FC = () => {
                     <button
                         onClick={() => setSelectedTest(TestComponentType.WORKFLOW_ORCHESTRATOR)}
                         className={`px-4 py-2 rounded-md font-medium transition-colors ${selectedTest === TestComponentType.WORKFLOW_ORCHESTRATOR
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
                             }`}
                     >
                         Workflow Orchestrator Test
