@@ -20,6 +20,7 @@ import JobsManager from './pages/JobsManager';
 import Job from './pages/Job';
 import AgentWorkflowPage from './pages/AgentWorkflow';
 import TestPage from './pages/TestPage';
+import AgentWorkflowOrchestratorTest from './components/AgentWorkflowOrchestratorTest';
 
 function App() {
   const { handleSessionExpired, isAuthenticated, login, register, error: authError } = useAuth();
@@ -125,6 +126,9 @@ function App() {
 
             <Route path="/agent-workflow" element={<AgentWorkflowPage />} />
             <Route path="/test" element={<TestPage />} />
+
+            {/* Add a new route for the AgentWorkflowOrchestratorTest component */}
+            <Route path="/agent-workflow-test" element={<AgentWorkflowOrchestratorTest />} />
 
             {/* Catch-all route for unmatched paths */}
             <Route path="*" element={<Navigate to="/" replace />} />

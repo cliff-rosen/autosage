@@ -9,6 +9,120 @@ import { WorkflowVariable, WorkflowVariableName } from '../../../types/workflows
 import { AgentWorkflowEngine } from './AgentWorkflowEngine';
 
 /**
+ * Event types for the agent workflow orchestrator
+ */
+export enum AgentWorkflowEventType {
+    STATUS_CHANGE = 'status_change',
+    PHASE_COMPLETE = 'phase_complete',
+    WORKFLOW_COMPLETE = 'workflow_complete',
+    ERROR = 'error'
+}
+
+/**
+ * Phases of the orchestration process
+ */
+export type OrchestrationPhase =
+    | 'question_development'
+    | 'knowledge_base_development'
+    | 'answer_generation'
+    | 'completed'
+    | 'failed';
+
+/**
+ * Status of the orchestration process
+ */
+export interface OrchestrationStatus {
+    sessionId: string;
+    currentPhase: OrchestrationPhase | string;
+    progress: number;
+    startTime: string;
+    endTime?: string;
+    error?: string;
+    currentWorkflowId?: string;
+    currentWorkflowStatus?: {
+        id: string;
+        status: 'running' | 'completed' | 'failed';
+        progress: number;
+        state: {
+            steps: Array<{
+                id: string;
+                name: string;
+                status: 'running' | 'completed' | 'failed';
+                result?: any;
+            }>;
+        };
+    };
+    results?: Record<string, any>;
+}
+
+/**
+ * Interface for the status change event
+ */
+export interface StatusChangeEvent {
+    type: AgentWorkflowEventType.STATUS_CHANGE;
+    sessionId: string;
+    timestamp: string;
+    status: OrchestrationStatus;
+}
+
+/**
+ * Interface for the phase complete event
+ */
+export interface PhaseCompleteEvent {
+    type: AgentWorkflowEventType.PHASE_COMPLETE;
+    sessionId: string;
+    timestamp: string;
+    phase: OrchestrationPhase;
+    result: any;
+}
+
+/**
+ * Interface for the workflow complete event
+ */
+export interface WorkflowCompleteEvent {
+    type: AgentWorkflowEventType.WORKFLOW_COMPLETE;
+    sessionId: string;
+    timestamp: string;
+    finalAnswer: string;
+}
+
+/**
+ * Interface for the error event
+ */
+export interface ErrorEvent {
+    type: AgentWorkflowEventType.ERROR;
+    sessionId: string;
+    timestamp: string;
+    error: string;
+}
+
+/**
+ * Configuration options for the agent workflow
+ */
+export interface AgentWorkflowConfig {
+    maxIterationsPerPhase?: Record<string, number>;
+    confidenceThresholds?: Record<string, number>;
+}
+
+/**
+ * Interface for the agent workflow orchestrator
+ */
+export interface AgentWorkflowOrchestratorInterface {
+    executeWorkflowChain(
+        inputValues: WorkflowVariable[],
+        workflowChain: AgentWorkflowChain,
+        config?: AgentWorkflowConfig
+    ): Promise<string>;
+    getStatus(): OrchestrationStatus;
+    cancelExecution(): Promise<boolean>;
+    onStatusChange(callback: (event: StatusChangeEvent) => void): void;
+    onPhaseComplete(callback: (event: PhaseCompleteEvent) => void): void;
+    onWorkflowComplete(callback: (event: WorkflowCompleteEvent) => void): void;
+    onError(callback: (event: ErrorEvent) => void): void;
+    setStepStatusCallback(callback: (status: any) => void): void;
+}
+
+/**
  * AgentWorkflowOrchestrator coordinates the execution of the three agent workflows
  * that make up the complete agent workflow: question development, knowledge base
  * development, and answer generation.
@@ -108,8 +222,11 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                     currentWorkflowId: phase.id
                 });
 
-                // Create the workflow for this phase
-                const workflow = await phase.createWorkflow();
+                // Get the workflow for this phase
+                const workflowPromise = phase.workflow();
+                const workflow = workflowPromise instanceof Promise
+                    ? await workflowPromise
+                    : workflowPromise;
 
                 // Apply workflow configuration
                 this.applyWorkflowConfig(workflow);
@@ -117,16 +234,10 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Prepare inputs for this phase from the chain state
                 const phaseInputs: Record<string, any> = {};
 
-                for (const [inputKey, inputConfig] of Object.entries(phase.inputs)) {
-                    if (inputConfig.source === 'previous' && inputConfig.sourcePhaseId && inputConfig.sourceVariable) {
-                        // Get from a previous phase's output in the chain state
-                        phaseInputs[inputKey] = chainState[inputConfig.sourceVariable as string];
-                    } else if (inputConfig.source === 'original') {
-                        // Get from the original input values
-                        phaseInputs[inputKey] = inputValuesRecord[inputConfig.sourceVariable as string || inputKey];
-                    } else if (inputConfig.source === 'constant') {
-                        // Use a constant value
-                        phaseInputs[inputKey] = inputConfig.value;
+                // Use the phase's input_mappings to map chain variables to workflow inputs
+                for (const [chainVar, workflowVar] of Object.entries(phase.inputs_mappings)) {
+                    if (chainState[chainVar]) {
+                        phaseInputs[workflowVar.toString()] = chainState[chainVar];
                     }
                 }
 
@@ -151,10 +262,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 this.phaseResults[phase.id] = result;
 
                 // Update the chain state with the outputs from this phase
-                for (const outputVar of phase.outputs) {
-                    if (result[outputVar as string] !== undefined) {
-                        chainState[outputVar as string] = result[outputVar as string];
-                    }
+                for (const [chainVar, value] of Object.entries(result)) {
+                    chainState[chainVar] = value;
                 }
 
                 // Update the workflow chain state
@@ -162,8 +271,19 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
                 // If this is the final phase, get the final answer
                 if (phase.id === workflowChain.phases[workflowChain.phases.length - 1].id) {
-                    // Assuming the final phase has a 'finalAnswer' output
-                    finalAnswer = result.finalAnswer || '';
+                    // Look for a final answer in the result
+                    // This assumes the final phase has an output mapped to something like 'finalAnswer'
+                    for (const key of Object.keys(result)) {
+                        if (key.toLowerCase().includes('final') && key.toLowerCase().includes('answer')) {
+                            finalAnswer = result[key] || '';
+                            break;
+                        }
+                    }
+
+                    // If no specific final answer found, use the first output
+                    if (!finalAnswer && Object.keys(result).length > 0) {
+                        finalAnswer = result[Object.keys(result)[0]] || '';
+                    }
                 }
 
                 console.timeEnd(`⏱️ Phase Execution Time: ${phase.id}`);
@@ -281,7 +401,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
         // Update status to reflect the current phase
         this.updateStatus({
-            currentPhase: 'question_development', // This should be mapped from phase.type
+            currentPhase: phase.id as OrchestrationPhase,
             progress: 0,
             currentWorkflowStatus: {
                 id: phase.id,
@@ -293,8 +413,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             }
         });
 
-        // Create the workflow
-        const workflowPromise = phase.createWorkflow();
+        // Get the workflow for this phase
+        const workflowPromise = phase.workflow();
         const workflow = workflowPromise instanceof Promise
             ? await workflowPromise
             : workflowPromise;
@@ -310,16 +430,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             inputValuesRecord[variable.name as string] = variable.value;
         }
 
-        // Prepare inputs for the workflow
+        // Prepare inputs for the workflow using the phase's input mappings
         const inputs: Record<string, any> = {};
 
-        for (const [inputName, inputConfig] of Object.entries(phase.inputs)) {
-            if (inputConfig.source === 'original') {
-                inputs[inputName] = inputValuesRecord[inputName];
-            } else if (inputConfig.source === 'previous' && inputConfig.sourcePhaseId && inputConfig.sourceVariable) {
-                inputs[inputName] = this.phaseResults[inputConfig.sourceVariable as string];
-            } else if (inputConfig.source === 'constant') {
-                inputs[inputName] = inputConfig.value;
+        // Use the phase's input_mappings to map chain variables to workflow inputs
+        for (const [chainVar, workflowVar] of Object.entries(phase.inputs_mappings)) {
+            if (inputValuesRecord[chainVar]) {
+                inputs[workflowVar.toString()] = inputValuesRecord[chainVar];
             }
         }
 
@@ -416,11 +533,14 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             throw new Error(errorMessage);
         }
 
-        // Extract outputs
+        // Extract outputs using the phase's output mappings
         const outputs: Record<string, any> = {};
 
-        for (const outputName of phase.outputs) {
-            outputs[outputName] = jobResult.outputs[outputName];
+        // Use the phase's output_mappings to map workflow outputs to chain variables
+        for (const [workflowVar, chainVar] of Object.entries(phase.outputs_mappings)) {
+            if (jobResult.outputs[workflowVar]) {
+                outputs[chainVar.toString()] = jobResult.outputs[workflowVar];
+            }
         }
 
         console.log(`✅ [PHASE ${phase.id}] Workflow completed successfully with outputs:`, Object.keys(outputs));

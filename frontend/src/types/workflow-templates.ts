@@ -26,15 +26,15 @@ export interface WorkflowTemplate {
 export const developQuestionWorkflowTemplate: Workflow = {
     workflow_id: "template-develop-question",
     name: "Develop Question Workflow",
-    description: "A workflow that improves the initial question",
+    description: "A workflow that improves the initial question through a two-step process",
     status: WorkflowStatus.DRAFT,
     error: undefined,
     created_at: "2025-03-12T01:04:58",
     updated_at: "2025-03-13T04:04:19",
     steps: [
         {
-            label: "Improve Question",
-            description: "Improves the initial question",
+            label: "Initial Question Processing",
+            description: "First step of question improvement",
             step_type: WorkflowStepType.ACTION,
             tool_id: "echo",
             prompt_template_id: undefined,
@@ -42,7 +42,7 @@ export const developQuestionWorkflowTemplate: Workflow = {
                 [asParamName("input")]: asVarName("initial_question")
             },
             output_mappings: {
-                [asOutputName("output")]: asVarName("improved_question")
+                [asOutputName("output")]: asVarName("interim_question")
             },
             evaluation_config: {
                 conditions: [],
@@ -52,6 +52,65 @@ export const developQuestionWorkflowTemplate: Workflow = {
             step_id: asStepId("5a531329-3aad-4dd5-9012-eaae18eeb7f8"),
             workflow_id: "template-develop-question",
             sequence_number: 0,
+            created_at: "2025-03-13T04:04:19",
+            updated_at: "2025-03-13T04:04:19",
+            tool: {
+                tool_id: "echo",
+                name: "Echo Tool",
+                description: "Echoes back the input with a prefix",
+                tool_type: "utility",
+                signature: {
+                    parameters: [
+                        {
+                            name: asParamName("input"),
+                            description: "The input to echo",
+                            schema: {
+                                type: "string",
+                                is_array: false
+                            }
+                        },
+                        {
+                            name: asParamName("stringify"),
+                            description: "Whether to convert objects to JSON strings",
+                            schema: {
+                                type: "boolean",
+                                is_array: false
+                            }
+                        }
+                    ],
+                    outputs: [
+                        {
+                            name: asOutputName("output"),
+                            description: "The echoed output",
+                            schema: {
+                                type: "string",
+                                is_array: false
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            label: "Finalize Question",
+            description: "Second step to finalize the improved question",
+            step_type: WorkflowStepType.ACTION,
+            tool_id: "echo",
+            prompt_template_id: undefined,
+            parameter_mappings: {
+                [asParamName("input")]: asVarName("interim_question")
+            },
+            output_mappings: {
+                [asOutputName("output")]: asVarName("improved_question")
+            },
+            evaluation_config: {
+                conditions: [],
+                default_action: "continue",
+                maximum_jumps: 1
+            },
+            step_id: asStepId("6c642430-bf71-4eb6-a5f0-2c8bbb9e6d9f"),
+            workflow_id: "template-develop-question",
+            sequence_number: 1,
             created_at: "2025-03-13T04:04:19",
             updated_at: "2025-03-13T04:04:19",
             tool: {
@@ -106,6 +165,21 @@ export const developQuestionWorkflowTemplate: Workflow = {
             io_type: "input",
             variable_id: "question_var_input_1",
             value: ""
+        },
+        {
+            name: asVarName("interim_question"),
+            schema: {
+                type: "string",
+                description: "Interim question for processing",
+                is_array: false,
+                fields: {},
+                format: undefined,
+                content_types: undefined
+            },
+            io_type: "output",
+            variable_id: "question_var_interim_1",
+            value: "",
+            variable_role: WorkflowVariableRole.INTERMEDIATE
         },
         {
             name: asVarName("improved_question"),

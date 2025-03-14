@@ -59,7 +59,6 @@ export class AgentWorkflowEngine {
 
         try {
             console.log(`🚀 [JOB ${jobId}] Starting workflow job: ${job.workflow.name}`);
-            console.time(`⏱️ Job ${jobId} Execution Time`);
 
             // Initialize workflow with inputs
             const workflow = { ...job.workflow };
@@ -71,7 +70,6 @@ export class AgentWorkflowEngine {
             }
 
             // Add input values to workflow state
-            console.log(`📥 [JOB ${jobId}] Setting up workflow inputs`);
             for (const inputVariable of job.inputs) {
                 // Find the variable in the workflow state
                 const existingVarIndex = workflow.state.findIndex(v => v.name === inputVariable.name);
@@ -96,12 +94,11 @@ export class AgentWorkflowEngine {
             let success = true;
             let error: string | undefined;
 
-            console.log(`🔄 [JOB ${jobId}] Starting workflow execution`);
+            console.log(`🔄 [JOB ${jobId}] Starting workflow execution loop`);
 
             while (currentStepIndex < workflow.steps.length) {
                 const step = workflow.steps[currentStepIndex];
                 console.log(`▶️ [JOB ${jobId}] Executing step ${currentStepIndex + 1}/${workflow.steps.length}: ${step.label}`);
-                console.time(`⏱️ [JOB ${jobId}] Step ${currentStepIndex + 1} Execution Time`);
 
                 // Update the job status with the current step index
                 this.activeJobs.set(jobId, {
@@ -154,7 +151,6 @@ export class AgentWorkflowEngine {
                     break;
                 }
 
-                console.timeEnd(`⏱️ [JOB ${jobId}] Step ${currentStepIndex + 1} Execution Time`);
                 console.log(`✅ [JOB ${jobId}] Step ${currentStepIndex + 1} completed successfully`);
 
                 // Move to the next step
@@ -186,7 +182,7 @@ export class AgentWorkflowEngine {
             }
 
             // Extract outputs from the final workflow state
-            console.log(`📤 [JOB ${jobId}] Collecting workflow outputs`);
+            console.log(`📤 [JOB ${jobId}] Exiting workflow execution loop and collecting workflow outputs`);
             const outputs: Record<string, any> = {};
             for (const variable of updatedState) {
                 if (variable.io_type === 'output' && variable.value !== undefined) {
@@ -195,7 +191,6 @@ export class AgentWorkflowEngine {
                 }
             }
 
-            console.timeEnd(`⏱️ Job ${jobId} Execution Time`);
             console.log(`${success ? '🎉' : '❌'} [JOB ${jobId}] Workflow job ${success ? 'completed successfully' : 'failed'}`);
 
             // Return result
