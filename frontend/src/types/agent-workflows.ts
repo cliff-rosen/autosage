@@ -78,7 +78,7 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             workflow: () => createWorkflowFromTemplate('develop-kb') as AgentWorkflow,
             inputs_mappings: {
                 // Map improved_question from chain state to workflow input
-                [asVarName('interim_question')]: asVarName('wfc_improved_question')
+                [asVarName('improved_question')]: asVarName('wfc_improved_question')
             },
             outputs_mappings: {
                 // Map kb from workflow output to chain state

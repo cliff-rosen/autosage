@@ -75,6 +75,7 @@ export class AgentWorkflowEngine {
             workflow.state = workflow.state.map((variable) => {
                 const inputVariable = job.inputs.find((input) => input.name === variable.name);
                 if (inputVariable) {
+                    console.log('qqq inputVariable', inputVariable);
                     return { ...variable, value: inputVariable.value };
                 }
                 return variable;
@@ -184,6 +185,7 @@ export class AgentWorkflowEngine {
                     console.log(`📤 [JOB ${jobId}] Output: ${variable.name}`);
                 }
             }
+
 
             console.log(`${success ? '🎉' : '❌'} [JOB ${jobId}] Workflow job ${success ? 'completed successfully' : 'failed'}`);
 

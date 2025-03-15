@@ -251,7 +251,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 const phaseInputVariables: WorkflowVariable[] = Object.entries(phaseInputs).map(([name, value]) => ({
                     variable_id: `${phase.id}-input-${name}`,
                     name: name as WorkflowVariableName,
-                    value: value,
+                    value: value.value,
                     schema: {
                         type: typeof value as any,
                         description: `Input ${name} for phase ${phase.id}`,
@@ -274,8 +274,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Update the chain state with the outputs from this phase
                 for (const [chainVar, variable] of Object.entries(result)) {
                     if (chainState[chainVar.toString()]) {
-                        chainState[chainVar.toString()].value = variable.value;
-                        console.log(`qqq Updated chain variable ${chainVar} to ${variable.value}`);
+                        chainState[chainVar.toString()].value = variable;
+                        console.log(`qqq Updated chain variable ${chainVar} to ${variable}`);
                     } else {
                         console.warn(`qqq Chain variable ${chainVar} not found in chain state`);
                     }
