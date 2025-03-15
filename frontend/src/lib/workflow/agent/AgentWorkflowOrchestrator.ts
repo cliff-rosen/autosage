@@ -185,30 +185,22 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Store config
             this.config = config || {};
 
-            let chainState: Record<string, WorkflowVariable> = {};
-
-            // Convert input variables array to a record for easier access
-            const inputValuesRecord = inputValues;
-
-            // Handle the workflow chain state
-            if (workflowChain.state) {
-                // Use type assertion to avoid TypeScript errors
-                const state = workflowChain.state as WorkflowVariable[];
-                state.forEach((v) => {
-                    if (v && typeof v === 'object' && 'name' in v) {
-                        chainState[v.name as string] = v;
-                    }
-                });
-            }
+            let chainState = [...(workflowChain.state as WorkflowVariable[])];
+            chainState.forEach((v) => {
+                const inputValue = inputValues.find((v: WorkflowVariable) => v.name === v.name);    
+                // if v.name is in inputValues, set v.value to inputValues[v.name]
+                if (inputValue) {
+                    v.value = inputValue.value;
+                }
+            });
 
             console.log('qqq AgentWorkflowOrchestrator.executeWorkflowChain inputs');
+            console.log('qqq inputValues', inputValues);
             console.log('qqq chainState', chainState);
-            console.log('qqq inputValuesRecord', inputValuesRecord);
-            console.log('qqq workflowChain.state', workflowChain.state);
 
             // Initialize phase results with the original input values
             this.phaseResults = {
-                ...inputValuesRecord
+                ...inputValues
             };
 
             // Update status
@@ -224,7 +216,6 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 console.log('qqq ********************************************************************')
                 console.log('qqq phase', phase);
                 console.log(`🔄 [WORKFLOW] Starting phase: ${phase.id}`);
-                console.time(`⏱️ Phase Execution Time: ${phase.id}`);
 
                 // Update status to the current phase
                 this.updateStatus({
@@ -241,30 +232,16 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Apply workflow configuration
                 this.applyWorkflowConfig(workflow);
 
-                // Prepare inputs for this phase from the chain state
-                const phaseInputs: Record<string, any> = {};
-
-                // Use the phase's input_mappings to map chain variables to workflow inputs
-                // The key is the workflow variable (consuming party) and the value is the chain variable (source)
+                const phaseInputVariables: WorkflowVariable[] = [];
                 for (const [workflowVar, chainVar] of Object.entries(phase.inputs_mappings)) {
-                    if (chainState[chainVar]) {
-                        phaseInputs[workflowVar.toString()] = chainState[chainVar];
+                    const chainVariable = chainState.find((v) => v.name === chainVar);
+                    if (chainVariable) {
+                        phaseInputVariables.push({
+                            ...chainVariable,
+                            value: inputValues[workflowVar]
+                        });
                     }
                 }
-
-                // Convert phase inputs to WorkflowVariable array
-                const phaseInputVariables: WorkflowVariable[] = Object.entries(phaseInputs).map(([name, value]) => ({
-                    variable_id: `${phase.id}-input-${name}`,
-                    name: name as WorkflowVariableName,
-                    value: value.value,
-                    schema: {
-                        type: typeof value as any,
-                        description: `Input ${name} for phase ${phase.id}`,
-                        is_array: Array.isArray(value)
-                    },
-                    io_type: 'input' as const,
-                    required: true
-                }));
 
                 console.log('qqq phaseInputVariables', phaseInputVariables);
 

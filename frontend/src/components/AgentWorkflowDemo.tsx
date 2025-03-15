@@ -13,9 +13,7 @@ import {
 } from '../types/agent-workflows';
 import {
     WorkflowStep,
-    WorkflowSignature,
     WorkflowVariable,
-    WorkflowVariableRole
 } from '../types/workflows';
 
 // Helper functions for phase display
