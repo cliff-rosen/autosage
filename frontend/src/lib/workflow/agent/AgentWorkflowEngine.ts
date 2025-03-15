@@ -71,23 +71,14 @@ export class AgentWorkflowEngine {
             }
 
             // Add input values to workflow state
-            for (const inputVariable of job.inputs) {
-                // Find the variable in the workflow state
-                const existingVarIndex = workflow.state.findIndex(v => v.name === inputVariable.name);
-
-                if (existingVarIndex >= 0) {
-                    // Update existing variable
-                    workflow.state[existingVarIndex] = {
-                        ...workflow.state[existingVarIndex],
-                        value: inputVariable.value
-                    };
-                    console.log(`📥 [JOB ${jobId}] Updated input: ${inputVariable.name}`);
-                } else {
-                    // Add the input variable to the workflow state
-                    workflow.state.push(inputVariable);
-                    console.log(`📥 [JOB ${jobId}] Added input: ${inputVariable.name}`);
+            workflow.state = workflow.state.map((variable) => {
+                const inputVariable = job.inputs.find((input) => input.name === variable.name);
+                if (inputVariable) {
+                    return { ...variable, value: inputVariable.value };
                 }
-            }
+                return variable;
+            });
+            console.log('qqq AgentWorkflowEngine.runJob workflow.state', workflow.state);
 
             // Execute each step in the workflow sequentially
             let currentStepIndex = 0;

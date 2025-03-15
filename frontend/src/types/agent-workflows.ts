@@ -63,7 +63,7 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             workflow: () => createWorkflowFromTemplate('develop-question') as AgentWorkflow,
             inputs_mappings: {
                 // Map initial_question from chain state to workflow input
-                [asVarName('wfc_initial_question')]: asVarName('input1')
+                [asVarName('input1')]: asVarName('wfc_initial_question')
             },
             outputs_mappings: {
                 // Map improved_question from workflow output to chain state
@@ -78,7 +78,7 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             workflow: () => createWorkflowFromTemplate('develop-kb') as AgentWorkflow,
             inputs_mappings: {
                 // Map improved_question from chain state to workflow input
-                [asVarName('wfc_improved_question')]: asVarName('output1')
+                [asVarName('output1')]: asVarName('wfc_improved_question')
             },
             outputs_mappings: {
                 // Map kb from workflow output to chain state
@@ -93,8 +93,8 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             workflow: () => createWorkflowFromTemplate('develop-answer') as AgentWorkflow,
             inputs_mappings: {
                 // Map improved_question and kb from chain state to workflow inputs
-                [asVarName('wfc_improved_question')]: asVarName('output1'),
-                [asVarName('wfc_kb')]: asVarName('output2')
+                [asVarName('output1')]: asVarName('wfc_improved_question'),
+                [asVarName('output2')]: asVarName('wfc_kb')
             },
             outputs_mappings: {
                 // Map final_answer from workflow output to chain state
