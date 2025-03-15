@@ -186,17 +186,18 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Store config
             this.config = config || {};
 
+            let chainState: Record<string, WorkflowVariable> = {};
+
             // Convert input variables array to a record for easier access
             const inputValuesRecord: Record<string, any> = {};
             for (const variable of inputValues) {
-                inputValuesRecord[variable.name as string] = variable.value;
+                inputValuesRecord[variable.name as string] = variable;
+                chainState[variable.name as string] = variable;
             }
+            workflowChain.state?.forEach((v: WorkflowVariable | WorkflowVariableName) => {
+                chainState[v.name as string] = v;
+            });
 
-            // Initialize chain state with the input values and existing chain state
-            const chainState = {
-                ...inputValuesRecord,
-                ...workflowChain.state
-            };
             console.log('qqq AgentWorkflowOrchestrator.executeWorkflowChain inputs');
             console.log('qqq chainState', chainState);
             console.log('qqq inputValuesRecord', inputValuesRecord);
@@ -265,13 +266,21 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Execute the workflow for this phase
                 const result = await this.executeWorkflowPhase(phase, phaseInputVariables);
 
+                console.log('qqq result', result);
+
                 // Store the results in the phase results
                 this.phaseResults[phase.id] = result;
 
                 // Update the chain state with the outputs from this phase
-                for (const [chainVar, value] of Object.entries(result)) {
-                    chainState[chainVar] = value;
+                for (const [chainVar, variable] of Object.entries(result)) {
+                    if (chainState[chainVar.toString()]) {
+                        chainState[chainVar.toString()].value = variable.value;
+                        console.log(`qqq Updated chain variable ${chainVar} to ${variable.value}`);
+                    } else {
+                        console.warn(`qqq Chain variable ${chainVar} not found in chain state`);
+                    }
                 }
+                console.log('qqq chainState again', chainState);
 
                 // Update the workflow chain state
                 workflowChain.state = chainState;

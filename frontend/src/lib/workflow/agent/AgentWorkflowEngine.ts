@@ -60,6 +60,7 @@ export class AgentWorkflowEngine {
 
         try {
             console.log(`🚀 [JOB ${jobId}] Starting workflow job: ${job.workflow.name}`);
+            console.log('qqq AgentWorkflowEngine.runJob job', job);
 
             // Initialize workflow with inputs
             const workflow = { ...job.workflow };
@@ -122,6 +123,7 @@ export class AgentWorkflowEngine {
                     currentStepIndex,
                     stepStatusCallback
                 );
+                console.log('qqq stepResult', stepResult);
 
                 // Update the workflow state
                 updatedState = stepResult.updatedState;
