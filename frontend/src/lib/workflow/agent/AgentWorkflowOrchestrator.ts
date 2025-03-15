@@ -218,6 +218,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Execute each phase in sequence
             let finalAnswer = '';
             for (const phase of workflowChain.phases) {
+                console.log('qqq ********************************************************************')
+                console.log('qqq phase', phase);
                 console.log(`🔄 [WORKFLOW] Starting phase: ${phase.id}`);
                 console.time(`⏱️ Phase Execution Time: ${phase.id}`);
 
