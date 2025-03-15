@@ -19,6 +19,8 @@ export const executeTool = async (toolId: string, parameters: ResolvedParameters
     return await executor(toolId, parameters);
 };
 
+const TOOL_DELAY = 100;
+
 // Tool type definitions
 export const TOOL_TYPES = [
     {
@@ -71,7 +73,7 @@ const registerAllTools = () => {
         console.log('Executing echo tool with parameters:', parameters);
         const input = parameters['input' as ToolParameterName];
         const stringify = parameters['stringify' as ToolParameterName] as boolean || false;
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, TOOL_DELAY));
 
         // Process the input based on the stringify parameter
         let processedInput;
@@ -97,7 +99,7 @@ const registerAllTools = () => {
     registerToolExecutor('concatenate', async (toolId: string, parameters: ResolvedParameters) => {
         const first = (parameters as Record<string, string>)['first'];
         const second = (parameters as Record<string, string>)['second'];
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, TOOL_DELAY));
         return { ['result' as ToolOutputName]: `${first}${second}` as SchemaValueType };
     });
 };

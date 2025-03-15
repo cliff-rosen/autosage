@@ -92,6 +92,7 @@ const AgentWorkflowDemo: React.FC = () => {
 
     // Handle phase complete events
     const handlePhaseComplete = (event: PhaseCompleteEvent) => {
+        console.log('qqq handlePhaseComplete', event);
         // Update phase results
         setPhaseResults(prev => ({
             ...prev,
