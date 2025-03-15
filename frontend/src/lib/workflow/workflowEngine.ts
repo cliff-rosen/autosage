@@ -675,6 +675,7 @@ export class WorkflowEngine {
         outputs: Record<string, any>,
         workflow: Workflow
     ): WorkflowVariable[] {
+
         const updatedState = [...(workflow.state || [])];
 
         if (!step.output_mappings || Object.keys(outputs).length === 0) {

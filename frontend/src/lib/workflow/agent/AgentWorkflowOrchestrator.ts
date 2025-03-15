@@ -235,7 +235,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 const phaseInputs: Record<string, any> = {};
 
                 // Use the phase's input_mappings to map chain variables to workflow inputs
-                for (const [chainVar, workflowVar] of Object.entries(phase.inputs_mappings)) {
+                // The key is the workflow variable (consuming party) and the value is the chain variable (source)
+                for (const [workflowVar, chainVar] of Object.entries(phase.inputs_mappings)) {
                     if (chainState[chainVar]) {
                         phaseInputs[workflowVar.toString()] = chainState[chainVar];
                     }
@@ -434,7 +435,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         const inputs: Record<string, any> = {};
 
         // Use the phase's input_mappings to map chain variables to workflow inputs
-        for (const [chainVar, workflowVar] of Object.entries(phase.inputs_mappings)) {
+        // The key is the workflow variable (consuming party) and the value is the chain variable (source)
+        for (const [workflowVar, chainVar] of Object.entries(phase.inputs_mappings)) {
             if (inputValuesRecord[chainVar]) {
                 inputs[workflowVar.toString()] = inputValuesRecord[chainVar];
             }
@@ -455,6 +457,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             io_type: 'input' as const,
             required: true
         }));
+
+        // log inputs and mappings
+        console.log('zzz inputValues', inputValues);
+        console.log('zzz inputValuesRecord', inputValuesRecord);
+        console.log('zzz inputs', inputs);
+        console.log('zzz mappings', phase.inputs_mappings);
+        console.log('zzz workflowVariables', workflowVariables);
 
         // Create a status callback for the job
         const statusCallback = (status: {
@@ -509,6 +518,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             inputs: workflowVariables,
             statusCallback
         });
+        console.log('AgentWorkflowOrchestrator jobResult', jobResult);
 
         // Update status to reflect phase completion
         const phaseStatus = jobResult.success ? 'completed' : 'failed';

@@ -49,6 +49,7 @@ export class AgentWorkflowEngine {
      * @returns A promise that resolves to the job result
      */
     async runJob(job: WorkflowJob): Promise<JobResult> {
+
         const jobId = job.jobId || uuidv4();
 
         // Store the job
@@ -182,7 +183,7 @@ export class AgentWorkflowEngine {
             }
 
             // Extract outputs from the final workflow state
-            console.log(`📤 [JOB ${jobId}] Exiting workflow execution loop and collecting workflow outputs`);
+            console.log(`📤 [JOB ${jobId}] Exiting workflow execution loop and collecting workflow outputs`, updatedState);
             const outputs: Record<string, any> = {};
             for (const variable of updatedState) {
                 if (variable.io_type === 'output' && variable.value !== undefined) {

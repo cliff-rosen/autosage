@@ -50,7 +50,8 @@ interface AgentWorkflowOrchestratorInterface {
  */
 const AgentWorkflowOrchestratorTest: React.FC = () => {
 
-    const [question, setQuestion] = useState<string>('');
+    // Replace single question with dynamic input values
+    const [inputValues, setInputValues] = useState<Record<string, any>>({});
     const [finalAnswer, setFinalAnswer] = useState<string>('');
 
     const [workflowChain, setWorkflowChain] = useState<AgentWorkflowChain>(SAMPLE_WORKFLOW_CHAIN);
@@ -69,6 +70,7 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
     const [stepStatus, setStepStatus] = useState<any | null>(null);
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
     const [selectedStatus, setSelectedStatus] = useState<OrchestrationStatus | any | null>(null);
     const [selectedStatusIndex, setSelectedStatusIndex] = useState<number | undefined>(undefined);
@@ -164,8 +166,8 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
                             v.name === chainVar.toString());
 
                         if (stateVarIndex !== -1) {
-                            // Get the value from the phase result
-                            const value = event.result[chainVar.toString()];
+                            // Get the value from the phase result using the workflow variable name
+                            const value = event.result[workflowVar];
                             if (value !== undefined) {
                                 console.log(`Updating ${chainVar} with value from phase ${event.phase}`);
                                 // Update the variable in the state array
@@ -247,7 +249,7 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
 
                                 if (stateVarIndex !== -1) {
                                     // Get the value from the phase result
-                                    const value = phaseResult[chainVar.toString()];
+                                    const value = phaseResult[workflowVar];
                                     if (value !== undefined) {
                                         console.log(`Updating ${chainVar} with value from phase ${phase.id}`);
                                         // Update the variable in the state array
@@ -365,7 +367,7 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
 
                                 if (stateVarIndex !== -1) {
                                     // Get the value from the phase result
-                                    const value = phaseResult[chainVar.toString()];
+                                    const value = phaseResult[workflowVar];
                                     if (value !== undefined) {
                                         console.log(`Updating ${chainVar} with value from phase ${phase.id} in error handler`);
                                         // Update the variable in the state array
@@ -441,10 +443,109 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
         };
     }, [orchestrator]);
 
+    // Handle input change for any input field
+    const handleInputChange = (name: string, value: any, type: string = 'string') => {
+        // Convert value based on type
+        let processedValue = value;
+
+        try {
+            if (type === 'number') {
+                processedValue = value === '' ? '' : Number(value);
+                if (isNaN(processedValue) && value !== '') {
+                    setValidationErrors(prev => ({
+                        ...prev,
+                        [name]: 'Please enter a valid number'
+                    }));
+                    return;
+                }
+            } else if (type === 'boolean') {
+                processedValue = value === 'true';
+            } else if (type === 'object' && typeof value === 'string') {
+                try {
+                    processedValue = value.trim() ? JSON.parse(value) : {};
+                } catch (e) {
+                    setValidationErrors(prev => ({
+                        ...prev,
+                        [name]: 'Please enter valid JSON'
+                    }));
+                    return;
+                }
+            }
+
+            // Clear validation error if value is valid
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
+
+            // Update input values
+            setInputValues(prev => ({
+                ...prev,
+                [name]: processedValue
+            }));
+        } catch (e) {
+            console.error(`Error processing input for ${name}:`, e);
+            setValidationErrors(prev => ({
+                ...prev,
+                [name]: 'Invalid input value'
+            }));
+        }
+    };
+
+    // Validate all inputs
+    const isValidInputs = (): boolean => {
+        if (!workflowChain || !Array.isArray(workflowChain.state)) {
+            return false;
+        }
+
+        // Get all required input variables
+        const requiredInputs = workflowChain.state.filter(
+            variable => variable.io_type === 'input' && variable.required
+        );
+
+        // Check if all required inputs have values
+        const missingInputs: Record<string, string> = {};
+        let isValid = true;
+
+        requiredInputs.forEach(variable => {
+            const name = variable.name as string;
+            if (inputValues[name] === undefined || inputValues[name] === '') {
+                missingInputs[name] = `${name} is required`;
+                isValid = false;
+            }
+        });
+
+        // Update validation errors
+        setValidationErrors(missingInputs);
+        return isValid;
+    };
+
+    // Initialize input values when workflow chain changes
+    useEffect(() => {
+        if (workflowChain && Array.isArray(workflowChain.state)) {
+            const initialInputs: Record<string, any> = {};
+
+            // Get all input variables
+            const inputVariables = workflowChain.state.filter(
+                variable => variable.io_type === 'input'
+            );
+
+            // Initialize input values with existing values or defaults
+            inputVariables.forEach(variable => {
+                const name = variable.name as string;
+                initialInputs[name] = variable.value !== undefined ? variable.value : '';
+            });
+
+            // Update input values
+            setInputValues(initialInputs);
+        }
+    }, [workflowChain]);
+
     // Start the workflow
     const startWorkflow = async () => {
-        if (!question.trim()) {
-            setError('Please enter a question');
+        if (!isValidInputs()) {
+            setError('Please fill in all required inputs');
             return;
         }
 
@@ -482,18 +583,13 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
                 workflowChainToUse.state.forEach(variable => {
                     // Initialize input variables with empty strings, leave outputs undefined
                     if (variable.io_type === 'input') {
-                        variable.value = '';
+                        const name = variable.name as string;
+                        variable.value = inputValues[name] !== undefined ? inputValues[name] : '';
                     } else {
                         variable.value = undefined;
                     }
                 });
             }
-
-            // Log the structure to verify
-            console.log("SAMPLE_WORKFLOW_CHAIN.state type:", typeof SAMPLE_WORKFLOW_CHAIN.state);
-            console.log("Is SAMPLE_WORKFLOW_CHAIN.state an array:", Array.isArray(SAMPLE_WORKFLOW_CHAIN.state));
-            console.log("workflowChainToUse.state type:", typeof workflowChainToUse.state);
-            console.log("Is workflowChainToUse.state an array:", Array.isArray(workflowChainToUse.state));
 
             setWorkflowChain(workflowChainToUse);
 
@@ -512,41 +608,46 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
             };
 
             setOrchestrationResult(initialOrchestrationResult);
-            console.log("Initial orchestration result set:", initialOrchestrationResult);
 
             // Clear previous status messages
             if (statusDisplayRef.current) {
                 statusDisplayRef.current.clearMessages();
             }
 
-            // Create the input variable
-            const inputVariables: WorkflowVariable[] = [
-                {
-                    variable_id: 'question',
-                    name: 'question' as any,
-                    value: question,
-                    schema: {
-                        type: 'string',
-                        description: 'The question to answer',
-                        is_array: false
+            // Create input variables from all input values
+            const inputVariables: WorkflowVariable[] = Object.entries(inputValues).map(([name, value]) => {
+                // Find the variable in the workflow chain state to get its schema and other properties
+                const variable = workflowChainToUse.state && Array.isArray(workflowChainToUse.state)
+                    ? workflowChainToUse.state.find((v: any) => v.name === name)
+                    : undefined;
+
+                return {
+                    variable_id: name,
+                    name: name as any,
+                    value: value,
+                    schema: variable?.schema || {
+                        type: typeof value as any,
+                        description: `Input ${name}`,
+                        is_array: Array.isArray(value)
                     },
                     io_type: 'input',
-                    required: true,
-                    variable_role: WorkflowVariableRole.USER_INPUT
-                }
-            ];
+                    required: variable?.required || false,
+                    variable_role: variable?.variable_role || WorkflowVariableRole.USER_INPUT
+                };
+            });
 
-            // Update the initial question in the workflow chain state
-            if (Array.isArray(workflowChainToUse.state)) {
-                const initialQuestionVar = workflowChainToUse.state.find(
-                    (v: any) => v.name === 'wfc_initial_question'
-                );
-                if (initialQuestionVar) {
-                    initialQuestionVar.value = question;
-                }
+            // Update all input variables in the workflow chain state
+            if (workflowChainToUse.state && Array.isArray(workflowChainToUse.state)) {
+                Object.entries(inputValues).forEach(([name, value]) => {
+                    const variable = workflowChainToUse.state && workflowChainToUse.state.find((v: any) => v.name === name);
+                    if (variable) {
+                        variable.value = value;
+                    }
+                });
             }
 
             console.log("Starting workflow with chain:", workflowChainToUse);
+            console.log("Input variables:", inputVariables);
 
             // Start the workflow
             await orchestrator.executeWorkflowChain(inputVariables, workflowChainToUse);
@@ -573,13 +674,15 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
 
     // Restart the workflow
     const restartWorkflow = () => {
-        setQuestion('');
+        // Reset all input values
+        setInputValues({});
         setFinalAnswer('');
         setStatus(null);
         setStepStatus(null);
         setSelectedStatus(null);
         setSelectedStatusIndex(undefined);
         setError(null);
+        setValidationErrors({});
         setOrchestrationResult(null);
 
         // Create a fresh clone of the workflow chain
@@ -613,7 +716,6 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
             statusDisplayRef.current.clearMessages();
         }
     };
-
 
     // Debug effect for workflow variables rendering
     useEffect(() => {
@@ -654,28 +756,95 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
 
                 {showInput ? (
                     <>
-                        <div className="mb-4">
-                            <label
-                                htmlFor="question"
-                                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                            >
-                                Question
-                            </label>
-                            <textarea
-                                id="question"
-                                value={question}
-                                onChange={(e) => setQuestion(e.target.value)}
-                                placeholder="Enter your question..."
-                                disabled={isRunning}
-                                rows={3}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed"
-                            />
-                        </div>
+                        {/* Dynamic Input Fields */}
+                        {workflowChain && Array.isArray(workflowChain.state) && (
+                            <div className="space-y-4">
+                                {workflowChain.state
+                                    .filter(variable => variable.io_type === 'input')
+                                    .map((variable, index) => {
+                                        const name = variable.name as string;
+                                        const type = variable.schema?.type || 'string';
+                                        const isArray = variable.schema?.is_array || false;
+                                        const description = variable.schema?.description || '';
+                                        const required = variable.required || false;
 
-                        <div className="flex gap-3">
+                                        return (
+                                            <div key={index} className="mb-4">
+                                                <label
+                                                    htmlFor={`input-${name}`}
+                                                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                                >
+                                                    {name}
+                                                    {required && <span className="text-red-500 ml-1">*</span>}
+                                                </label>
+
+                                                {description && (
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                        {description}
+                                                    </p>
+                                                )}
+
+                                                {/* Render different input types based on schema */}
+                                                {type === 'boolean' ? (
+                                                    <select
+                                                        id={`input-${name}`}
+                                                        value={inputValues[name] === true ? 'true' : 'false'}
+                                                        onChange={(e) => handleInputChange(name, e.target.value, 'boolean')}
+                                                        disabled={isRunning}
+                                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed"
+                                                    >
+                                                        <option value="true">True</option>
+                                                        <option value="false">False</option>
+                                                    </select>
+                                                ) : type === 'number' ? (
+                                                    <input
+                                                        id={`input-${name}`}
+                                                        type="number"
+                                                        value={inputValues[name] !== undefined ? inputValues[name] : ''}
+                                                        onChange={(e) => handleInputChange(name, e.target.value, 'number')}
+                                                        placeholder={`Enter ${name}...`}
+                                                        disabled={isRunning}
+                                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed"
+                                                    />
+                                                ) : type === 'object' ? (
+                                                    <textarea
+                                                        id={`input-${name}`}
+                                                        value={typeof inputValues[name] === 'object'
+                                                            ? JSON.stringify(inputValues[name], null, 2)
+                                                            : inputValues[name] || ''}
+                                                        onChange={(e) => handleInputChange(name, e.target.value, 'object')}
+                                                        placeholder={`Enter JSON for ${name}...`}
+                                                        disabled={isRunning}
+                                                        rows={5}
+                                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed font-mono text-sm"
+                                                    />
+                                                ) : (
+                                                    <textarea
+                                                        id={`input-${name}`}
+                                                        value={inputValues[name] !== undefined ? inputValues[name] : ''}
+                                                        onChange={(e) => handleInputChange(name, e.target.value)}
+                                                        placeholder={`Enter ${name}...`}
+                                                        disabled={isRunning}
+                                                        rows={3}
+                                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed"
+                                                    />
+                                                )}
+
+                                                {validationErrors[name] && (
+                                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                                        {validationErrors[name]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 mt-4">
                             <button
                                 onClick={startWorkflow}
-                                disabled={isRunning || !question.trim()}
+                                disabled={isRunning || Object.keys(validationErrors).length > 0}
                                 className="px-4 py-2 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                                 Submit
@@ -686,11 +855,20 @@ const AgentWorkflowOrchestratorTest: React.FC = () => {
                     <>
                         <div className="mb-4">
                             <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                                Question:
+                                Input Values:
                             </h4>
-                            <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
-                                {question}
-                            </p>
+                            <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                                {Object.entries(inputValues).map(([name, value], index) => (
+                                    <div key={index} className="mb-2">
+                                        <span className="font-medium text-gray-700 dark:text-gray-300">{name}: </span>
+                                        <span className="text-gray-600 dark:text-gray-400">
+                                            {typeof value === 'object'
+                                                ? JSON.stringify(value)
+                                                : String(value)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="flex gap-3">
