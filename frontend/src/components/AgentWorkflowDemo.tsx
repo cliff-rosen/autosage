@@ -112,6 +112,11 @@ const AgentWorkflowDemo: React.FC = () => {
                             ...prev,
                             [chainVar]: value
                         }));
+                        // Update the activeWorkflowChain state
+                        setActiveWorkflowChain(prev => ({
+                            ...prev,
+                            state: prev?.state?.map((v: WorkflowVariable) => v.name === chainVar ? { ...v, value } : v) || []
+                        }));
                     }
                 });
             }
