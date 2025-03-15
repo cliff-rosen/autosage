@@ -175,13 +175,12 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
      * @returns Promise resolving to the final answer
      */
     async executeWorkflowChain(
-        inputValues: WorkflowVariable[],
+        inputValues: Record<string, any>,
         workflowChain: AgentWorkflowChain,
         config?: AgentWorkflowConfig
     ): Promise<string> {
         try {
             console.log('🚀 [WORKFLOW] Starting full workflow execution');
-            console.time('⏱️ Full Workflow Execution Time');
 
             // Store config
             this.config = config || {};
@@ -189,11 +188,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             let chainState: Record<string, WorkflowVariable> = {};
 
             // Convert input variables array to a record for easier access
-            const inputValuesRecord: Record<string, any> = {};
-            for (const variable of inputValues) {
-                inputValuesRecord[variable.name as string] = variable;
-                chainState[variable.name as string] = variable;
-            }
+            const inputValuesRecord = inputValues;
 
             // Handle the workflow chain state
             if (workflowChain.state) {
@@ -296,8 +291,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 }
                 console.log('qqq chainState again', chainState);
 
-                // Update the workflow chain state
-                workflowChain.state = chainState;
+                // Update the workflow chain state while maintaining array structure
+                if (Array.isArray(workflowChain.state)) {
+                    workflowChain.state = workflowChain.state.map(variable => ({
+                        ...variable,
+                        value: chainState[variable.name]?.value ?? variable.value
+                    }));
+                }
 
                 // If this is the final phase, get the final answer
                 if (phase.id === workflowChain.phases[workflowChain.phases.length - 1].id) {

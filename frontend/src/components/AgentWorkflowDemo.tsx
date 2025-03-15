@@ -208,13 +208,13 @@ const AgentWorkflowDemo: React.FC = () => {
             const chainState = activeWorkflowChain.state || [];
 
             // Create workflow variables by combining chain state with input values
-            const workflowVariables = chainState.map((variable: WorkflowVariable) => ({
+            const inputVariables = chainState.map((variable: WorkflowVariable) => ({
                 ...variable,
                 value: chainInputValues[variable.name] || variable.value
             }));
 
             // Start the workflow with the prepared variables
-            await orchestrator.executeWorkflowChain(workflowVariables, activeWorkflowChain);
+            await orchestrator.executeWorkflowChain(inputVariables, activeWorkflowChain);
         } catch (error) {
             console.error('Error starting workflow:', error);
             setError('Failed to start workflow');
