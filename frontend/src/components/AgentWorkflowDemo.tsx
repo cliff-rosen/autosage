@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { AgentWorkflowService } from '../lib/workflow/agent/AgentWorkflowService';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    AgentWorkflowOrchestrator,
+    StatusChangeEvent,
+    PhaseCompleteEvent,
+    WorkflowCompleteEvent,
+    OrchestrationStatus
+} from '../lib/workflow/agent/AgentWorkflowOrchestrator';
+import { AgentWorkflowEngine } from '../lib/workflow/agent/AgentWorkflowEngine';
 import {
     AgentWorkflowChain,
-    SAMPLE_WORKFLOW_CHAIN,
-    AgentWorkflow
+    SAMPLE_WORKFLOW_CHAIN
 } from '../types/agent-workflows';
 import {
-    getWorkflowSignature,
-    getWorkflowSignatureDescription,
     WorkflowStep,
     WorkflowSignature,
     WorkflowVariable,
@@ -24,7 +28,7 @@ const getPhaseProgress = (phaseId: string): number => {
 const AgentWorkflowDemo: React.FC = () => {
     // Input values for the workflow
     const [inputValues, setInputValues] = useState<Record<string, any>>({ question: '' });
-    const [status, setStatus] = useState<any | null>(null);
+    const [status, setStatus] = useState<OrchestrationStatus | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedPhase, setSelectedPhase] = useState('input');
@@ -33,25 +37,25 @@ const AgentWorkflowDemo: React.FC = () => {
     const [phaseResults, setPhaseResults] = useState<Record<string, any>>({});
     const [chainOutputs, setChainOutputs] = useState<Record<string, any>>({});
     // New state variables for workflow details
-    const [selectedWorkflow, setSelectedWorkflow] = useState<AgentWorkflow | null>(null);
     const [workflowSignature, setWorkflowSignature] = useState<WorkflowSignature | null>(null);
     const [workflowDescription, setWorkflowDescription] = useState<string>('');
     // New state for workflow inputs
     const [workflowInputs, setWorkflowInputs] = useState<any[]>([]);
 
-    // Create a ref to the service to avoid recreating it on each render
-    const serviceRef = React.useRef<AgentWorkflowService | null>(null);
+    // Create a ref to the orchestrator to avoid recreating it on each render
+    const orchestratorRef = useRef<AgentWorkflowOrchestrator | null>(null);
 
-    // Initialize the service if it doesn't exist
-    if (!serviceRef.current) {
-        serviceRef.current = new AgentWorkflowService();
+    // Initialize the orchestrator if it doesn't exist
+    if (!orchestratorRef.current) {
+        const workflowEngine = new AgentWorkflowEngine();
+        orchestratorRef.current = new AgentWorkflowOrchestrator(workflowEngine);
     }
 
-    // Get the service from the ref
-    const service = serviceRef.current;
+    // Get the orchestrator from the ref
+    const orchestrator = orchestratorRef.current;
 
     // Handle status change events
-    const handleStatusChange = (event: any) => {
+    const handleStatusChange = (event: StatusChangeEvent) => {
         setStatus(event.status);
 
         // Update running state based on status
@@ -62,10 +66,19 @@ const AgentWorkflowDemo: React.FC = () => {
             if (event.status.currentPhase === 'completed') {
                 setSelectedPhase('output');
 
-                // Update chain outputs with final results
-                if (event.status.outputs) {
-                    // Just use the outputs directly, roles are already defined in the workflow chain
-                    setChainOutputs(event.status.outputs);
+                // Update chain outputs with final results from the status
+                if (event.status.results) {
+                    // Extract outputs from the results, ensuring they are objects
+                    const outputs = Object.values(event.status.results)
+                        .filter((result): result is Record<string, any> =>
+                            result !== null && typeof result === 'object'
+                        )
+                        .reduce((acc, result) => ({
+                            ...acc,
+                            ...result
+                        }), {} as Record<string, any>);
+
+                    setChainOutputs(outputs);
                 }
             }
         } else {
@@ -84,56 +97,75 @@ const AgentWorkflowDemo: React.FC = () => {
         }
     };
 
+    // Handle phase complete events
+    const handlePhaseComplete = (event: PhaseCompleteEvent) => {
+        // Update phase results
+        setPhaseResults(prev => ({
+            ...prev,
+            [event.phase]: event.result
+        }));
+
+        // Update the workflow chain state with the phase results
+        if (event.result) {
+            const phase = activeWorkflowChain.phases.find(p => p.id === event.phase);
+            if (phase) {
+                // For each output mapping in this phase
+                Object.entries(phase.outputs_mappings).forEach(([workflowVar, chainVar]) => {
+                    const value = event.result[workflowVar];
+                    if (value !== undefined) {
+                        // Update chain outputs
+                        setChainOutputs(prev => ({
+                            ...prev,
+                            [chainVar]: value
+                        }));
+                    }
+                });
+            }
+        }
+    };
+
+    // Handle workflow complete events
+    const handleWorkflowComplete = (event: WorkflowCompleteEvent) => {
+        // Get the current orchestrator status
+        const currentStatus = orchestrator?.getStatus();
+        if (currentStatus?.results) {
+            // Extract outputs from all phase results, ensuring they are objects
+            const outputs = Object.values(currentStatus.results)
+                .filter((result): result is Record<string, any> =>
+                    result !== null && typeof result === 'object'
+                )
+                .reduce((acc, result) => ({
+                    ...acc,
+                    ...result
+                }), {} as Record<string, any>);
+
+            setChainOutputs(outputs);
+        }
+        setSelectedPhase('output');
+        setIsRunning(false);
+    };
+
+    // Handle error events
+    const handleError = (event: { error: string }) => {
+        setError(event.error);
+        setIsRunning(false);
+    };
+
     // Set up event listeners when the component mounts
     useEffect(() => {
-        service.onStatusChange(handleStatusChange);
+        if (orchestrator) {
+            orchestrator.onStatusChange(handleStatusChange);
+            orchestrator.onPhaseComplete(handlePhaseComplete);
+            orchestrator.onWorkflowComplete(handleWorkflowComplete);
+            orchestrator.onError(handleError);
+        }
 
         // Clean up event listeners when the component unmounts
         return () => {
-            service.offStatusChange(handleStatusChange);
+            // Note: In a real implementation, we would need to remove the event listeners
+            // but the current interface doesn't provide methods for that
         };
-    }, [service]);
-
-    // Load the selected workflow when the phase changes
-    useEffect(() => {
-        const loadSelectedWorkflow = async () => {
-            // Only load workflow for actual phases (not input or output)
-            if (selectedPhase !== 'input' && selectedPhase !== 'output') {
-                try {
-                    const phase = activeWorkflowChain.phases.find(p => p.id === selectedPhase);
-                    if (phase) {
-                        const workflowResult = phase.workflow();
-                        const workflow = workflowResult instanceof Promise
-                            ? await workflowResult
-                            : workflowResult;
-
-                        setSelectedWorkflow(workflow);
-
-                        // Get the workflow signature and description
-                        const signature = getWorkflowSignature(workflow);
-                        setWorkflowSignature(signature);
-
-                        const description = getWorkflowSignatureDescription(workflow);
-                        setWorkflowDescription(description);
-
-                        // Set the current workflow steps
-                        setCurrentWorkflowSteps(workflow.steps);
-                    }
-                } catch (error) {
-                    console.error('Error loading workflow:', error);
-                    setError('Failed to load workflow details');
-                }
-            } else {
-                // Clear workflow details when input or output is selected
-                setSelectedWorkflow(null);
-                setWorkflowSignature(null);
-                setWorkflowDescription('');
-                setCurrentWorkflowSteps([]);
-            }
-        };
-
-        loadSelectedWorkflow();
-    }, [selectedPhase, activeWorkflowChain]);
+    }, [orchestrator]);
 
     // Handle input change for dynamic inputs
     const handleInputChange = (
@@ -231,24 +263,23 @@ const AgentWorkflowDemo: React.FC = () => {
             setPhaseResults({});
             setChainOutputs({});
 
-            // Use the existing variables from the workflow chain's state and just update their values
-            const workflowVariables: WorkflowVariable[] = [];
+            // Create workflow variables from input values
+            const workflowVariables: WorkflowVariable[] = Object.entries(inputValues).map(([name, value]) => ({
+                variable_id: name,
+                name: name as any,
+                value: value,
+                schema: {
+                    type: typeof value as any,
+                    description: `Input ${name}`,
+                    is_array: Array.isArray(value)
+                },
+                io_type: 'input',
+                required: true,
+                variable_role: WorkflowVariableRole.USER_INPUT
+            }));
 
-            if (activeWorkflowChain.state) {
-                // Clone the state variables and update input values
-                activeWorkflowChain.state.forEach((variable: any) => {
-                    if (variable.io_type === 'input') {
-                        // Update the input value from the form
-                        workflowVariables.push({
-                            ...variable,
-                            value: inputValues[variable.name] || ''
-                        });
-                    }
-                });
-            }
-
-            // Start the workflow with the input values as WorkflowVariable array
-            await service.executeWorkflowChain(workflowVariables, activeWorkflowChain);
+            // Start the workflow with the input values
+            await orchestrator.executeWorkflowChain(workflowVariables, activeWorkflowChain);
         } catch (error) {
             console.error('Error starting workflow:', error);
             setError('Failed to start workflow');
@@ -266,64 +297,87 @@ const AgentWorkflowDemo: React.FC = () => {
             <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <h4 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-2">Workflow Steps:</h4>
                 <ul className="list-none p-0 m-0">
-                    {currentWorkflowSteps.map((step: WorkflowStep, index) => (
-                        <li key={step.step_id.toString()} className="p-3 mb-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs font-semibold">{index + 1}</span>
-                                <strong className="flex-1 font-medium text-gray-800 dark:text-gray-200">{step.label || `Step ${index + 1}`}</strong>
-                                <span className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">{step.step_type}</span>
-                            </div>
+                    {currentWorkflowSteps.map((step: WorkflowStep, index) => {
+                        // Safely get the step ID, defaulting to the index if not available
+                        const stepId = step?.step_id?.toString() || `step-${index}`;
+                        // Safely get the step label
+                        const stepLabel = step?.label || `Step ${index + 1}`;
+                        // Safely get the step type
+                        const stepType = step?.step_type || 'unknown';
+                        // Safely get the step description
+                        const stepDescription = step?.description || '';
+                        // Safely get the tool information
+                        const tool = step?.tool || null;
 
-                            {step.description && <p className="my-2 text-sm text-gray-600 dark:text-gray-400">{step.description}</p>}
-
-                            {step.tool && (
-                                <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm">
-                                    <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">{step.tool.name} ({step.tool.tool_type})</p>
-                                    {step.tool.description && <p className="text-gray-600 dark:text-gray-400 mb-3 text-xs">{step.tool.description}</p>}
-
-                                    {/* Tool Input Mappings */}
-                                    {step.parameter_mappings && Object.keys(step.parameter_mappings).length > 0 && (
-                                        <div className="mb-3">
-                                            <h6 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 border-b border-gray-200 dark:border-gray-700 pb-1">Input Mappings:</h6>
-                                            <ul className="list-none p-0 m-0 space-y-1">
-                                                {Object.entries(step.parameter_mappings).map(([paramName, varName]) => (
-                                                    <li key={paramName} className="flex items-center text-xs">
-                                                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded mr-2">
-                                                            {paramName}
-                                                        </span>
-                                                        <span className="text-gray-500 dark:text-gray-400 mx-1">←</span>
-                                                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
-                                                            {varName.toString()}
-                                                        </span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-
-                                    {/* Tool Output Mappings */}
-                                    {step.output_mappings && Object.keys(step.output_mappings).length > 0 && (
-                                        <div>
-                                            <h6 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 border-b border-gray-200 dark:border-gray-700 pb-1">Output Mappings:</h6>
-                                            <ul className="list-none p-0 m-0 space-y-1">
-                                                {Object.entries(step.output_mappings).map(([outputName, varName]) => (
-                                                    <li key={outputName} className="flex items-center text-xs">
-                                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded mr-2">
-                                                            {outputName}
-                                                        </span>
-                                                        <span className="text-gray-500 dark:text-gray-400 mx-1">→</span>
-                                                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
-                                                            {varName.toString()}
-                                                        </span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
+                        return (
+                            <li key={stepId} className="p-3 mb-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 shadow-sm">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs font-semibold">{index + 1}</span>
+                                    <strong className="flex-1 font-medium text-gray-800 dark:text-gray-200">{stepLabel}</strong>
+                                    <span className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">{stepType}</span>
                                 </div>
-                            )}
-                        </li>
-                    ))}
+
+                                {stepDescription && (
+                                    <p className="my-2 text-sm text-gray-600 dark:text-gray-400">{stepDescription}</p>
+                                )}
+
+                                {tool && (
+                                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm">
+                                        <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            {tool.name || 'Unnamed Tool'} ({tool.tool_type || 'unknown'})
+                                        </p>
+                                        {tool.description && (
+                                            <p className="text-gray-600 dark:text-gray-400 mb-3 text-xs">{tool.description}</p>
+                                        )}
+
+                                        {/* Tool Input Mappings */}
+                                        {step.parameter_mappings && Object.keys(step.parameter_mappings).length > 0 && (
+                                            <div className="mb-3">
+                                                <h6 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                    Input Mappings:
+                                                </h6>
+                                                <ul className="list-none p-0 m-0 space-y-1">
+                                                    {Object.entries(step.parameter_mappings).map(([paramName, varName]) => (
+                                                        <li key={paramName} className="flex items-center text-xs">
+                                                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded mr-2">
+                                                                {paramName}
+                                                            </span>
+                                                            <span className="text-gray-500 dark:text-gray-400 mx-1">←</span>
+                                                            <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
+                                                                {String(varName)}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Tool Output Mappings */}
+                                        {step.output_mappings && Object.keys(step.output_mappings).length > 0 && (
+                                            <div>
+                                                <h6 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                    Output Mappings:
+                                                </h6>
+                                                <ul className="list-none p-0 m-0 space-y-1">
+                                                    {Object.entries(step.output_mappings).map(([outputName, varName]) => (
+                                                        <li key={outputName} className="flex items-center text-xs">
+                                                            <span className="px-1.5 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded mr-2">
+                                                                {outputName}
+                                                            </span>
+                                                            <span className="text-gray-500 dark:text-gray-400 mx-1">→</span>
+                                                            <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
+                                                                {String(varName)}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </li>
+                        );
+                    })}
                 </ul>
             </div>
         );
@@ -626,11 +680,16 @@ const AgentWorkflowDemo: React.FC = () => {
 
     // Render the chain outputs
     const renderChainOutputs = () => {
+        // Ensure we have a valid array of state variables
+        const stateVariables = Array.isArray(activeWorkflowChain?.state)
+            ? activeWorkflowChain.state
+            : [];
+
         // Filter the workflow chain state for output variables with FINAL role
-        const finalOutputs = activeWorkflowChain.state?.filter(
+        const finalOutputs = stateVariables.filter(
             (variable: any) =>
-                variable.io_type === 'output' &&
-                variable.variable_role === WorkflowVariableRole.FINAL
+                variable?.io_type === 'output' &&
+                variable?.variable_role === WorkflowVariableRole.FINAL
         ) || [];
 
         if (finalOutputs.length === 0) {
@@ -642,15 +701,19 @@ const AgentWorkflowDemo: React.FC = () => {
                 <h4 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-2">Chain Outputs:</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {finalOutputs.map((variable: any) => {
-                        // Get the variable name and value
-                        const key = variable.name;
-                        const value = variable.value || chainOutputs[key] || '';
+                        // Safely get the variable name and value
+                        const key = variable?.name || 'unnamed';
+                        const value = variable?.value || chainOutputs[key] || '';
 
                         return (
                             <div key={key} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                                 <div className="flex items-center justify-between mb-2">
-                                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 m-0">{key.toString().replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</h5>
-                                    <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 rounded">Final Output</span>
+                                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 m-0">
+                                        {key.toString().replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                    </h5>
+                                    <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 rounded">
+                                        Final Output
+                                    </span>
                                 </div>
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
                                     {typeof value === 'object' && value !== null ? (

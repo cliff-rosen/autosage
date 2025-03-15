@@ -194,9 +194,17 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 inputValuesRecord[variable.name as string] = variable;
                 chainState[variable.name as string] = variable;
             }
-            workflowChain.state?.forEach((v: WorkflowVariable | WorkflowVariableName) => {
-                chainState[v.name as string] = v;
-            });
+
+            // Handle the workflow chain state
+            if (workflowChain.state) {
+                // Use type assertion to avoid TypeScript errors
+                const state = workflowChain.state as WorkflowVariable[];
+                state.forEach((v) => {
+                    if (v && typeof v === 'object' && 'name' in v) {
+                        chainState[v.name as string] = v;
+                    }
+                });
+            }
 
             console.log('qqq AgentWorkflowOrchestrator.executeWorkflowChain inputs');
             console.log('qqq chainState', chainState);
@@ -273,13 +281,17 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Store the results in the phase results
                 this.phaseResults[phase.id] = result;
 
-                // Update the chain state with the outputs from this phase
-                for (const [chainVar, variable] of Object.entries(result)) {
-                    if (chainState[chainVar.toString()]) {
-                        chainState[chainVar.toString()].value = variable;
-                        console.log(`qqq Updated chain variable ${chainVar} to ${variable}`);
-                    } else {
-                        console.warn(`qqq Chain variable ${chainVar} not found in chain state`);
+                // Map workflow outputs to chain variables and update chain state in a single loop
+                for (const [workflowVar, chainVar] of Object.entries(phase.outputs_mappings)) {
+                    if (result[workflowVar]) {
+                        const value = result[workflowVar];
+
+                        if (chainState[chainVar.toString()]) {
+                            chainState[chainVar.toString()].value = value;
+                            console.log(`qqq Updated chain variable ${chainVar} to ${value}`);
+                        } else {
+                            console.warn(`qqq Chain variable ${chainVar} not found in chain state`);
+                        }
                     }
                 }
                 console.log('qqq chainState again', chainState);
@@ -442,7 +454,6 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         // Apply any configuration
         this.applyWorkflowConfig(workflow);
 
-
         // set workflowVariables to inputValues
         const workflowVariables = inputValues;
 
@@ -529,22 +540,14 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             throw new Error(errorMessage);
         }
 
-        // Extract outputs using the phase's output mappings
-        const outputs: Record<string, any> = {};
+        // Return the raw outputs from the workflow engine
+        // The mapping to chain variables will be done in executeWorkflowChain
+        console.log(`✅ [PHASE ${phase.id}] Workflow completed successfully with outputs:`, Object.keys(jobResult.outputs));
 
-        // Use the phase's output_mappings to map workflow outputs to chain variables
-        for (const [workflowVar, chainVar] of Object.entries(phase.outputs_mappings)) {
-            if (jobResult.outputs[workflowVar]) {
-                outputs[chainVar.toString()] = jobResult.outputs[workflowVar];
-            }
-        }
+        // Emit phase complete event with the raw outputs
+        this.emitPhaseComplete(phase.id as OrchestrationPhase, jobResult.outputs);
 
-        console.log(`✅ [PHASE ${phase.id}] Workflow completed successfully with outputs:`, Object.keys(outputs));
-
-        // Emit phase complete event
-        this.emitPhaseComplete(phase.id as OrchestrationPhase, outputs);
-
-        return outputs;
+        return jobResult.outputs;
     }
 
     /**
