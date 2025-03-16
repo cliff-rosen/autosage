@@ -10,6 +10,17 @@ import { AgentWorkflowEngine } from './AgentWorkflowEngine';
 import { updateStateWithInputs, updateStateWithOutputs, variablesToRecord } from '../utils/state-management';
 
 /**
+ * Type for phase execution results
+ */
+interface PhaseResultItem {
+    name: string;
+    value: any;
+}
+type PhaseArrayResult = Array<PhaseResultItem>;
+type PhaseRecordResult = Record<string, any>;
+type PhaseResult = PhaseArrayResult | PhaseRecordResult;
+
+/**
  * Event types for the agent workflow orchestrator
  */
 export enum AgentWorkflowEventType {
@@ -238,12 +249,18 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 this.phaseResults[phase.id] = result;
 
                 // Transform the result to match the output mapping format
-                // The result needs to be transformed from { key: value } to { newVarName: value }
-
+                // Handle both array and record result types
                 const transformedOutputs: Record<string, any> = {};
-                result.map((e: any) => {
-                    transformedOutputs[e.name] = e.value;
-                });
+                if (Array.isArray(result)) {
+                    const arrayResult = result as PhaseArrayResult;
+                    arrayResult.forEach((item: PhaseResultItem) => {
+                        transformedOutputs[item.name] = item.value;
+                    });
+                } else {
+                    // If result is already a record, use it directly
+                    const recordResult = result as PhaseRecordResult;
+                    Object.assign(transformedOutputs, recordResult);
+                }
 
                 // Update chain state with phase outputs
                 console.log('qqq result', result);
@@ -251,7 +268,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 console.log('qqq phase.outputs_mappings', phase.outputs_mappings);
                 chainState = updateStateWithOutputs(
                     chainState,
-                    variablesToRecord(result),
+                    transformedOutputs,
                     phase.outputs_mappings
                 );
                 console.log('qqq chainState again', chainState);
@@ -379,7 +396,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     private async executeWorkflowPhase(
         phase: WorkflowPhase,
         inputs: Record<string, any>
-    ): Promise<Record<string, any>> {
+    ): Promise<PhaseResult> {
         console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
 
         // Store the current phase
