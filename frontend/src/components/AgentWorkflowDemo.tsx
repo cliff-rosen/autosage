@@ -59,11 +59,6 @@ const AgentWorkflowDemo: React.FC = () => {
             // If completed, select the output phase
             if (event.status.currentPhase === 'completed') {
                 setSelectedPhase('output');
-                setActiveWorkflowChain(prev => ({
-                    ...prev,
-                    state: event.status.results?.chainOutputs || []
-                }));
-
                 // Update chain outputs with final results from the status
                 if (event.status.results) {
                     // Extract outputs from the results, ensuring they are objects
@@ -122,15 +117,14 @@ const AgentWorkflowDemo: React.FC = () => {
     // Handle workflow complete events
     const handleWorkflowComplete = (event: WorkflowCompleteEvent) => {
         console.log('qqq handleWorkflowComplete', event);
-        return;
 
         // Get the current orchestrator status
         const currentStatus = orchestrator?.getStatus();
         if (currentStatus?.results) {
-            setChainOutputs(prev => ({
-                ...prev,
-                ...currentStatus.results
-            }));
+            setActiveWorkflowChain({
+                ...activeWorkflowChain,
+                state: event.finalAnswer || []
+            });
         }
         setSelectedPhase('output');
         setIsRunning(false);

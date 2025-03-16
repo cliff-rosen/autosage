@@ -291,7 +291,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             });
 
             // Emit workflow complete event
-            this.emitWorkflowComplete(finalAnswer);
+            this.emitWorkflowComplete(chainState);
 
             console.timeEnd('⏱️ Full Workflow Execution Time');
             console.log('✅ [WORKFLOW] Workflow execution completed');
