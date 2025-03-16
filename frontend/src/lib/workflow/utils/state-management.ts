@@ -28,6 +28,39 @@ export function updateStateWithInputs<T extends WorkflowVariable>(
 }
 
 /**
+ * Updates a workflow state with output values based on a mapping
+ * @param state Current state variables
+ * @param outputs Output values as key-value pairs
+ * @param outputMappings Maps from previous variable space to new variable space
+ * @returns Updated state variables
+ */
+export function updateStateWithOutputs<T extends WorkflowVariable>(
+    state: T[],
+    outputs: Record<string, any>,
+    outputMappings: Record<string, string>
+): T[] {
+    console.log('qqq outputs', outputs);
+    console.log('qqq outputMappings', outputMappings);
+    console.log('qqq state', state);
+
+    return state.map(variable => {
+        // Find if this variable has a mapping (match on prevVar)
+        const outputVarName = Object.entries(outputMappings)
+            .find(([newVar, prevVar]) => prevVar === variable.name)?.[0];
+
+        console.log('qqq outputVarName', outputVarName);
+        // Make sure outputVar name is in outputs with name as key
+        if (outputVarName && outputVarName in outputs ) {
+            return {
+                ...variable,
+                value: outputs[outputVarName]
+            };
+        }
+        return variable;
+    });
+}
+
+/**
  * Converts workflow variables to a simple record
  * @param variables Array of workflow variables
  * @returns Record of variable names to values

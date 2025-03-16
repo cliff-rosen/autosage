@@ -1,5 +1,4 @@
 import { AgentWorkflow } from '../../../types/agent-workflows';
-import { WorkflowVariableName } from '../../../types/workflows';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkflowEngine } from '../workflowEngine';
 import { WorkflowVariable } from '../../../types/workflows';
@@ -146,7 +145,7 @@ export class AgentWorkflowEngine {
 
             return {
                 success: true,
-                outputs
+                outputs: currentState
             };
         } catch (error) {
             console.error(`❌ [JOB ${jobId}] Error executing workflow:`, error);

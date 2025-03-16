@@ -5,9 +5,9 @@ import {
     AgentWorkflowChain,
     WorkflowPhase
 } from '../../../types/agent-workflows';
-import { WorkflowVariable, WorkflowVariableName } from '../../../types/workflows';
+import { WorkflowVariable } from '../../../types/workflows';
 import { AgentWorkflowEngine } from './AgentWorkflowEngine';
-import { updateStateWithInputs, variablesToRecord } from '../utils/state-management';
+import { updateStateWithInputs, updateStateWithOutputs, variablesToRecord } from '../utils/state-management';
 
 /**
  * Event types for the agent workflow orchestrator
@@ -234,16 +234,24 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Execute the workflow for this phase
                 const result = await this.executeWorkflowPhase(phase, phaseInputs);
 
-                console.log('qqq result', result);
-                console.log('qqq phase.outputs_mappings', phase.outputs_mappings);
-
                 // Store the results in the phase results
                 this.phaseResults[phase.id] = result;
 
+                // Transform the result to match the output mapping format
+                // The result needs to be transformed from { key: value } to { newVarName: value }
+
+                const transformedOutputs: Record<string, any> = {};
+                result.map((e: any) => {
+                    transformedOutputs[e.name] = e.value;
+                });
+
                 // Update chain state with phase outputs
-                chainState = updateStateWithInputs(
+                console.log('qqq result', result);
+                console.log('qqq transformedOutputs', transformedOutputs);
+                console.log('qqq phase.outputs_mappings', phase.outputs_mappings);
+                chainState = updateStateWithOutputs(
                     chainState,
-                    result,
+                    transformedOutputs,
                     phase.outputs_mappings
                 );
                 console.log('qqq chainState again', chainState);

@@ -67,7 +67,7 @@ export const SAMPLE_WORKFLOW_CHAIN: AgentWorkflowChain = {
             },
             outputs_mappings: {
                 // Map improved_question from workflow output to chain state
-                [asVarName('interim_question')]: asVarName('wfc_improved_question')
+                [asVarName('improved_question')]: asVarName('wfc_improved_question')
             }
         },
         {
