@@ -7,6 +7,7 @@ import {
 } from '../../../types/agent-workflows';
 import { WorkflowVariable, WorkflowVariableName } from '../../../types/workflows';
 import { AgentWorkflowEngine } from './AgentWorkflowEngine';
+import { updateStateWithInputs, variablesToRecord } from '../utils/state-management';
 
 /**
  * Event types for the agent workflow orchestrator
@@ -185,18 +186,15 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Store config
             this.config = config || {};
 
-            let chainState = [...(workflowChain.state as WorkflowVariable[])];
-            chainState.forEach((v) => {
-                const inputValue = inputValues.find((v: WorkflowVariable) => v.name === v.name);
-                // if v.name is in inputValues, set v.value to inputValues[v.name]
-                if (inputValue) {
-                    v.value = inputValue.value;
-                }
-            });
+            // Update chain state with input values
+            let chainState = updateStateWithInputs(
+                workflowChain.state as WorkflowVariable[],
+                inputValues,
+                // Create identity mapping for input values
+                Object.fromEntries(Object.keys(inputValues).map(k => [k, k]))
+            );
 
-            console.log('qqq AgentWorkflowOrchestrator.executeWorkflowChain inputs');
-            console.log('qqq inputValues', inputValues);
-            // Initialize phase results with the original input values
+            // Initialize phase results with the input values
             this.phaseResults = {
                 ...inputValues
             };
@@ -223,28 +221,18 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 });
 
                 // Get the workflow for this phase
-                const workflowPromise = phase.workflow();
-                const workflow = workflowPromise instanceof Promise
-                    ? await workflowPromise
-                    : workflowPromise;
+                const workflow = await (phase.workflow instanceof Promise ? phase.workflow : phase.workflow());
 
                 // Apply workflow configuration
                 this.applyWorkflowConfig(workflow);
 
-                const phaseInputVariables: WorkflowVariable[] = [];
-                for (const [workflowVar, chainVar] of Object.entries(phase.inputs_mappings)) {
-                    const chainVariable = chainState.find((v) => v.name === chainVar);
-                    if (chainVariable) {
-                        phaseInputVariables.push(chainVariable);
-                    }
-                }
+                // Convert chain state to record for phase inputs
+                const phaseInputs = variablesToRecord(chainState);
 
-                console.log('qqq phaseInputVariables', phaseInputVariables);
-                const piv = { ...phaseInputVariables };
-                console.log('qqq piv', piv);
+                console.log('qqq phaseInputs', phaseInputs);
 
                 // Execute the workflow for this phase
-                const result = await this.executeWorkflowPhase(phase, phaseInputVariables);
+                const result = await this.executeWorkflowPhase(phase, phaseInputs);
 
                 console.log('qqq result', result);
                 console.log('qqq phase.outputs_mappings', phase.outputs_mappings);
@@ -252,29 +240,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Store the results in the phase results
                 this.phaseResults[phase.id] = result;
 
-                // Map workflow outputs to chain variables and update chain state in a single loop
-                for (const [workflowVar, chainVar] of Object.entries(phase.outputs_mappings)) {
-                    if (result[workflowVar]) {
-                        const value = result[workflowVar];
-
-                        const chainVariable = chainState.find((v) => v.name === chainVar);
-                        if (chainVariable) {
-                            chainVariable.value = value;
-                            console.log(`qqq Updated chain variable ${chainVar} to ${value}`);
-                        } else {
-                            console.warn(`qqq Chain variable ${chainVar} not found in chain state`);
-                        }
-                    }
-                }
+                // Update chain state with phase outputs
+                chainState = updateStateWithInputs(
+                    chainState,
+                    result,
+                    phase.outputs_mappings
+                );
                 console.log('qqq chainState again', chainState);
-
-                // Update the workflow chain state while maintaining array structure
-                if (Array.isArray(workflowChain.state)) {
-                    workflowChain.state = workflowChain.state.map(variable => ({
-                        ...variable,
-                        value: chainState[variable.name]?.value ?? variable.value
-                    }));
-                }
 
                 // If this is the final phase, get the final answer
                 if (phase.id === workflowChain.phases[workflowChain.phases.length - 1].id) {
@@ -394,19 +366,19 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     /**
      * Execute a single workflow phase
      * @param phase The workflow phase to execute
-     * @param inputValues The input values for this phase
+     * @param inputs The input values for this phase
      * @returns Promise resolving to the phase results
      */
     private async executeWorkflowPhase(
         phase: WorkflowPhase,
-        inputValues: WorkflowVariable[]
+        inputs: Record<string, any>
     ): Promise<Record<string, any>> {
         console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
 
         // Store the current phase
         this.currentPhase = phase;
 
-        // Update status to reflect the current phase
+        // Update status
         this.updateStatus({
             currentPhase: phase.id as OrchestrationPhase,
             progress: 0,
@@ -420,38 +392,20 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             }
         });
 
-        // Get the workflow for this phase
-        const workflowPromise = phase.workflow();
-        const workflow = workflowPromise instanceof Promise
-            ? await workflowPromise
-            : workflowPromise;
+        // Get the workflow
+        const workflow = await (phase.workflow instanceof Promise ? phase.workflow : phase.workflow());
 
-        console.log(`🔄 [PHASE ${phase.id}] Created workflow with ${workflow.steps.length} steps`);
-
-        // Apply any configuration
+        // Apply configuration
         this.applyWorkflowConfig(workflow);
 
-        // set workflowVariables to inputValues
-        const workflowState = [...(workflow.state as WorkflowVariable[])];
-        const workflowInputVariables = [];
-        const input_mappings = phase.inputs_mappings;
-        // map through each input_mappings and add the value to workflowInputVariables
-        for (const [workflowVar, chainVar] of Object.entries(input_mappings)) {
-            const inputVariable = inputValues.find((v) => v.name === chainVar);
-            const inputVariableValue = inputVariable?.value;
-            workflowInputVariables.push({
-                name: workflowVar,
-                value: inputVariableValue
-            });
+        // Update workflow state with inputs
+        const workflowState = updateStateWithInputs(
+            workflow.state as WorkflowVariable[],
+            inputs,
+            phase.inputs_mappings
+        );
 
-        }
-
-        // log inputs and mappings
-        console.log('qqq inputValues', inputValues);
-        console.log('qqq mappings', phase.inputs_mappings);
-        console.log('qqq workflowInputVariables', workflowInputVariables);
-
-        // Create a status callback for the job
+        // Create status callback
         const statusCallback = (status: {
             jobId: string;
             stepId: string;
@@ -498,10 +452,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             }
         };
 
-        // Run the workflow
+        // Run the workflow with updated state
         const jobResult = await this.workflowEngine.runJob({
-            workflow,
-            inputs: workflowInputVariables,
+            workflow: {
+                ...workflow,
+                state: workflowState
+            },
+            inputs,
             statusCallback
         });
         console.log('qqq AgentWorkflowOrchestrator jobResult', jobResult);

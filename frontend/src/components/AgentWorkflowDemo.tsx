@@ -15,6 +15,7 @@ import {
     WorkflowStep,
     WorkflowVariable,
 } from '../types/workflows';
+import { updateStateWithInputs, variablesToRecord, createIdentityMapping } from '../lib/workflow/utils/state-management';
 
 // Helper functions for phase display
 const getPhaseProgress = (phaseId: string): number => {
@@ -93,32 +94,21 @@ const AgentWorkflowDemo: React.FC = () => {
     // Handle phase complete events
     const handlePhaseComplete = (event: PhaseCompleteEvent) => {
         console.log('qqq handlePhaseComplete', event);
+
         // Update phase results
         setPhaseResults(prev => ({
             ...prev,
             [event.phase]: event.result
         }));
 
-        // Update the workflow chain state with the phase results
+        // Update chain outputs using the new pattern
         if (event.result) {
             const phase = activeWorkflowChain.phases.find(p => p.id === event.phase);
             if (phase) {
-                // For each output mapping in this phase
-                Object.entries(phase.outputs_mappings).forEach(([workflowVar, chainVar]) => {
-                    const value = event.result[workflowVar];
-                    if (value !== undefined) {
-                        // Update chain outputs
-                        setChainOutputs(prev => ({
-                            ...prev,
-                            [chainVar]: value
-                        }));
-                        // Update the activeWorkflowChain state
-                        setActiveWorkflowChain(prev => ({
-                            ...prev,
-                            state: prev?.state?.map((v: WorkflowVariable) => v.name === chainVar ? { ...v, value } : v) || []
-                        }));
-                    }
-                });
+                setChainOutputs(prev => ({
+                    ...prev,
+                    ...event.result
+                }));
             }
         }
     };
@@ -128,17 +118,7 @@ const AgentWorkflowDemo: React.FC = () => {
         // Get the current orchestrator status
         const currentStatus = orchestrator?.getStatus();
         if (currentStatus?.results) {
-            // Extract outputs from all phase results, ensuring they are objects
-            const outputs = Object.values(currentStatus.results)
-                .filter((result): result is Record<string, any> =>
-                    result !== null && typeof result === 'object'
-                )
-                .reduce((acc, result) => ({
-                    ...acc,
-                    ...result
-                }), {} as Record<string, any>);
-
-            setChainOutputs(outputs);
+            setChainOutputs(currentStatus.results);
         }
         setSelectedPhase('output');
         setIsRunning(false);
@@ -208,17 +188,11 @@ const AgentWorkflowDemo: React.FC = () => {
             setPhaseResults({});
             setChainOutputs({});
 
-            // Get all chain state variables
-            const chainState = activeWorkflowChain.state || [];
-
-            // Create workflow variables by combining chain state with input values
-            const inputVariables = chainState.map((variable: WorkflowVariable) => ({
-                ...variable,
-                value: chainInputValues[variable.name] || variable.value
-            }));
-
-            // Start the workflow with the prepared variables
-            await orchestrator.executeWorkflowChain(inputVariables, activeWorkflowChain);
+            // Execute the workflow chain with the input values
+            await orchestrator.executeWorkflowChain(
+                chainInputValues,
+                activeWorkflowChain
+            );
         } catch (error) {
             console.error('Error starting workflow:', error);
             setError('Failed to start workflow');
@@ -449,13 +423,13 @@ const AgentWorkflowDemo: React.FC = () => {
                                         {getChainInputs().map((input: WorkflowVariable) => (
                                             <tr key={input.name.toString()}>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{input.name.toString()}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                                     {input.schema.is_array ? `${input.schema.type}[]` : input.schema.type}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                                     {input.required ? 'Yes' : 'No'}
                                                 </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
                                                     {input.schema.description || '-'}
                                                 </td>
                                             </tr>
@@ -488,16 +462,16 @@ const AgentWorkflowDemo: React.FC = () => {
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                                     {variable.name.toString()}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                                     {variable.schema.is_array ? `${variable.schema.type}[]` : variable.schema.type}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                                     {variable.io_type}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                                     {variable.variable_role || '-'}
                                                 </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
                                                     {chainOutputs[variable.name] ?
                                                         JSON.stringify(chainOutputs[variable.name]) :
                                                         chainInputValues[variable.name] ?
@@ -511,7 +485,7 @@ const AgentWorkflowDemo: React.FC = () => {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                            <td colSpan={5} className="px-6 py-4 text-center text-gray-500 dark:text-gray-300">
                                                 No workflow state available
                                             </td>
                                         </tr>
@@ -544,7 +518,7 @@ const AgentWorkflowDemo: React.FC = () => {
                             {phaseResults[selectedPhase] && (
                                 <div className="mt-6">
                                     <h4 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-2">Phase Results:</h4>
-                                    <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-auto text-sm">
+                                    <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-auto text-sm text-gray-800 dark:text-gray-200">
                                         {JSON.stringify(phaseResults[selectedPhase], null, 2)}
                                     </pre>
                                 </div>

@@ -3,14 +3,17 @@ import { WorkflowVariableName } from '../../../types/workflows';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkflowEngine } from '../workflowEngine';
 import { WorkflowVariable } from '../../../types/workflows';
+import { updateStateWithInputs } from '../utils/state-management';
+
+// Job status type
+type JobStatus = 'running' | 'completed' | 'failed';
 
 /**
- * Interface for a workflow job
+ * Interface for a workflow job configuration
  */
-export interface WorkflowJob {
-    jobId?: string;
+export interface WorkflowJobConfig {
     workflow: AgentWorkflow;
-    inputs: WorkflowVariable[];
+    inputs: Record<string, any>;
     statusCallback?: (status: {
         jobId: string;
         stepId: string;
@@ -25,125 +28,96 @@ export interface WorkflowJob {
 /**
  * Interface for a job result
  */
-export interface JobResult {
-    jobId: string;
+export interface WorkflowJobResult {
     success: boolean;
-    outputs?: Record<WorkflowVariableName | string, any>;
+    outputs?: Record<string, any>;
     error?: string;
 }
 
 /**
- * A simple WorkflowEngine implementation for agent workflows
- * This is a simplified version that only implements the methods needed by AgentWorkflowOrchestrator
+ * A WorkflowEngine implementation for agent workflows
  */
 export class AgentWorkflowEngine {
     private activeJobs: Map<string, {
-        job: WorkflowJob;
-        status: 'running' | 'completed' | 'failed';
+        status: JobStatus;
         currentStepIndex?: number;
     }> = new Map();
 
-    /**
-     * Run a workflow job
-     * @param job The job to run
-     * @returns A promise that resolves to the job result
-     */
-    async runJob(job: WorkflowJob): Promise<JobResult> {
+    async runJob(config: WorkflowJobConfig): Promise<WorkflowJobResult> {
+        const jobId = uuidv4();
+        console.log(`🚀 [JOB ${jobId}] Starting workflow job: ${config.workflow.name}`);
 
-        const jobId = job.jobId || uuidv4();
-
-        // Store the job
+        // Store the job status
         this.activeJobs.set(jobId, {
-            job,
             status: 'running'
         });
 
         try {
-            console.log(`🚀 [JOB ${jobId}] Starting workflow job: ${job.workflow.name}`);
-            console.log('qqq AgentWorkflowEngine.runJob job', job);
+            const { workflow, inputs, statusCallback } = config;
 
-            // Initialize workflow with inputs
-            const workflow = { ...job.workflow };
+            // Update workflow state with inputs using the new system
+            const workflowState = updateStateWithInputs(
+                workflow.state as WorkflowVariable[],
+                inputs,
+                // Create identity mapping since inputs are already in workflow variable space
+                Object.fromEntries(Object.keys(inputs).map(k => [k, k]))
+            );
+
+            // Execute each step in sequence
+            let currentState = workflowState;
+            const outputs: Record<string, any> = {};
+            let currentStepIndex = 0;
+
             console.log(`📋 [JOB ${jobId}] Workflow has ${workflow.steps.length} steps`);
 
-            // Initialize workflow state with input variables
-            if (!workflow.state) {
-                workflow.state = [];
-            }
-
-            // Add input values to workflow state
-            workflow.state = workflow.state.map((variable) => {
-                const inputVariable = job.inputs.find((input) => input.name === variable.name);
-                if (inputVariable) {
-                    console.log('qqq inputVariable', inputVariable);
-                    return { ...variable, value: inputVariable.value };
-                }
-                return variable;
-            });
-            console.log('qqq AgentWorkflowEngine.runJob workflow.state', workflow.state);
-
-            // Execute each step in the workflow sequentially
-            let currentStepIndex = 0;
-            let updatedState = [...workflow.state];
-            let success = true;
-            let error: string | undefined;
-
-            console.log(`🔄 [JOB ${jobId}] Starting workflow execution loop`);
-
             while (currentStepIndex < workflow.steps.length) {
+                // Check if job was cancelled
+                if (this.activeJobs.get(jobId)?.status !== 'running') {
+                    throw new Error('Job cancelled');
+                }
+
                 const step = workflow.steps[currentStepIndex];
                 console.log(`▶️ [JOB ${jobId}] Executing step ${currentStepIndex + 1}/${workflow.steps.length}: ${step.label}`);
 
-                // Update the job status with the current step index
+                // Update job status with current step
                 this.activeJobs.set(jobId, {
-                    job,
                     status: 'running',
                     currentStepIndex
                 });
 
-                // Create a step status callback that includes the job ID
-                const stepStatusCallback = job.statusCallback ? (stepStatus: {
-                    stepId: string;
-                    stepIndex: number;
-                    status: 'running' | 'completed' | 'failed';
-                    message?: string;
-                    progress?: number;
-                    result?: any;
-                }) => {
-                    if (job.statusCallback) {
-                        job.statusCallback({
-                            jobId,
-                            ...stepStatus
-                        });
-                    }
-                } : undefined;
-
-                // Execute the current step
+                // Execute the step
                 const stepResult = await WorkflowEngine.executeStepSimple(
-                    { ...workflow, state: updatedState },
+                    {
+                        ...workflow,
+                        state: currentState
+                    },
                     currentStepIndex,
-                    stepStatusCallback
+                    statusCallback ? (status) => statusCallback({
+                        ...status,
+                        jobId
+                    }) : undefined
                 );
-                console.log('qqq stepResult', stepResult);
 
-                // Update the workflow state
-                updatedState = stepResult.updatedState;
+                // Update current state
+                currentState = stepResult.updatedState;
 
                 // Check if the step execution was successful
                 if (!stepResult.result.success) {
-                    success = false;
-                    error = stepResult.result.error;
+                    const error = stepResult.result.error || 'Step failed';
                     console.error(`❌ [JOB ${jobId}] Step ${currentStepIndex + 1} failed: ${error}`);
-                    console.timeEnd(`⏱️ [JOB ${jobId}] Step ${currentStepIndex + 1} Execution Time`);
 
                     // Update job status to failed
                     this.activeJobs.set(jobId, {
-                        job,
                         status: 'failed',
                         currentStepIndex
                     });
 
-                    break;
+                    throw new Error(error);
+                }
+
+                // Collect outputs if step was successful
+                if (stepResult.result.outputs) {
+                    Object.assign(outputs, stepResult.result.outputs);
                 }
 
                 console.log(`✅ [JOB ${jobId}] Step ${currentStepIndex + 1} completed successfully`);
@@ -160,77 +134,45 @@ export class AgentWorkflowEngine {
                         console.log(`↪️ [JOB ${jobId}] Jumping from step ${previousStepIndex + 1} to step ${currentStepIndex + 1}`);
                     }
                 }
-
-                // Check if we've reached the end of the workflow
-                if (currentStepIndex >= workflow.steps.length) {
-                    console.log(`🏁 [JOB ${jobId}] Workflow execution completed successfully`);
-
-                    // Update job status to completed
-                    this.activeJobs.set(jobId, {
-                        job,
-                        status: 'completed',
-                        currentStepIndex: workflow.steps.length - 1
-                    });
-
-                    break;
-                }
             }
 
-            // Extract outputs from the final workflow state
-            console.log(`📤 [JOB ${jobId}] Exiting workflow execution loop and collecting workflow outputs`, updatedState);
-            const outputs: Record<string, any> = {};
-            for (const variable of updatedState) {
-                if (variable.io_type === 'output' && variable.value !== undefined) {
-                    outputs[variable.name] = variable.value;
-                    console.log(`📤 [JOB ${jobId}] Output: ${variable.name}`);
-                }
-            }
+            // Update job status to completed
+            this.activeJobs.set(jobId, {
+                status: 'completed',
+                currentStepIndex: workflow.steps.length - 1
+            });
 
+            console.log(`🎉 [JOB ${jobId}] Workflow job completed successfully`);
 
-            console.log(`${success ? '🎉' : '❌'} [JOB ${jobId}] Workflow job ${success ? 'completed successfully' : 'failed'}`);
-
-            // Return result
             return {
-                jobId,
-                success,
-                outputs: success ? outputs : undefined,
-                error: success ? undefined : error
+                success: true,
+                outputs
             };
         } catch (error) {
             console.error(`❌ [JOB ${jobId}] Error executing workflow:`, error);
 
-            // Update job status
-            this.activeJobs.set(jobId, {
-                job,
-                status: 'failed'
-            });
+            // Update job status to failed if not already
+            if (this.activeJobs.get(jobId)?.status === 'running') {
+                this.activeJobs.set(jobId, {
+                    status: 'failed'
+                });
+            }
 
-            console.timeEnd(`⏱️ Job ${jobId} Execution Time`);
-
-            // Return error result
             return {
-                jobId,
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
+                error: error instanceof Error ? error.message : String(error)
             };
         }
     }
 
-    /**
-     * Cancel a job
-     * @param jobId The ID of the job to cancel
-     * @returns A promise that resolves to true if the job was cancelled
-     */
     async cancelJob(jobId: string): Promise<boolean> {
-        if (this.activeJobs.has(jobId)) {
-            const jobData = this.activeJobs.get(jobId);
-            if (jobData && jobData.status === 'running') {
-                this.activeJobs.set(jobId, {
-                    ...jobData,
-                    status: 'failed'
-                });
-                return true;
-            }
+        const jobData = this.activeJobs.get(jobId);
+        if (jobData && jobData.status === 'running') {
+            this.activeJobs.set(jobId, {
+                ...jobData,
+                status: 'failed'
+            });
+            return true;
         }
         return false;
     }
