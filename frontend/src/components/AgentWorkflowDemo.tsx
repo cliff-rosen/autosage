@@ -50,6 +50,7 @@ const AgentWorkflowDemo: React.FC = () => {
 
     // Handle status change events
     const handleStatusChange = (event: StatusChangeEvent) => {
+        console.log('qqq handleStatusChange', event);
         setStatus(event.status);
 
         // Update running state based on status
@@ -105,6 +106,8 @@ const AgentWorkflowDemo: React.FC = () => {
         if (event.result) {
             const phase = activeWorkflowChain.phases.find(p => p.id === event.phase);
             if (phase) {
+                console.log('qqq event.result', event.result);
+                console.log('qqq chainOutputs', chainOutputs);
                 setChainOutputs(prev => ({
                     ...prev,
                     ...event.result
@@ -115,10 +118,16 @@ const AgentWorkflowDemo: React.FC = () => {
 
     // Handle workflow complete events
     const handleWorkflowComplete = (event: WorkflowCompleteEvent) => {
+        console.log('qqq handleWorkflowComplete', event);
+        return;
+
         // Get the current orchestrator status
         const currentStatus = orchestrator?.getStatus();
         if (currentStatus?.results) {
-            setChainOutputs(currentStatus.results);
+            setChainOutputs(prev => ({
+                ...prev,
+                ...currentStatus.results
+            }));
         }
         setSelectedPhase('output');
         setIsRunning(false);
