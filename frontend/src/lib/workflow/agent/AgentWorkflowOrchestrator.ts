@@ -251,7 +251,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 console.log('qqq phase.outputs_mappings', phase.outputs_mappings);
                 chainState = updateStateWithOutputs(
                     chainState,
-                    transformedOutputs,
+                    variablesToRecord(result),
                     phase.outputs_mappings
                 );
                 console.log('qqq chainState again', chainState);

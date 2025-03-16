@@ -80,3 +80,4 @@ export function variablesToRecord(variables: WorkflowVariable[]): Record<string,
 export function createIdentityMapping(keys: string[]): Record<string, string> {
     return Object.fromEntries(keys.map(k => [k, k]));
 } 
+
