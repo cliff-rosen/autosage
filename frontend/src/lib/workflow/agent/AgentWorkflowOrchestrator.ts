@@ -110,8 +110,8 @@ export interface AgentWorkflowConfig {
  */
 export interface AgentWorkflowOrchestratorInterface {
     executeWorkflowChain(
-        inputValues: WorkflowVariable[],
         workflowChain: AgentWorkflowChain,
+        inputValues: WorkflowVariable[],
         config?: AgentWorkflowConfig
     ): Promise<string>;
     getStatus(): OrchestrationStatus;
@@ -176,8 +176,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
      * @returns Promise resolving to the final answer
      */
     async executeWorkflowChain(
-        inputValues: Record<string, any>,
         workflowChain: AgentWorkflowChain,
+        inputValues: Record<string, any>,
         config?: AgentWorkflowConfig
     ): Promise<string> {
         try {

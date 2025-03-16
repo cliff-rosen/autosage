@@ -196,8 +196,8 @@ const AgentWorkflowDemo: React.FC = () => {
 
             // Execute the workflow chain with the input values
             await orchestrator.executeWorkflowChain(
-                chainInputValues,
-                activeWorkflowChain
+                activeWorkflowChain,
+                chainInputValues
             );
         } catch (error) {
             console.error('Error starting workflow:', error);
@@ -382,19 +382,16 @@ const AgentWorkflowDemo: React.FC = () => {
 
 
     return (
-        <div className="max-w-6xl mx-auto px-4 py-6">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Sample Workflow Chain Demo</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-                This demo shows how multiple workflows can be chained together, with outputs from one workflow becoming inputs to the next.
-            </p>
+        <div className="container mx-auto px-4 py-8">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Sample Workflow Chain Demo</h2>
 
-            {/* Section 1: Workflow Phases - Fixed Height Top Section */}
-            <div className="h-32 mb-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+            {/* Section 1: Workflow Phases */}
+            <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg shadow">
                 {renderWorkflowPhases()}
             </div>
 
-            {/* Section 2: Input Area - Fixed Height Middle Section */}
-            <div className="h-64 mb-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto p-6">
+            {/* Section 2: Input Area */}
+            <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto p-6">
                 <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
                     Workflow Inputs
                 </h3>
@@ -406,8 +403,8 @@ const AgentWorkflowDemo: React.FC = () => {
                 )}
             </div>
 
-            {/* Section 3: Phase Details - Fixed Height Bottom Section */}
-            <div className="h-[32rem] bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto">
+            {/* Section 3: Phase Details */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto">
                 {selectedPhase === 'input' ? (
                     <div className="p-6">
                         <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
@@ -530,6 +527,7 @@ const AgentWorkflowDemo: React.FC = () => {
                     </div>
                 )}
             </div>
+            
         </div>
     );
 };
