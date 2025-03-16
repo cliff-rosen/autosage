@@ -10,17 +10,6 @@ import { AgentWorkflowEngine } from './AgentWorkflowEngine';
 import { updateStateWithInputs, updateStateWithOutputs, variablesToRecord } from '../utils/state-management';
 
 /**
- * Type for phase execution results
- */
-interface PhaseResultItem {
-    name: string;
-    value: any;
-}
-type PhaseArrayResult = Array<PhaseResultItem>;
-type PhaseRecordResult = Record<string, any>;
-type PhaseResult = PhaseArrayResult | PhaseRecordResult;
-
-/**
  * Event types for the agent workflow orchestrator
  */
 export enum AgentWorkflowEventType {
@@ -237,38 +226,22 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Apply workflow configuration
                 this.applyWorkflowConfig(workflow);
 
-                // Convert chain state to record for phase inputs
-                const phaseInputs = variablesToRecord(chainState);
-
-                console.log('qqq phaseInputs', phaseInputs);
-
                 // Execute the workflow for this phase
-                const result = await this.executeWorkflowPhase(phase, phaseInputs);
+                const result = await this.executeWorkflowPhase(phase, variablesToRecord(chainState));
 
                 // Store the results in the phase results
                 this.phaseResults[phase.id] = result;
 
                 // Transform the result to match the output mapping format
-                // Handle both array and record result types
-                const transformedOutputs: Record<string, any> = {};
-                if (Array.isArray(result)) {
-                    const arrayResult = result as PhaseArrayResult;
-                    arrayResult.forEach((item: PhaseResultItem) => {
-                        transformedOutputs[item.name] = item.value;
-                    });
-                } else {
-                    // If result is already a record, use it directly
-                    const recordResult = result as PhaseRecordResult;
-                    Object.assign(transformedOutputs, recordResult);
-                }
+                // The result needs to be transformed from { key: value } to { newVarName: value }
+
 
                 // Update chain state with phase outputs
                 console.log('qqq result', result);
-                console.log('qqq transformedOutputs', transformedOutputs);
                 console.log('qqq phase.outputs_mappings', phase.outputs_mappings);
                 chainState = updateStateWithOutputs(
                     chainState,
-                    transformedOutputs,
+                    variablesToRecord(result),
                     phase.outputs_mappings
                 );
                 console.log('qqq chainState again', chainState);
@@ -277,17 +250,6 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 if (phase.id === workflowChain.phases[workflowChain.phases.length - 1].id) {
                     // Look for a final answer in the result
                     // This assumes the final phase has an output mapped to something like 'finalAnswer'
-                    for (const key of Object.keys(result)) {
-                        if (key.toLowerCase().includes('final') && key.toLowerCase().includes('answer')) {
-                            finalAnswer = result[key] || '';
-                            break;
-                        }
-                    }
-
-                    // If no specific final answer found, use the first output
-                    if (!finalAnswer && Object.keys(result).length > 0) {
-                        finalAnswer = result[Object.keys(result)[0]] || '';
-                    }
                 }
 
                 console.timeEnd(`⏱️ Phase Execution Time: ${phase.id}`);
@@ -396,7 +358,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     private async executeWorkflowPhase(
         phase: WorkflowPhase,
         inputs: Record<string, any>
-    ): Promise<PhaseResult> {
+    ): Promise<Record<string, any>> {
         console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
 
         // Store the current phase
