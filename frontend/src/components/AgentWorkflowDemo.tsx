@@ -15,7 +15,6 @@ import {
     WorkflowStep,
     WorkflowVariable,
 } from '../types/workflows';
-import { updateStateWithInputs, variablesToRecord, createIdentityMapping } from '../lib/workflow/utils/state-management';
 
 // Helper functions for phase display
 const getPhaseProgress = (phaseId: string): number => {
@@ -26,15 +25,15 @@ const getPhaseProgress = (phaseId: string): number => {
 
 const AgentWorkflowDemo: React.FC = () => {
     // Replace inputValues with chainInputValues
+    const [activeWorkflowChain, setActiveWorkflowChain] = useState<AgentWorkflowChain>(SAMPLE_WORKFLOW_CHAIN);
     const [chainInputValues, setChainInputValues] = useState<Record<string, any>>({});
+    const [chainOutputs, setChainOutputs] = useState<Record<string, any>>({});
+    const [selectedPhase, setSelectedPhase] = useState('input');
+    const [currentWorkflowSteps, setCurrentWorkflowSteps] = useState<any[]>([]);
+    const [phaseResults, setPhaseResults] = useState<Record<string, any>>({});
     const [status, setStatus] = useState<OrchestrationStatus | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedPhase, setSelectedPhase] = useState('input');
-    const [activeWorkflowChain, setActiveWorkflowChain] = useState<AgentWorkflowChain>(SAMPLE_WORKFLOW_CHAIN);
-    const [currentWorkflowSteps, setCurrentWorkflowSteps] = useState<any[]>([]);
-    const [phaseResults, setPhaseResults] = useState<Record<string, any>>({});
-    const [chainOutputs, setChainOutputs] = useState<Record<string, any>>({});
 
     // Create a ref to the orchestrator to avoid recreating it on each render
     const orchestratorRef = useRef<AgentWorkflowOrchestrator | null>(null);
@@ -60,6 +59,10 @@ const AgentWorkflowDemo: React.FC = () => {
             // If completed, select the output phase
             if (event.status.currentPhase === 'completed') {
                 setSelectedPhase('output');
+                setActiveWorkflowChain(prev => ({
+                    ...prev,
+                    state: event.status.results?.chainOutputs || []
+                }));
 
                 // Update chain outputs with final results from the status
                 if (event.status.results) {
@@ -481,13 +484,10 @@ const AgentWorkflowDemo: React.FC = () => {
                                                     {variable.variable_role || '-'}
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
-                                                    {chainOutputs[variable.name] ?
-                                                        JSON.stringify(chainOutputs[variable.name]) :
-                                                        chainInputValues[variable.name] ?
-                                                            JSON.stringify(chainInputValues[variable.name]) :
-                                                            variable.value ?
-                                                                JSON.stringify(variable.value) :
-                                                                '-'
+                                                    {
+                                                        variable.value ?
+                                                            JSON.stringify(variable.value) :
+                                                            '-'
                                                     }
                                                 </td>
                                             </tr>

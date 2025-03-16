@@ -286,8 +286,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 progress: 100,
                 endTime: new Date().toISOString(),
                 results: {
-                    ...this.status.results,
-                    finalAnswer
+                    chainOutputs: chainState
                 }
             });
 
