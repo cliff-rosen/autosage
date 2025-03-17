@@ -41,6 +41,8 @@ const AgentWorkflowDemo: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [workflowMessages, setWorkflowMessages] = useState<WorkflowMessage[]>([]);
     const [selectedMessageIndex, setSelectedMessageIndex] = useState<number | null>(null);
+    const [isMessagesFullscreen, setIsMessagesFullscreen] = useState(false);
+    const tableRef = useRef<HTMLDivElement>(null);
 
     // Create a ref to the orchestrator to avoid recreating it on each render
     const orchestratorRef = useRef<AgentWorkflowOrchestrator | null>(null);
@@ -73,28 +75,44 @@ const AgentWorkflowDemo: React.FC = () => {
             if (workflowMessages.length === 0) return true;
             const lastMessage = workflowMessages[workflowMessages.length - 1];
 
-            // Always show non-status-update messages
-            if (message.type !== WorkflowMessageType.STATUS_UPDATE) return true;
-
             // For status updates, check if there's a meaningful change
-            const hasNewSteps = message.status.currentSteps.some(step =>
-                !lastMessage.status.currentSteps.find(lastStep =>
-                    lastStep.id === step.id &&
-                    lastStep.status === step.status &&
-                    lastStep.name === step.name
-                )
-            );
+            if (message.type === WorkflowMessageType.STATUS_UPDATE) {
+                const hasNewSteps = message.status.currentSteps.some(step =>
+                    !lastMessage.status.currentSteps.find(lastStep =>
+                        lastStep.id === step.id &&
+                        lastStep.status === step.status &&
+                        lastStep.name === step.name
+                    )
+                );
 
-            const hasPhaseChange = message.status.phase !== lastMessage.status.phase;
-            const hasSignificantProgressChange = Math.abs(message.status.progress - lastMessage.status.progress) >= 10;
-            const hasErrorChange = message.status.error !== lastMessage.status.error;
+                const hasPhaseChange = message.status.phase !== lastMessage.status.phase;
+                const hasSignificantProgressChange = Math.abs(message.status.progress - lastMessage.status.progress) >= 10;
+                const hasErrorChange = message.status.error !== lastMessage.status.error;
 
-            return hasNewSteps || hasPhaseChange || hasSignificantProgressChange || hasErrorChange;
+                return hasNewSteps || hasPhaseChange || hasSignificantProgressChange || hasErrorChange;
+            }
+
+            // For phase complete messages, only filter exact duplicates
+            if (message.type === WorkflowMessageType.PHASE_COMPLETE) {
+                const isDuplicate = lastMessage.type === WorkflowMessageType.PHASE_COMPLETE &&
+                    lastMessage.status.phase === message.status.phase &&
+                    JSON.stringify(lastMessage.status.results) === JSON.stringify(message.status.results);
+                return !isDuplicate;
+            }
+
+            // Always show workflow complete and error messages
+            return true;
         };
 
         // Add message to our array if it's significant
         if (shouldAddMessage()) {
-            setWorkflowMessages(prev => [...prev, message]);
+            setWorkflowMessages(prev => {
+                const newMessages = [...prev, message];
+                // Sort messages by timestamp in descending order (newest first)
+                return newMessages.sort((a, b) =>
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                );
+            });
         }
 
         switch (message.type) {
@@ -438,6 +456,40 @@ const AgentWorkflowDemo: React.FC = () => {
         );
     };
 
+    // Handle keyboard navigation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (selectedMessageIndex === null || workflowMessages.length === 0) return;
+
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const newIndex = Math.max(0, selectedMessageIndex - 1);
+                setSelectedMessageIndex(newIndex);
+                scrollRowIntoView(newIndex);
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const newIndex = Math.min(workflowMessages.length - 1, selectedMessageIndex + 1);
+                setSelectedMessageIndex(newIndex);
+                scrollRowIntoView(newIndex);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedMessageIndex, workflowMessages.length]);
+
+    // Helper function to scroll the selected row into view
+    const scrollRowIntoView = (index: number) => {
+        const tableContainer = tableRef.current;
+        if (!tableContainer) return;
+
+        const rows = tableContainer.getElementsByTagName('tr');
+        const selectedRow = rows[index + 1]; // +1 to account for header row
+        if (selectedRow) {
+            selectedRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    };
+
     return (
         <div className="container mx-auto px-4 py-8">
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
@@ -493,20 +545,38 @@ const AgentWorkflowDemo: React.FC = () => {
             </div>
 
             {/* Section 4: Workflow Messages */}
-            <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
-                        Workflow Messages
-                        <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                            ({workflowMessages.length} messages)
-                        </span>
-                    </h3>
+            <div className={`${isMessagesFullscreen
+                ? 'fixed inset-0 z-50 bg-white dark:bg-gray-800'
+                : 'mt-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden'}`}>
+                <div className={`${isMessagesFullscreen ? 'h-full flex flex-col' : 'p-6'}`}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+                            Workflow Messages
+                            <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                ({workflowMessages.length} messages)
+                            </span>
+                        </h3>
+                        <button
+                            onClick={() => setIsMessagesFullscreen(prev => !prev)}
+                            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                            {isMessagesFullscreen ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                                </svg>
+                            )}
+                        </button>
+                    </div>
 
                     {workflowMessages.length > 0 ? (
-                        <div className="flex gap-4">
+                        <div className={`flex gap-4 ${isMessagesFullscreen ? 'flex-1 overflow-hidden' : ''}`}>
                             {/* Left Pane - Message List */}
-                            <div className="w-[500px] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                                <div className="h-[400px] overflow-y-auto">
+                            <div className={`${isMessagesFullscreen ? 'w-1/2' : 'w-[500px]'} border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden`}>
+                                <div ref={tableRef} className={`${isMessagesFullscreen ? 'h-full' : 'h-[400px]'} overflow-y-auto`}>
                                     <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
                                         <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
                                             <tr>
@@ -525,6 +595,9 @@ const AgentWorkflowDemo: React.FC = () => {
                                                         ? 'bg-blue-50 dark:bg-blue-900/20'
                                                         : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                                                         }`}
+                                                    tabIndex={0}
+                                                    role="row"
+                                                    aria-selected={selectedMessageIndex === index}
                                                 >
                                                     <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
                                                         {new Date(message.timestamp).toLocaleTimeString()}
@@ -540,6 +613,17 @@ const AgentWorkflowDemo: React.FC = () => {
                                                                     message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'Done' : 'Error'}
                                                         </span>
                                                     </td>
+                                                    <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                                                        {message.status.error ? (
+                                                            <span className="text-red-500 dark:text-red-400">Error</span>
+                                                        ) : message.type === WorkflowMessageType.PHASE_COMPLETE ? (
+                                                            <span>Phase Complete</span>
+                                                        ) : message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? (
+                                                            <span>Workflow Complete</span>
+                                                        ) : (
+                                                            <span>{message.status.phase}</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-3 py-2 text-xs">
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -551,19 +635,46 @@ const AgentWorkflowDemo: React.FC = () => {
                                                                     style={{ width: `${message.status.progress}%` }}
                                                                 />
                                                             </div>
+                                                            <span className="text-xs">{message.status.progress}%</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
                                                         {message.status.error ? (
-                                                            <span className="text-red-500 dark:text-red-400">{message.status.error.slice(0, 50)}{message.status.error.length > 50 ? '...' : ''}</span>
-                                                        ) : message.status.currentSteps.length > 0 ? (
-                                                            <span>{message.status.currentSteps[0].name}{message.status.currentSteps.length > 1 ? ` (+${message.status.currentSteps.length - 1} more)` : ''}</span>
+                                                            <span className="text-red-500 dark:text-red-400">
+                                                                {message.status.error.slice(0, 50)}{message.status.error.length > 50 ? '...' : ''}
+                                                            </span>
                                                         ) : message.type === WorkflowMessageType.PHASE_COMPLETE ? (
-                                                            <span>Phase {message.status.phase} completed</span>
+                                                            <div className="flex items-center gap-1">
+                                                                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                                <span>Completed {message.status.phase}</span>
+                                                            </div>
                                                         ) : message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? (
-                                                            <span>Workflow completed successfully</span>
+                                                            <div className="flex items-center gap-1">
+                                                                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                <span>Workflow completed successfully</span>
+                                                            </div>
+                                                        ) : message.status.currentSteps.length > 0 ? (
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="truncate">
+                                                                    {message.status.currentSteps[0].name}
+                                                                    {message.status.currentSteps.length > 1 && (
+                                                                        <span className="ml-1 text-xs text-gray-400">
+                                                                            (+{message.status.currentSteps.length - 1})
+                                                                        </span>
+                                                                    )}
+                                                                </span>
+                                                                {message.status.currentSteps[0].status === 'completed' && (
+                                                                    <svg className="w-4 h-4 text-green-500 ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
                                                         ) : (
-                                                            <span>{message.status.phase} - {message.status.progress}%</span>
+                                                            <span>Processing {message.status.phase}</span>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -574,10 +685,45 @@ const AgentWorkflowDemo: React.FC = () => {
                             </div>
 
                             {/* Right Pane - Message Details */}
-                            <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg p-4 h-[400px] overflow-y-auto">
+                            <div className={`flex-1 border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${isMessagesFullscreen ? 'h-full' : 'h-[400px]'} overflow-y-auto`}>
                                 {selectedMessageIndex !== null && selectedMessageIndex < workflowMessages.length ? (
-                                    <div className="space-y-4">
-                                        {/* Current steps */}
+                                    <div className="space-y-6">
+                                        {/* Message Overview */}
+                                        <div>
+                                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Message Overview
+                                            </h4>
+                                            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                                                <dl className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Type</dt>
+                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                            {workflowMessages[selectedMessageIndex].type}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Phase</dt>
+                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                            {workflowMessages[selectedMessageIndex].status.phase}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Progress</dt>
+                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                            {workflowMessages[selectedMessageIndex].status.progress}%
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Timestamp</dt>
+                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                            {new Date(workflowMessages[selectedMessageIndex].timestamp).toLocaleString()}
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                            </div>
+                                        </div>
+
+                                        {/* Current Steps */}
                                         {workflowMessages[selectedMessageIndex].status.currentSteps.length > 0 && (
                                             <div>
                                                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -588,7 +734,7 @@ const AgentWorkflowDemo: React.FC = () => {
                                                         <div key={step.id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
                                                             <div className="flex items-center justify-between mb-2">
                                                                 <span className="font-medium text-gray-700 dark:text-gray-300">{step.name}</span>
-                                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${step.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${step.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
                                                                     step.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
                                                                         'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                                                     }`}>
@@ -601,7 +747,7 @@ const AgentWorkflowDemo: React.FC = () => {
                                                                 </div>
                                                             )}
                                                             {step.result && (
-                                                                <details className="mt-2" onClick={e => e.stopPropagation()}>
+                                                                <details className="mt-2">
                                                                     <summary className="cursor-pointer text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                                                                         View Result
                                                                     </summary>
@@ -616,31 +762,28 @@ const AgentWorkflowDemo: React.FC = () => {
                                             </div>
                                         )}
 
-                                        {/* Error details */}
+                                        {/* Error Details */}
                                         {workflowMessages[selectedMessageIndex].status.error && (
-                                            <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r">
-                                                <div className="flex">
-                                                    <div className="flex-shrink-0">
-                                                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                                        </svg>
-                                                    </div>
-                                                    <div className="ml-3">
-                                                        <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
-                                                        <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                                                            {workflowMessages[selectedMessageIndex].status.error}
-                                                        </div>
-                                                    </div>
+                                            <div>
+                                                <h4 className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                                    Error Details
+                                                </h4>
+                                                <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r">
+                                                    <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">
+                                                        {workflowMessages[selectedMessageIndex].status.error}
+                                                    </pre>
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Results */}
+                                        {/* Phase/Workflow Results */}
                                         {workflowMessages[selectedMessageIndex].status.results &&
                                             Object.keys(workflowMessages[selectedMessageIndex].status.results).length > 0 && (
                                                 <div>
                                                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                        Results
+                                                        {workflowMessages[selectedMessageIndex].type === WorkflowMessageType.PHASE_COMPLETE ? 'Phase Results' :
+                                                            workflowMessages[selectedMessageIndex].type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'Final Results' :
+                                                                'Results'}
                                                     </h4>
                                                     <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
                                                         <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-auto max-h-96">
