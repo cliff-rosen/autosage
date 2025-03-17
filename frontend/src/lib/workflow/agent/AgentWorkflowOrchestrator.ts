@@ -217,9 +217,6 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
                 console.timeEnd(`⏱️ Phase Execution Time: ${phase.id}`);
                 console.log(`✅ [WORKFLOW] Completed phase: ${phase.id}`);
-
-                // Emit phase complete event
-                this.emitPhaseComplete(phase.id as OrchestrationPhase, result);
             }
 
             // Update status to completed
@@ -295,13 +292,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     ): Promise<Record<string, any>> {
         console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
 
-        // Store the current phase
+        // Store the current phase but don't emit a status update since it was already done in executeWorkflowChain
         this.status.phase = phase.id as OrchestrationPhase;
-
-        // Update status
-        this.updateStatus({
-            currentSteps: []
-        });
 
         // Get the workflow
         const workflow = await (phase.workflow instanceof Promise ? phase.workflow : phase.workflow());

@@ -70,50 +70,14 @@ const AgentWorkflowDemo: React.FC = () => {
             setError(message.status.error);
         }
 
-        // Determine if we should add this message to our list
-        const shouldAddMessage = () => {
-            if (workflowMessages.length === 0) return true;
-            const lastMessage = workflowMessages[workflowMessages.length - 1];
-
-            // For status updates, check if there's a meaningful change
-            if (message.type === WorkflowMessageType.STATUS_UPDATE) {
-                const hasNewSteps = message.status.currentSteps.some(step =>
-                    !lastMessage.status.currentSteps.find(lastStep =>
-                        lastStep.id === step.id &&
-                        lastStep.status === step.status &&
-                        lastStep.name === step.name
-                    )
-                );
-
-                const hasPhaseChange = message.status.phase !== lastMessage.status.phase;
-                const hasSignificantProgressChange = Math.abs(message.status.progress - lastMessage.status.progress) >= 10;
-                const hasErrorChange = message.status.error !== lastMessage.status.error;
-
-                return hasNewSteps || hasPhaseChange || hasSignificantProgressChange || hasErrorChange;
-            }
-
-            // For phase complete messages, only filter exact duplicates
-            if (message.type === WorkflowMessageType.PHASE_COMPLETE) {
-                const isDuplicate = lastMessage.type === WorkflowMessageType.PHASE_COMPLETE &&
-                    lastMessage.status.phase === message.status.phase &&
-                    JSON.stringify(lastMessage.status.results) === JSON.stringify(message.status.results);
-                return !isDuplicate;
-            }
-
-            // Always show workflow complete and error messages
-            return true;
-        };
-
-        // Add message to our array if it's significant
-        if (shouldAddMessage()) {
-            setWorkflowMessages(prev => {
-                const newMessages = [...prev, message];
-                // Sort messages by timestamp in descending order (newest first)
-                return newMessages.sort((a, b) =>
-                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                );
-            });
-        }
+        // Simply add every message without any filtering
+        setWorkflowMessages(prev => {
+            const newMessages = [...prev, message];
+            // Keep the timestamp sorting
+            return newMessages.sort((a, b) =>
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
+        });
 
         switch (message.type) {
             case WorkflowMessageType.STATUS_UPDATE:
@@ -151,14 +115,6 @@ const AgentWorkflowDemo: React.FC = () => {
                 setError(message.status.error || 'Unknown error');
                 setIsRunning(false);
                 break;
-        }
-
-        // Update running state based on status
-        if (message.status.phase === 'completed' || message.status.phase === 'failed') {
-            setIsRunning(false);
-            if (message.status.phase === 'completed') {
-                setSelectedPhase('output');
-            }
         }
     };
 
@@ -600,7 +556,12 @@ const AgentWorkflowDemo: React.FC = () => {
                                                     aria-selected={selectedMessageIndex === index}
                                                 >
                                                     <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
-                                                        {new Date(message.timestamp).toLocaleTimeString()}
+                                                        {(() => {
+                                                            const date = new Date(message.timestamp);
+                                                            const time = date.toLocaleTimeString();
+                                                            const ms = date.getMilliseconds().toString().padStart(3, '0');
+                                                            return `${time}.${ms}`;
+                                                        })()}
                                                     </td>
                                                     <td className="px-3 py-2 whitespace-nowrap">
                                                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${message.type === WorkflowMessageType.STATUS_UPDATE ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
@@ -716,7 +677,12 @@ const AgentWorkflowDemo: React.FC = () => {
                                                     <div>
                                                         <dt className="text-xs text-gray-500 dark:text-gray-400">Timestamp</dt>
                                                         <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                                                            {new Date(workflowMessages[selectedMessageIndex].timestamp).toLocaleString()}
+                                                            {(() => {
+                                                                const date = new Date(workflowMessages[selectedMessageIndex].timestamp);
+                                                                const fullDate = date.toLocaleString();
+                                                                const ms = date.getMilliseconds().toString().padStart(3, '0');
+                                                                return `${fullDate}.${ms}`;
+                                                            })()}
                                                         </dd>
                                                     </div>
                                                 </dl>
