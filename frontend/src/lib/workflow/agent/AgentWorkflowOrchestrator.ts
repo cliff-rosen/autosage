@@ -20,21 +20,6 @@ export enum WorkflowMessageType {
 }
 
 /**
- * Unified message structure for all workflow updates
- */
-export interface WorkflowMessage {
-    type: WorkflowMessageType;
-    sessionId: string;
-    timestamp: string;
-    status: OrchestrationStatus;
-    details?: {
-        phase?: OrchestrationPhase;
-        error?: string;
-        result?: any;
-    };
-}
-
-/**
  * Phases of the orchestration process
  */
 export type OrchestrationPhase =
@@ -45,30 +30,35 @@ export type OrchestrationPhase =
     | 'failed';
 
 /**
- * Status of the orchestration process
+ * Status of a workflow step
  */
-export interface OrchestrationStatus {
-    sessionId: string;
-    currentPhase: OrchestrationPhase | string;
+export interface WorkflowStepStatus {
+    id: string;
+    name: string;
+    status: 'running' | 'completed' | 'failed';
+    result?: any;
+    message?: string;
+}
+
+/**
+ * Core status information for the workflow
+ */
+export interface WorkflowStatus {
+    phase: OrchestrationPhase;
     progress: number;
-    startTime: string;
-    endTime?: string;
     error?: string;
-    currentWorkflowId?: string;
-    currentWorkflowStatus?: {
-        id: string;
-        status: 'running' | 'completed' | 'failed';
-        progress: number;
-        state: {
-            steps: Array<{
-                id: string;
-                name: string;
-                status: 'running' | 'completed' | 'failed';
-                result?: any;
-            }>;
-        };
-    };
+    currentSteps: WorkflowStepStatus[];
     results?: Record<string, any>;
+}
+
+/**
+ * Unified message structure for all workflow updates
+ */
+export interface WorkflowMessage {
+    type: WorkflowMessageType;
+    sessionId: string;
+    timestamp: string;
+    status: WorkflowStatus;
 }
 
 /**
@@ -88,7 +78,7 @@ export interface AgentWorkflowOrchestratorInterface {
         inputValues: WorkflowVariable[],
         config?: AgentWorkflowConfig
     ): Promise<string>;
-    getStatus(): OrchestrationStatus;
+    getStatus(): WorkflowStatus;
     cancelExecution(): Promise<boolean>;
     onMessage(callback: (message: WorkflowMessage) => void): void;
 }
@@ -100,7 +90,7 @@ export interface AgentWorkflowOrchestratorInterface {
  */
 export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInterface {
     private sessionId: string;
-    private status: OrchestrationStatus;
+    private status: WorkflowStatus;
     private eventEmitter: EventEmitter;
     private workflowEngine: AgentWorkflowEngine;
     private config: AgentWorkflowConfig;
@@ -110,11 +100,11 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     constructor(workflowEngine?: AgentWorkflowEngine) {
         this.sessionId = uuidv4();
         this.status = {
-            sessionId: this.sessionId,
-            currentPhase: 'question_development',
+            phase: 'question_development',
             progress: 0,
-            startTime: new Date().toISOString(),
-            error: undefined
+            error: undefined,
+            currentSteps: [],
+            results: {}
         };
         this.eventEmitter = new EventEmitter();
         this.workflowEngine = workflowEngine || new AgentWorkflowEngine();
@@ -128,13 +118,19 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         this.eventEmitter.on('workflow_message', callback);
     }
 
-    private emitMessage(type: WorkflowMessageType, details?: WorkflowMessage['details']): void {
+    private emitMessage(type: WorkflowMessageType, status: Partial<WorkflowStatus>): void {
         const message: WorkflowMessage = {
             type,
             sessionId: this.sessionId,
             timestamp: new Date().toISOString(),
-            status: { ...this.status },
-            details
+            status: {
+                phase: this.status.phase,
+                progress: this.status.progress,
+                error: this.status.error,
+                currentSteps: this.status.currentSteps,
+                results: this.status.results,
+                ...status
+            }
         };
         this.eventEmitter.emit('workflow_message', message);
     }
@@ -170,12 +166,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 ...inputValues
             };
 
-            // Update status
-            this.updateStatus({
-                currentPhase: 'question_development',
-                progress: 0,
-                results: {}
-            });
+
 
             // Execute each phase in sequence
             let finalAnswer = '';
@@ -187,8 +178,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
                 // Update status to the current phase
                 this.updateStatus({
-                    currentPhase: phase.id as OrchestrationPhase,
-                    currentWorkflowId: phase.id
+                    phase: phase.id as OrchestrationPhase,
+                    currentSteps: []
                 });
 
                 // Get the workflow for this phase
@@ -226,9 +217,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
             // Update status to completed
             this.updateStatus({
-                currentPhase: 'completed',
+                phase: 'completed',
                 progress: 100,
-                endTime: new Date().toISOString(),
                 results: {
                     chainOutputs: chainState
                 }
@@ -246,7 +236,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
 
             // Update status to failed
             this.updateStatus({
-                currentPhase: 'failed',
+                phase: 'failed',
                 error: error instanceof Error ? error.message : String(error)
             });
 
@@ -260,7 +250,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     /**
      * Get the current status of the workflow
      */
-    getStatus(): OrchestrationStatus {
+    getStatus(): WorkflowStatus {
         return { ...this.status };
     }
 
@@ -269,15 +259,15 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
      */
     async cancelExecution(): Promise<boolean> {
         // If there's a current workflow job, cancel it
-        if (this.status.currentWorkflowId) {
-            await this.workflowEngine.cancelJob(this.status.currentWorkflowId);
+        if (this.status.currentSteps.length > 0) {
+            await this.workflowEngine.cancelJob(this.status.currentSteps[0].id);
         }
 
         // Update status
         this.updateStatus({
-            currentPhase: 'failed',
+            phase: 'failed',
             error: 'Workflow cancelled by user',
-            endTime: new Date().toISOString()
+            currentSteps: []
         });
 
         // Emit error event
@@ -299,20 +289,11 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         console.log(`🔄 [PHASE ${phase.id}] Starting workflow phase: ${phase.label}`);
 
         // Store the current phase
-        this.currentPhase = phase;
+        this.status.phase = phase.id as OrchestrationPhase;
 
         // Update status
         this.updateStatus({
-            currentPhase: phase.id as OrchestrationPhase,
-            progress: 0,
-            currentWorkflowStatus: {
-                id: phase.id,
-                status: 'running',
-                progress: 0,
-                state: {
-                    steps: []
-                }
-            }
+            currentSteps: []
         });
 
         // Get the workflow
@@ -350,19 +331,16 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             // Emit a status update message with step information
             this.updateStatus({
                 progress: phaseProgress,
-                currentWorkflowStatus: {
-                    id: phase.id,
-                    status: 'running',
-                    progress: phaseProgress,
-                    state: {
-                        steps: [{
-                            id: status.stepId,
-                            name: workflow.steps[status.stepIndex]?.label || `Step ${status.stepIndex + 1}`,
-                            status: status.status,
-                            result: status.result
-                        }]
-                    }
-                }
+                currentSteps: [{
+                    id: status.stepId,
+                    name: workflow.steps[status.stepIndex]?.label || `Step ${status.stepIndex + 1}`,
+                    status: status.status,
+                    result: status.result,
+                    message: status.message
+                }],
+                results: status.result ? {
+                    [`step_${status.stepIndex}`]: status.result
+                } : undefined
             });
         };
 
@@ -378,19 +356,10 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         console.log('qqq AgentWorkflowOrchestrator jobResult', jobResult);
 
         // Update status to reflect phase completion
-        const phaseStatus = jobResult.success ? 'completed' : 'failed';
         this.updateStatus({
-            currentPhase: phaseStatus as OrchestrationPhase,
             progress: jobResult.success ? 100 : this.status.progress,
             error: jobResult.error,
-            currentWorkflowStatus: {
-                id: phase.id,
-                status: phaseStatus,
-                progress: jobResult.success ? 100 : this.status.progress,
-                state: {
-                    steps: []
-                }
-            }
+            currentSteps: []
         });
 
         // Check for errors
@@ -435,23 +404,37 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         }
     }
 
-    private updateStatus(updates: Partial<OrchestrationStatus>): void {
-        this.status = {
-            ...this.status,
-            ...updates
-        };
-        this.emitMessage(WorkflowMessageType.STATUS_UPDATE);
+    private updateStatus(updates: Partial<WorkflowStatus>): void {
+        // Update internal state
+        if (updates.phase !== undefined) this.status.phase = updates.phase;
+        if (updates.progress !== undefined) this.status.progress = updates.progress;
+        if (updates.error !== undefined) this.status.error = updates.error;
+        if (updates.currentSteps !== undefined) this.status.currentSteps = updates.currentSteps;
+        if (updates.results !== undefined) this.status.results = updates.results;
+
+        // Emit status update message
+        this.emitMessage(WorkflowMessageType.STATUS_UPDATE, updates);
     }
 
     private emitError(error: string): void {
-        this.emitMessage(WorkflowMessageType.ERROR, { error });
+        this.emitMessage(WorkflowMessageType.ERROR, {
+            phase: 'failed',
+            error
+        });
     }
 
     private emitPhaseComplete(phase: OrchestrationPhase, result: any): void {
-        this.emitMessage(WorkflowMessageType.PHASE_COMPLETE, { phase, result });
+        this.emitMessage(WorkflowMessageType.PHASE_COMPLETE, {
+            phase,
+            results: { [phase]: result }
+        });
     }
 
     private emitWorkflowComplete(result: any): void {
-        this.emitMessage(WorkflowMessageType.WORKFLOW_COMPLETE, { result });
+        this.emitMessage(WorkflowMessageType.WORKFLOW_COMPLETE, {
+            phase: 'completed',
+            progress: 100,
+            results: result
+        });
     }
 } 
