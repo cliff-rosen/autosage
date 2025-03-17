@@ -175,15 +175,15 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 ...inputValues
             };
 
+            this.updateStatus({
+                currentState: chainState
+            });
 
 
             // Execute each phase in sequence
             let finalAnswer = '';
             for (const phase of workflowChain.phases) {
                 console.log(`🔄 [WORKFLOW] Starting phase: ${phase.id}`);
-                console.log('qqq ********************************************************************')
-                console.log('qqq phase', phase);
-                console.log('qqq chainState', chainState);
 
                 // Update status to the current phase
                 this.updateStatus({
@@ -209,13 +209,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                     variablesToRecord(result),
                     phase.outputs_mappings
                 );
-                console.log('qqq chainState again', chainState);
 
-                // If this is the final phase, get the final answer
-                if (phase.id === workflowChain.phases[workflowChain.phases.length - 1].id) {
-                    // Look for a final answer in the result
-                    // This assumes the final phase has an output mapped to something like 'finalAnswer'
-                }
 
                 console.timeEnd(`⏱️ Phase Execution Time: ${phase.id}`);
                 console.log(`✅ [WORKFLOW] Completed phase: ${phase.id}`);
