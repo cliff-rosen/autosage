@@ -49,6 +49,7 @@ export interface WorkflowStatus {
     error?: string;
     currentSteps: WorkflowStepStatus[];
     results?: Record<string, any>;
+    currentState?: WorkflowVariable[];
 }
 
 /**
@@ -136,6 +137,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 error: this.status.error,
                 currentSteps: this.status.currentSteps,
                 results: this.status.results,
+                currentState: this.status.currentState,
                 ...status
             }
         };
@@ -317,6 +319,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             message?: string;
             progress?: number;
             result?: any;
+            currentState?: WorkflowVariable[];
         }) => {
             // Calculate progress
             const stepCount = workflow.steps.length;
@@ -339,7 +342,8 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 }],
                 results: status.result ? {
                     [`step_${status.stepIndex}`]: status.result
-                } : undefined
+                } : undefined,
+                currentState: status.currentState // Include current state in status updates
             });
         };
 
@@ -410,6 +414,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         if (updates.error !== undefined) this.status.error = updates.error;
         if (updates.currentSteps !== undefined) this.status.currentSteps = updates.currentSteps;
         if (updates.results !== undefined) this.status.results = updates.results;
+        if (updates.currentState !== undefined) this.status.currentState = updates.currentState;
 
         // Emit status update message
         this.emitMessage(WorkflowMessageType.STATUS_UPDATE, updates);

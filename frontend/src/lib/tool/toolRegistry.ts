@@ -19,7 +19,7 @@ export const executeTool = async (toolId: string, parameters: ResolvedParameters
     return await executor(toolId, parameters);
 };
 
-const TOOL_DELAY = 100;
+const TOOL_DELAY = 2000;
 
 // Tool type definitions
 export const TOOL_TYPES = [

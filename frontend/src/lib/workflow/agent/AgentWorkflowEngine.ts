@@ -21,6 +21,7 @@ export interface WorkflowJobConfig {
         message?: string;
         progress?: number;
         result?: any;
+        currentState?: WorkflowVariable[];
     }) => void;
 }
 
@@ -93,7 +94,8 @@ export class AgentWorkflowEngine {
                     currentStepIndex,
                     statusCallback ? (status) => statusCallback({
                         ...status,
-                        jobId
+                        jobId,
+                        currentState
                     }) : undefined
                 );
 

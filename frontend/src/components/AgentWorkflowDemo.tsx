@@ -83,6 +83,16 @@ const AgentWorkflowDemo: React.FC = () => {
                 if (message.status.phase !== 'completed' && message.status.phase !== 'failed') {
                     setSelectedPhase(message.status.phase);
                 }
+                // Update phase state if available
+                if (message.status.currentState) {
+                    setPhaseStateData(prev => prev ? {
+                        ...prev,
+                        state: message.status.currentState || []
+                    } : {
+                        phase: message.status.phase,
+                        state: message.status.currentState || []
+                    });
+                }
                 break;
 
             case WorkflowMessageType.PHASE_COMPLETE:
@@ -461,8 +471,45 @@ const AgentWorkflowDemo: React.FC = () => {
         }
     };
 
+    // Add new function to get current phase state
+    const getCurrentPhaseState = async () => {
+        if (selectedPhase === 'input' || selectedPhase === 'output') return null;
+
+        const phase = activeWorkflowChain.phases.find(p => p.id === selectedPhase);
+        if (!phase) return null;
+
+        // Get all variables that are mapped in this phase's workflow
+        const workflow = await phase.workflow();
+        if (!workflow) return null;
+
+        const phaseState = workflow.state || [];
+        return {
+            phase,
+            state: phaseState
+        };
+    };
+
+    // Add state for phase state data
+    const [phaseStateData, setPhaseStateData] = useState<{
+        phase: any;
+        state: any[];
+    } | null>(null);
+
+    // Add effect to update phase state when phase changes
+    useEffect(() => {
+        const updatePhaseState = async () => {
+            if (selectedPhase !== 'input' && selectedPhase !== 'output') {
+                const state = await getCurrentPhaseState();
+                setPhaseStateData(state);
+            } else {
+                setPhaseStateData(null);
+            }
+        };
+        updatePhaseState();
+    }, [selectedPhase]);
+
     return (
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 max-w-[2000px]">
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 Sample Workflow Chain Demo
                 {isRunning && (
@@ -477,316 +524,376 @@ const AgentWorkflowDemo: React.FC = () => {
                 {renderWorkflowPhases()}
             </div>
 
-            {/* Section 2: Input Area */}
-            <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto p-6">
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
-                    Workflow Inputs
-                </h3>
-                {renderInputFields()}
-                {error && (
-                    <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
-                        {error}
-                    </div>
-                )}
-            </div>
-
-            {/* Section 3: Phase Details */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto p-6">
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
-                    {selectedPhase === 'input' ? 'Input Phase Details' :
-                        selectedPhase === 'output' ? 'Final Results' :
-                            `Phase: ${activeWorkflowChain.phases.find(p => p.id === selectedPhase)?.label || selectedPhase}`}
-                </h3>
-
-                {selectedPhase === 'input' && renderInputPhaseDetails()}
-                {selectedPhase === 'output' && renderOutputPhaseDetails()}
-                {selectedPhase !== 'input' && selectedPhase !== 'output' && (
-                    <>
-                        {renderWorkflowSteps()}
-                        {phaseResults[selectedPhase] && (
-                            <div className="mt-6">
-                                <h4 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-2">Phase Results:</h4>
-                                <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-auto text-sm text-gray-800 dark:text-gray-200">
-                                    {JSON.stringify(phaseResults[selectedPhase], null, 2)}
-                                </pre>
+            {/* Main Content Area - Split into two columns */}
+            <div className="flex gap-6">
+                {/* Left Column - Main Content */}
+                <div className="flex-1">
+                    {/* Section 2: Input Area */}
+                    <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
+                            Workflow Inputs
+                        </h3>
+                        {renderInputFields()}
+                        {error && (
+                            <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
+                                {error}
                             </div>
                         )}
-                    </>
-                )}
-            </div>
-
-            {/* Section 4: Workflow Messages */}
-            <div className={`${isMessagesFullscreen
-                ? 'fixed inset-0 z-50 bg-white dark:bg-gray-800'
-                : 'mt-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden'}`}>
-                <div className={`${isMessagesFullscreen ? 'h-full flex flex-col' : 'p-6'}`}>
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-                            Workflow Messages
-                            <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                                ({workflowMessages.length} messages)
-                            </span>
-                        </h3>
-                        <button
-                            onClick={() => setIsMessagesFullscreen(prev => !prev)}
-                            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        >
-                            {isMessagesFullscreen ? (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            ) : (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                                </svg>
-                            )}
-                        </button>
                     </div>
 
-                    {workflowMessages.length > 0 ? (
-                        <div className={`flex gap-4 ${isMessagesFullscreen ? 'flex-1 overflow-hidden' : ''}`}>
-                            {/* Left Pane - Message List */}
-                            <div className={`${isMessagesFullscreen ? 'w-1/2' : 'w-[500px]'} border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden`}>
-                                <div ref={tableRef} className={`${isMessagesFullscreen ? 'h-full' : 'h-[400px]'} overflow-y-auto`}>
-                                    <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                        <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
-                                            <tr>
-                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">Time</th>
-                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">Type</th>
-                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">Status</th>
-                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Details</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                            {workflowMessages.map((message, index) => (
-                                                <tr
-                                                    key={`${message.sessionId}-${index}`}
-                                                    onClick={() => setSelectedMessageIndex(index)}
-                                                    className={`cursor-pointer transition-colors ${selectedMessageIndex === index
-                                                        ? 'bg-blue-50 dark:bg-blue-900/20'
-                                                        : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                                                        }`}
-                                                    tabIndex={0}
-                                                    role="row"
-                                                    aria-selected={selectedMessageIndex === index}
-                                                >
-                                                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
-                                                        {(() => {
-                                                            const date = new Date(message.timestamp);
-                                                            const time = date.toLocaleTimeString();
-                                                            const ms = date.getMilliseconds().toString().padStart(3, '0');
-                                                            return `${time}.${ms}`;
-                                                        })()}
-                                                    </td>
-                                                    <td className="px-3 py-2 whitespace-nowrap">
-                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${message.type === WorkflowMessageType.STATUS_UPDATE ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                                            message.type === WorkflowMessageType.PHASE_COMPLETE ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                                                message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                                                                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                                            }`}>
-                                                            {message.type === WorkflowMessageType.STATUS_UPDATE ? 'Update' :
-                                                                message.type === WorkflowMessageType.PHASE_COMPLETE ? 'Phase' :
-                                                                    message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'Done' : 'Error'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-                                                        {message.status.error ? (
-                                                            <span className="text-red-500 dark:text-red-400">Error</span>
-                                                        ) : message.type === WorkflowMessageType.PHASE_COMPLETE ? (
-                                                            <span>Phase Complete</span>
-                                                        ) : message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? (
-                                                            <span>Workflow Complete</span>
-                                                        ) : (
-                                                            <span>{message.status.phase}</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-2 text-xs">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                                <div
-                                                                    className={`h-full transition-all duration-500 ${message.status.error ? 'bg-red-500' :
-                                                                        message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'bg-green-500' :
-                                                                            'bg-blue-500'
-                                                                        }`}
-                                                                    style={{ width: `${message.status.progress}%` }}
-                                                                />
-                                                            </div>
-                                                            <span className="text-xs">{message.status.progress}%</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-                                                        {message.status.error ? (
-                                                            <span className="text-red-500 dark:text-red-400">
-                                                                {message.status.error.slice(0, 50)}{message.status.error.length > 50 ? '...' : ''}
-                                                            </span>
-                                                        ) : message.type === WorkflowMessageType.PHASE_COMPLETE ? (
-                                                            <div className="flex items-center gap-1">
-                                                                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                                <span>Completed {message.status.phase}</span>
-                                                            </div>
-                                                        ) : message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? (
-                                                            <div className="flex items-center gap-1">
-                                                                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                </svg>
-                                                                <span>Workflow completed successfully</span>
-                                                            </div>
-                                                        ) : message.status.currentSteps.length > 0 ? (
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="truncate">
-                                                                    {message.status.currentSteps[0].name}
-                                                                    {message.status.currentSteps.length > 1 && (
-                                                                        <span className="ml-1 text-xs text-gray-400">
-                                                                            (+{message.status.currentSteps.length - 1})
-                                                                        </span>
-                                                                    )}
-                                                                </span>
-                                                                {message.status.currentSteps[0].status === 'completed' && (
-                                                                    <svg className="w-4 h-4 text-green-500 ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <span>Processing {message.status.phase}</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                    {/* Section 3: Phase Details */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-auto p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
+                            {selectedPhase === 'input' ? 'Input Phase Details' :
+                                selectedPhase === 'output' ? 'Final Results' :
+                                    `Phase: ${activeWorkflowChain.phases.find(p => p.id === selectedPhase)?.label || selectedPhase}`}
+                        </h3>
 
-                            {/* Right Pane - Message Details */}
-                            <div className={`flex-1 border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${isMessagesFullscreen ? 'h-full' : 'h-[400px]'} overflow-y-auto`}>
-                                {selectedMessageIndex !== null && selectedMessageIndex < workflowMessages.length ? (
-                                    <div className="space-y-6">
-                                        {/* Message Overview */}
-                                        <div>
-                                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                Message Overview
-                                            </h4>
-                                            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-                                                <dl className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Type</dt>
-                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                                                            {workflowMessages[selectedMessageIndex].type}
-                                                        </dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Phase</dt>
-                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                                                            {workflowMessages[selectedMessageIndex].status.phase}
-                                                        </dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Progress</dt>
-                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                                                            {workflowMessages[selectedMessageIndex].status.progress}%
-                                                        </dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt className="text-xs text-gray-500 dark:text-gray-400">Timestamp</dt>
-                                                        <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                                                            {(() => {
-                                                                const date = new Date(workflowMessages[selectedMessageIndex].timestamp);
-                                                                const fullDate = date.toLocaleString();
-                                                                const ms = date.getMilliseconds().toString().padStart(3, '0');
-                                                                return `${fullDate}.${ms}`;
-                                                            })()}
-                                                        </dd>
-                                                    </div>
-                                                </dl>
-                                            </div>
-                                        </div>
-
-                                        {/* Current Steps */}
-                                        {workflowMessages[selectedMessageIndex].status.currentSteps.length > 0 && (
-                                            <div>
-                                                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                    Current Steps
-                                                </h4>
-                                                <div className="space-y-2">
-                                                    {workflowMessages[selectedMessageIndex].status.currentSteps.map(step => (
-                                                        <div key={step.id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <span className="font-medium text-gray-700 dark:text-gray-300">{step.name}</span>
-                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${step.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                                                    step.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                                                                        'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                                                    }`}>
-                                                                    {step.status}
-                                                                </span>
-                                                            </div>
-                                                            {step.message && (
-                                                                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                                                    {step.message}
-                                                                </div>
-                                                            )}
-                                                            {step.result && (
-                                                                <details className="mt-2">
-                                                                    <summary className="cursor-pointer text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
-                                                                        View Result
-                                                                    </summary>
-                                                                    <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-48">
-                                                                        {JSON.stringify(step.result, null, 2)}
-                                                                    </pre>
-                                                                </details>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Error Details */}
-                                        {workflowMessages[selectedMessageIndex].status.error && (
-                                            <div>
-                                                <h4 className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
-                                                    Error Details
-                                                </h4>
-                                                <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r">
-                                                    <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">
-                                                        {workflowMessages[selectedMessageIndex].status.error}
-                                                    </pre>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Phase/Workflow Results */}
-                                        {workflowMessages[selectedMessageIndex].status.results &&
-                                            Object.keys(workflowMessages[selectedMessageIndex].status.results).length > 0 && (
-                                                <div>
-                                                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                        {workflowMessages[selectedMessageIndex].type === WorkflowMessageType.PHASE_COMPLETE ? 'Phase Results' :
-                                                            workflowMessages[selectedMessageIndex].type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'Final Results' :
-                                                                'Results'}
-                                                    </h4>
-                                                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-                                                        <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-auto max-h-96">
-                                                            {JSON.stringify(workflowMessages[selectedMessageIndex].status.results, null, 2)}
-                                                        </pre>
-                                                    </div>
-                                                </div>
-                                            )}
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                                        Select a message to view details
+                        {selectedPhase === 'input' && renderInputPhaseDetails()}
+                        {selectedPhase === 'output' && renderOutputPhaseDetails()}
+                        {selectedPhase !== 'input' && selectedPhase !== 'output' && (
+                            <>
+                                {renderWorkflowSteps()}
+                                {phaseResults[selectedPhase] && (
+                                    <div className="mt-6">
+                                        <h4 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-2">Phase Results:</h4>
+                                        <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-auto text-sm text-gray-800 dark:text-gray-200">
+                                            {JSON.stringify(phaseResults[selectedPhase], null, 2)}
+                                        </pre>
                                     </div>
                                 )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Section 4: Workflow Messages */}
+                    <div className={`${isMessagesFullscreen
+                        ? 'fixed inset-0 z-50 bg-white dark:bg-gray-800'
+                        : 'mt-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden'}`}>
+                        <div className={`${isMessagesFullscreen ? 'h-full flex flex-col' : 'p-6'}`}>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+                                    Workflow Messages
+                                    <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                        ({workflowMessages.length} messages)
+                                    </span>
+                                </h3>
+                                <button
+                                    onClick={() => setIsMessagesFullscreen(prev => !prev)}
+                                    className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                    {isMessagesFullscreen ? (
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                                        </svg>
+                                    )}
+                                </button>
                             </div>
+
+                            {workflowMessages.length > 0 ? (
+                                <div className={`flex gap-4 ${isMessagesFullscreen ? 'flex-1 overflow-hidden' : ''}`}>
+                                    {/* Left Pane - Message List */}
+                                    <div className={`${isMessagesFullscreen ? 'w-1/2' : 'w-[500px]'} border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden`}>
+                                        <div ref={tableRef} className={`${isMessagesFullscreen ? 'h-full' : 'h-[400px]'} overflow-y-auto`}>
+                                            <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">Time</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">Type</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">Status</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Details</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                    {workflowMessages.map((message, index) => (
+                                                        <tr
+                                                            key={`${message.sessionId}-${index}`}
+                                                            onClick={() => setSelectedMessageIndex(index)}
+                                                            className={`cursor-pointer transition-colors ${selectedMessageIndex === index
+                                                                ? 'bg-blue-50 dark:bg-blue-900/20'
+                                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                                }`}
+                                                            tabIndex={0}
+                                                            role="row"
+                                                            aria-selected={selectedMessageIndex === index}
+                                                        >
+                                                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                                                                {(() => {
+                                                                    const date = new Date(message.timestamp);
+                                                                    const time = date.toLocaleTimeString();
+                                                                    const ms = date.getMilliseconds().toString().padStart(3, '0');
+                                                                    return `${time}.${ms}`;
+                                                                })()}
+                                                            </td>
+                                                            <td className="px-3 py-2 whitespace-nowrap">
+                                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${message.type === WorkflowMessageType.STATUS_UPDATE ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                                                    message.type === WorkflowMessageType.PHASE_COMPLETE ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                                        message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                                                                            'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                                                    }`}>
+                                                                    {message.type === WorkflowMessageType.STATUS_UPDATE ? 'Update' :
+                                                                        message.type === WorkflowMessageType.PHASE_COMPLETE ? 'Phase' :
+                                                                            message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'Done' : 'Error'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                                                                {message.status.error ? (
+                                                                    <span className="text-red-500 dark:text-red-400">Error</span>
+                                                                ) : message.type === WorkflowMessageType.PHASE_COMPLETE ? (
+                                                                    <span>Phase Complete</span>
+                                                                ) : message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? (
+                                                                    <span>Workflow Complete</span>
+                                                                ) : (
+                                                                    <span>{message.status.phase}</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-xs">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full transition-all duration-500 ${message.status.error ? 'bg-red-500' :
+                                                                                message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'bg-green-500' :
+                                                                                    'bg-blue-500'
+                                                                                }`}
+                                                                            style={{ width: `${message.status.progress}%` }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-xs">{message.status.progress}%</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                                                                {message.status.error ? (
+                                                                    <span className="text-red-500 dark:text-red-400">
+                                                                        {message.status.error.slice(0, 50)}{message.status.error.length > 50 ? '...' : ''}
+                                                                    </span>
+                                                                ) : message.type === WorkflowMessageType.PHASE_COMPLETE ? (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                        </svg>
+                                                                        <span>Completed {message.status.phase}</span>
+                                                                    </div>
+                                                                ) : message.type === WorkflowMessageType.WORKFLOW_COMPLETE ? (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                        </svg>
+                                                                        <span>Workflow completed successfully</span>
+                                                                    </div>
+                                                                ) : message.status.currentSteps.length > 0 ? (
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="truncate">
+                                                                            {message.status.currentSteps[0].name}
+                                                                            {message.status.currentSteps.length > 1 && (
+                                                                                <span className="ml-1 text-xs text-gray-400">
+                                                                                    (+{message.status.currentSteps.length - 1})
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                        {message.status.currentSteps[0].status === 'completed' && (
+                                                                            <svg className="w-4 h-4 text-green-500 ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                            </svg>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span>Processing {message.status.phase}</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Pane - Message Details */}
+                                    <div className={`flex-1 border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${isMessagesFullscreen ? 'h-full' : 'h-[400px]'} overflow-y-auto`}>
+                                        {selectedMessageIndex !== null && selectedMessageIndex < workflowMessages.length ? (
+                                            <div className="space-y-6">
+                                                {/* Message Overview */}
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                        Message Overview
+                                                    </h4>
+                                                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                                                        <dl className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <dt className="text-xs text-gray-500 dark:text-gray-400">Type</dt>
+                                                                <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                                    {workflowMessages[selectedMessageIndex].type}
+                                                                </dd>
+                                                            </div>
+                                                            <div>
+                                                                <dt className="text-xs text-gray-500 dark:text-gray-400">Phase</dt>
+                                                                <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                                    {workflowMessages[selectedMessageIndex].status.phase}
+                                                                </dd>
+                                                            </div>
+                                                            <div>
+                                                                <dt className="text-xs text-gray-500 dark:text-gray-400">Progress</dt>
+                                                                <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                                    {workflowMessages[selectedMessageIndex].status.progress}%
+                                                                </dd>
+                                                            </div>
+                                                            <div>
+                                                                <dt className="text-xs text-gray-500 dark:text-gray-400">Timestamp</dt>
+                                                                <dd className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                                                    {(() => {
+                                                                        const date = new Date(workflowMessages[selectedMessageIndex].timestamp);
+                                                                        const fullDate = date.toLocaleString();
+                                                                        const ms = date.getMilliseconds().toString().padStart(3, '0');
+                                                                        return `${fullDate}.${ms}`;
+                                                                    })()}
+                                                                </dd>
+                                                            </div>
+                                                        </dl>
+                                                    </div>
+                                                </div>
+
+                                                {/* Current Steps */}
+                                                {workflowMessages[selectedMessageIndex].status.currentSteps.length > 0 && (
+                                                    <div>
+                                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                            Current Steps
+                                                        </h4>
+                                                        <div className="space-y-2">
+                                                            {workflowMessages[selectedMessageIndex].status.currentSteps.map(step => (
+                                                                <div key={step.id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+                                                                    <div className="flex items-center justify-between mb-2">
+                                                                        <span className="font-medium text-gray-700 dark:text-gray-300">{step.name}</span>
+                                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${step.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                                            step.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                                                                                'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                                                            }`}>
+                                                                            {step.status}
+                                                                        </span>
+                                                                    </div>
+                                                                    {step.message && (
+                                                                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                                                            {step.message}
+                                                                        </div>
+                                                                    )}
+                                                                    {step.result && (
+                                                                        <details className="mt-2">
+                                                                            <summary className="cursor-pointer text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                                                                                View Result
+                                                                            </summary>
+                                                                            <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-48">
+                                                                                {JSON.stringify(step.result, null, 2)}
+                                                                            </pre>
+                                                                        </details>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Error Details */}
+                                                {workflowMessages[selectedMessageIndex].status.error && (
+                                                    <div>
+                                                        <h4 className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                                            Error Details
+                                                        </h4>
+                                                        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r">
+                                                            <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">
+                                                                {workflowMessages[selectedMessageIndex].status.error}
+                                                            </pre>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Phase/Workflow Results */}
+                                                {workflowMessages[selectedMessageIndex].status.results &&
+                                                    Object.keys(workflowMessages[selectedMessageIndex].status.results).length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                                {workflowMessages[selectedMessageIndex].type === WorkflowMessageType.PHASE_COMPLETE ? 'Phase Results' :
+                                                                    workflowMessages[selectedMessageIndex].type === WorkflowMessageType.WORKFLOW_COMPLETE ? 'Final Results' :
+                                                                        'Results'}
+                                                            </h4>
+                                                            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                                                                <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-auto max-h-96">
+                                                                    {JSON.stringify(workflowMessages[selectedMessageIndex].status.results, null, 2)}
+                                                                </pre>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                            </div>
+                                        ) : (
+                                            <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                                Select a message to view details
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                    No workflow messages yet. Start a workflow to see messages here.
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                            No workflow messages yet. Start a workflow to see messages here.
-                        </div>
-                    )}
+                    </div>
                 </div>
+
+                {/* Right Column - Phase State Panel */}
+                {selectedPhase !== 'input' && selectedPhase !== 'output' && (
+                    <div className="w-[768px] bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                                Phase State
+                            </h3>
+                        </div>
+                        <div className="flex-1 overflow-auto p-4">
+                            {(() => {
+                                if (!phaseStateData) {
+                                    return (
+                                        <div className="text-gray-500 dark:text-gray-400 text-center py-4">
+                                            No phase state available
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="space-y-2">
+                                        {phaseStateData.state.map((variable: WorkflowVariable) => (
+                                            <div key={variable.name} className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                        {variable.name}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {variable.io_type}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    {variable.schema.type}
+                                                    {variable.schema.is_array && '[]'}
+                                                </div>
+                                                <div className="text-sm text-gray-700 dark:text-gray-300">
+                                                    {variable.value !== undefined ? (
+                                                        <pre className="whitespace-pre-wrap break-words">
+                                                            {JSON.stringify(variable.value, null, 2)}
+                                                        </pre>
+                                                    ) : (
+                                                        <span className="text-gray-400 dark:text-gray-500 italic">
+                                                            No value
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
