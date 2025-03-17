@@ -4,8 +4,7 @@ import {
     WorkflowMessage,
     WorkflowMessageType,
     WorkflowStatus,
-    WorkflowStepStatus,
-    OrchestrationPhase
+    WorkflowStepStatus
 } from '../lib/workflow/agent/AgentWorkflowOrchestrator';
 import { AgentWorkflowEngine } from '../lib/workflow/agent/AgentWorkflowEngine';
 import {
@@ -13,7 +12,6 @@ import {
     SAMPLE_WORKFLOW_CHAIN
 } from '../types/agent-workflows';
 import {
-    WorkflowStep,
     WorkflowVariable,
 } from '../types/workflows';
 
@@ -107,7 +105,11 @@ const AgentWorkflowDemo: React.FC = () => {
                 setSelectedPhase('output');
                 setIsRunning(false);
                 if (message.status.results) {
-                    setChainOutputs(message.status.results);
+                    const newStateVars = getStateVarsFromCompletedPhases(message.status.results);
+                    setActiveWorkflowChain(prev => ({
+                        ...prev,
+                        state: newStateVars
+                    }));
                 }
                 break;
 
@@ -116,6 +118,19 @@ const AgentWorkflowDemo: React.FC = () => {
                 setIsRunning(false);
                 break;
         }
+    };
+
+    const getStateVarsFromCompletedPhases = (results: Record<string, any>): WorkflowVariable[] => {
+        const newStateVars: WorkflowVariable[] = [];
+        var phaseId: string | undefined;
+        Object.keys(results).map(
+            (key: string) => {
+                if (!phaseId) phaseId = activeWorkflowChain.phases.find(p => p.id === key)?.id;
+                newStateVars.push(results[key]);
+            }
+
+        );
+        return newStateVars;
     };
 
     // Set up message handler when the component mounts
