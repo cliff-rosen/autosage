@@ -10,13 +10,28 @@ import { AgentWorkflowEngine } from './AgentWorkflowEngine';
 import { updateStateWithInputs, updateStateWithOutputs, variablesToRecord } from '../utils/state-management';
 
 /**
- * Event types for the agent workflow orchestrator
+ * Message types for workflow status updates
  */
-export enum AgentWorkflowEventType {
-    STATUS_CHANGE = 'status_change',
+export enum WorkflowMessageType {
+    STATUS_UPDATE = 'status_update',
     PHASE_COMPLETE = 'phase_complete',
     WORKFLOW_COMPLETE = 'workflow_complete',
     ERROR = 'error'
+}
+
+/**
+ * Unified message structure for all workflow updates
+ */
+export interface WorkflowMessage {
+    type: WorkflowMessageType;
+    sessionId: string;
+    timestamp: string;
+    status: OrchestrationStatus;
+    details?: {
+        phase?: OrchestrationPhase;
+        error?: string;
+        result?: any;
+    };
 }
 
 /**
@@ -57,47 +72,6 @@ export interface OrchestrationStatus {
 }
 
 /**
- * Interface for the status change event
- */
-export interface StatusChangeEvent {
-    type: AgentWorkflowEventType.STATUS_CHANGE;
-    sessionId: string;
-    timestamp: string;
-    status: OrchestrationStatus;
-}
-
-/**
- * Interface for the phase complete event
- */
-export interface PhaseCompleteEvent {
-    type: AgentWorkflowEventType.PHASE_COMPLETE;
-    sessionId: string;
-    timestamp: string;
-    phase: OrchestrationPhase;
-    result: any;
-}
-
-/**
- * Interface for the workflow complete event
- */
-export interface WorkflowCompleteEvent {
-    type: AgentWorkflowEventType.WORKFLOW_COMPLETE;
-    sessionId: string;
-    timestamp: string;
-    finalAnswer: string;
-}
-
-/**
- * Interface for the error event
- */
-export interface ErrorEvent {
-    type: AgentWorkflowEventType.ERROR;
-    sessionId: string;
-    timestamp: string;
-    error: string;
-}
-
-/**
  * Configuration options for the agent workflow
  */
 export interface AgentWorkflowConfig {
@@ -116,11 +90,7 @@ export interface AgentWorkflowOrchestratorInterface {
     ): Promise<string>;
     getStatus(): OrchestrationStatus;
     cancelExecution(): Promise<boolean>;
-    onStatusChange(callback: (event: StatusChangeEvent) => void): void;
-    onPhaseComplete(callback: (event: PhaseCompleteEvent) => void): void;
-    onWorkflowComplete(callback: (event: WorkflowCompleteEvent) => void): void;
-    onError(callback: (event: ErrorEvent) => void): void;
-    setStepStatusCallback(callback: (status: any) => void): void;
+    onMessage(callback: (message: WorkflowMessage) => void): void;
 }
 
 /**
@@ -135,8 +105,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     private workflowEngine: AgentWorkflowEngine;
     private config: AgentWorkflowConfig;
     private phaseResults: Record<string, any> = {};
-    private currentPhase: WorkflowPhase | null = null;
-    private stepStatusCallback: ((status: any) => void) | null = null;
+
 
     constructor(workflowEngine?: AgentWorkflowEngine) {
         this.sessionId = uuidv4();
@@ -153,19 +122,21 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     }
 
     /**
-     * Set a callback to receive step status updates
-     * @param callback The callback to call when a step status update is received
+     * Register a callback for all workflow messages
      */
-    setStepStatusCallback(callback: (status: {
-        jobId: string;
-        stepId: string;
-        stepIndex: number;
-        status: 'running' | 'completed' | 'failed';
-        message?: string;
-        progress?: number;
-        result?: any;
-    }) => void): void {
-        this.stepStatusCallback = callback;
+    onMessage(callback: (message: WorkflowMessage) => void): void {
+        this.eventEmitter.on('workflow_message', callback);
+    }
+
+    private emitMessage(type: WorkflowMessageType, details?: WorkflowMessage['details']): void {
+        const message: WorkflowMessage = {
+            type,
+            sessionId: this.sessionId,
+            timestamp: new Date().toISOString(),
+            status: { ...this.status },
+            details
+        };
+        this.eventEmitter.emit('workflow_message', message);
     }
 
     /**
@@ -232,13 +203,7 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                 // Store the results in the phase results
                 this.phaseResults[phase.id] = result;
 
-                // Transform the result to match the output mapping format
-                // The result needs to be transformed from { key: value } to { newVarName: value }
-
-
                 // Update chain state with phase outputs
-                console.log('qqq result', result);
-                console.log('qqq phase.outputs_mappings', phase.outputs_mappings);
                 chainState = updateStateWithOutputs(
                     chainState,
                     variablesToRecord(result),
@@ -322,34 +287,6 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
     }
 
     /**
-     * Register a callback for status change events
-     */
-    onStatusChange(callback: (event: StatusChangeEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.STATUS_CHANGE, callback);
-    }
-
-    /**
-     * Register a callback for phase complete events
-     */
-    onPhaseComplete(callback: (event: PhaseCompleteEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.PHASE_COMPLETE, callback);
-    }
-
-    /**
-     * Register a callback for workflow complete events
-     */
-    onWorkflowComplete(callback: (event: WorkflowCompleteEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.WORKFLOW_COMPLETE, callback);
-    }
-
-    /**
-     * Register a callback for error events
-     */
-    onError(callback: (event: ErrorEvent) => void): void {
-        this.eventEmitter.on(AgentWorkflowEventType.ERROR, callback);
-    }
-
-    /**
      * Execute a single workflow phase
      * @param phase The workflow phase to execute
      * @param inputs The input values for this phase
@@ -401,20 +338,16 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
             progress?: number;
             result?: any;
         }) => {
-            // Calculate overall phase progress based on step progress
-            // For simplicity, we'll assume each step contributes equally to the phase progress
+            // Calculate progress
             const stepCount = workflow.steps.length;
             const stepWeight = 1 / stepCount;
             const stepProgress = status.progress || 0;
-
-            // Calculate the phase progress as: 
-            // (completed steps * 100% + current step progress * step weight)
             const phaseProgress = Math.min(
                 100,
                 Math.round((status.stepIndex * stepWeight * 100) + (stepProgress * stepWeight))
             );
 
-            // Update the orchestration status with the step information
+            // Emit a status update message with step information
             this.updateStatus({
                 progress: phaseProgress,
                 currentWorkflowStatus: {
@@ -431,11 +364,6 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
                     }
                 }
             });
-
-            // Forward the status update to the step status callback if set
-            if (this.stepStatusCallback) {
-                this.stepStatusCallback(status);
-            }
         };
 
         // Run the workflow with updated state
@@ -507,73 +435,23 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         }
     }
 
-    /**
-     * Update the status and emit a status change event
-     */
     private updateStatus(updates: Partial<OrchestrationStatus>): void {
         this.status = {
             ...this.status,
             ...updates
         };
-
-        // Emit status change event
-        this.emitStatusChange();
+        this.emitMessage(WorkflowMessageType.STATUS_UPDATE);
     }
 
-    /**
-     * Emit a status change event
-     */
-    private emitStatusChange(): void {
-        const event: StatusChangeEvent = {
-            type: AgentWorkflowEventType.STATUS_CHANGE,
-            sessionId: this.sessionId,
-            timestamp: new Date().toISOString(),
-            status: { ...this.status }
-        };
-
-        this.eventEmitter.emit(AgentWorkflowEventType.STATUS_CHANGE, event);
-    }
-
-    /**
-     * Emit a phase complete event
-     */
-    private emitPhaseComplete(phase: OrchestrationPhase, result: any): void {
-        const event: PhaseCompleteEvent = {
-            type: AgentWorkflowEventType.PHASE_COMPLETE,
-            sessionId: this.sessionId,
-            timestamp: new Date().toISOString(),
-            phase,
-            result
-        };
-
-        this.eventEmitter.emit(AgentWorkflowEventType.PHASE_COMPLETE, event);
-    }
-
-    /**
-     * Emit a workflow complete event
-     */
-    private emitWorkflowComplete(finalAnswer: string): void {
-        const event: WorkflowCompleteEvent = {
-            type: AgentWorkflowEventType.WORKFLOW_COMPLETE,
-            sessionId: this.sessionId,
-            timestamp: new Date().toISOString(),
-            finalAnswer
-        };
-
-        this.eventEmitter.emit(AgentWorkflowEventType.WORKFLOW_COMPLETE, event);
-    }
-
-    /**
-     * Emit an error event
-     */
     private emitError(error: string): void {
-        const event: ErrorEvent = {
-            type: AgentWorkflowEventType.ERROR,
-            sessionId: this.sessionId,
-            timestamp: new Date().toISOString(),
-            error
-        };
+        this.emitMessage(WorkflowMessageType.ERROR, { error });
+    }
 
-        this.eventEmitter.emit(AgentWorkflowEventType.ERROR, event);
+    private emitPhaseComplete(phase: OrchestrationPhase, result: any): void {
+        this.emitMessage(WorkflowMessageType.PHASE_COMPLETE, { phase, result });
+    }
+
+    private emitWorkflowComplete(result: any): void {
+        this.emitMessage(WorkflowMessageType.WORKFLOW_COMPLETE, { result });
     }
 } 

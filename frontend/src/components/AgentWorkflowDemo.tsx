@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     AgentWorkflowOrchestrator,
-    StatusChangeEvent,
-    PhaseCompleteEvent,
-    WorkflowCompleteEvent,
+    WorkflowMessage,
+    WorkflowMessageType,
     OrchestrationStatus
 } from '../lib/workflow/agent/AgentWorkflowOrchestrator';
 import { AgentWorkflowEngine } from '../lib/workflow/agent/AgentWorkflowEngine';
@@ -24,7 +23,6 @@ const getPhaseProgress = (phaseId: string): number => {
 };
 
 const AgentWorkflowDemo: React.FC = () => {
-    // Replace inputValues with chainInputValues
     const [activeWorkflowChain, setActiveWorkflowChain] = useState<AgentWorkflowChain>(SAMPLE_WORKFLOW_CHAIN);
     const [chainInputValues, setChainInputValues] = useState<Record<string, any>>({});
     const [chainOutputs, setChainOutputs] = useState<Record<string, any>>({});
@@ -47,22 +45,70 @@ const AgentWorkflowDemo: React.FC = () => {
     // Get the orchestrator from the ref
     const orchestrator = orchestratorRef.current;
 
-    // Handle status change events
-    const handleStatusChange = (event: StatusChangeEvent) => {
-        console.log('qqq handleStatusChange', event);
-        setStatus(event.status);
+    // Handle all workflow messages
+    const handleWorkflowMessage = (message: WorkflowMessage) => {
+        console.log('Workflow message:', message);
+
+        // Always update status
+        setStatus(message.status);
+
+        switch (message.type) {
+            case WorkflowMessageType.STATUS_UPDATE:
+                // Update workflow steps if available
+                if (message.status.currentWorkflowStatus?.state?.steps) {
+                    setCurrentWorkflowSteps(message.status.currentWorkflowStatus.state.steps);
+                }
+
+                // Update phase selection
+                if (message.status.currentPhase !== 'completed' && message.status.currentPhase !== 'failed') {
+                    setSelectedPhase(message.status.currentPhase);
+                }
+                break;
+
+            case WorkflowMessageType.PHASE_COMPLETE:
+                const { phase, result } = message.details || {};
+                if (phase && result) {
+                    // Update phase results
+                    setPhaseResults(prev => ({
+                        ...prev,
+                        [phase.toString()]: result
+                    }));
+
+                    // Update chain outputs
+                    setChainOutputs(prev => ({
+                        ...prev,
+                        ...result
+                    }));
+                }
+                break;
+
+            case WorkflowMessageType.WORKFLOW_COMPLETE:
+                setSelectedPhase('output');
+                setIsRunning(false);
+                const { result: workflowResult } = message.details || {};
+                if (workflowResult) {
+                    setActiveWorkflowChain(prev => ({
+                        ...prev,
+                        state: workflowResult
+                    }));
+                }
+                break;
+
+            case WorkflowMessageType.ERROR:
+                const { error: errorMessage } = message.details || {};
+                setError(errorMessage || 'Unknown error');
+                setIsRunning(false);
+                break;
+        }
 
         // Update running state based on status
-        if (event.status.currentPhase === 'completed' || event.status.currentPhase === 'failed') {
+        if (message.status.currentPhase === 'completed' || message.status.currentPhase === 'failed') {
             setIsRunning(false);
-
-            // If completed, select the output phase
-            if (event.status.currentPhase === 'completed') {
+            if (message.status.currentPhase === 'completed') {
                 setSelectedPhase('output');
-                // Update chain outputs with final results from the status
-                if (event.status.results) {
-                    // Extract outputs from the results, ensuring they are objects
-                    const outputs = Object.values(event.status.results)
+                // Update outputs if available
+                if (message.status.results) {
+                    const outputs = Object.values(message.status.results)
                         .filter((result): result is Record<string, any> =>
                             result !== null && typeof result === 'object'
                         )
@@ -70,86 +116,17 @@ const AgentWorkflowDemo: React.FC = () => {
                             ...acc,
                             ...result
                         }), {} as Record<string, any>);
-
                     setChainOutputs(outputs);
                 }
             }
-        } else {
-            // Set the selected phase to the current phase
-            setSelectedPhase(event.status.currentPhase);
-        }
-
-        // Update current workflow steps if available
-        if (event.status.currentWorkflowStatus?.state?.steps) {
-            setCurrentWorkflowSteps(event.status.currentWorkflowStatus.state.steps);
-        }
-
-        // Update error state
-        if (event.status.currentPhase === 'failed' && event.status.error) {
-            setError(event.status.error);
         }
     };
 
-    // Handle phase complete events
-    const handlePhaseComplete = (event: PhaseCompleteEvent) => {
-        console.log('qqq handlePhaseComplete', event);
-
-        // Update phase results
-        setPhaseResults(prev => ({
-            ...prev,
-            [event.phase]: event.result
-        }));
-
-        // Update chain outputs using the new pattern
-        if (event.result) {
-            const phase = activeWorkflowChain.phases.find(p => p.id === event.phase);
-            if (phase) {
-                console.log('qqq event.result', event.result);
-                console.log('qqq chainOutputs', chainOutputs);
-                setChainOutputs(prev => ({
-                    ...prev,
-                    ...event.result
-                }));
-            }
-        }
-    };
-
-    // Handle workflow complete events
-    const handleWorkflowComplete = (event: WorkflowCompleteEvent) => {
-        console.log('qqq handleWorkflowComplete', event);
-
-        // Get the current orchestrator status
-        const currentStatus = orchestrator?.getStatus();
-        if (currentStatus?.results) {
-            setActiveWorkflowChain({
-                ...activeWorkflowChain,
-                state: event.finalAnswer || []
-            });
-        }
-        setSelectedPhase('output');
-        setIsRunning(false);
-    };
-
-    // Handle error events
-    const handleError = (event: { error: string }) => {
-        setError(event.error);
-        setIsRunning(false);
-    };
-
-    // Set up event listeners when the component mounts
+    // Set up message handler when the component mounts
     useEffect(() => {
         if (orchestrator) {
-            orchestrator.onStatusChange(handleStatusChange);
-            orchestrator.onPhaseComplete(handlePhaseComplete);
-            orchestrator.onWorkflowComplete(handleWorkflowComplete);
-            orchestrator.onError(handleError);
+            orchestrator.onMessage(handleWorkflowMessage);
         }
-
-        // Clean up event listeners when the component unmounts
-        return () => {
-            // Note: In a real implementation, we would need to remove the event listeners
-            // but the current interface doesn't provide methods for that
-        };
     }, [orchestrator]);
 
     // Handle input change for dynamic inputs
@@ -527,7 +504,7 @@ const AgentWorkflowDemo: React.FC = () => {
                     </div>
                 )}
             </div>
-            
+
         </div>
     );
 };
