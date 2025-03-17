@@ -118,6 +118,13 @@ export class AgentWorkflowOrchestrator implements AgentWorkflowOrchestratorInter
         this.eventEmitter.on('workflow_message', callback);
     }
 
+    /**
+     * Remove a callback for workflow messages
+     */
+    offMessage(callback: (message: WorkflowMessage) => void): void {
+        this.eventEmitter.off('workflow_message', callback);
+    }
+
     private emitMessage(type: WorkflowMessageType, status: Partial<WorkflowStatus>): void {
         const message: WorkflowMessage = {
             type,
