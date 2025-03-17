@@ -411,7 +411,7 @@ const InteractiveWorkflowTest: React.FC = () => {
     // Render the chat interface
     const renderChat = () => {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col h-[600px]">
+            <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow">
                 {/* Chat Header */}
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -502,7 +502,7 @@ const InteractiveWorkflowTest: React.FC = () => {
             {/* Main Content Area - Fixed height container with consistent layout */}
             <div className="flex gap-6 h-[calc(100vh-200px)]">
                 {/* Chat Panel - Fixed width and full height */}
-                <div className="w-[400px]">
+                <div className="w-[400px] flex flex-col">
                     {renderChat()}
                 </div>
 
@@ -563,7 +563,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        // Step Execution - Show step details
+                        // Step Execution - Show four panes
                         <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                             {/* Get current step details */}
                             {(() => {
@@ -575,7 +575,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                                     progress: 0
                                 };
                                 return (
-                                    <div className="grid grid-cols-2 gap-6 h-[calc(100%-3rem)]">
+                                    <div className="grid grid-cols-4 gap-6 h-[calc(100%-3rem)]">
                                         {/* Step List */}
                                         <div className="overflow-y-auto">
                                             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
@@ -627,6 +627,38 @@ const InteractiveWorkflowTest: React.FC = () => {
                                                     </div>
                                                 ))}
                                             </div>
+                                            {/* Add Step Button */}
+                                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                                <button
+                                                    className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors"
+                                                    onClick={() => {
+                                                        // Add a new step after the current one
+                                                        const newStep: WorkflowStep = {
+                                                            id: uuidv4(),
+                                                            name: 'New Step',
+                                                            description: 'Add a description for this step',
+                                                            status: 'pending',
+                                                            agentType: 'analysis'
+                                                        };
+                                                        setWorkflowSteps(prev => {
+                                                            const newSteps = [...prev];
+                                                            newSteps.splice(currentStepIndex + 1, 0, newStep);
+                                                            return newSteps;
+                                                        });
+                                                        setStepDetails(prev => ({
+                                                            ...prev,
+                                                            [newStep.id]: {
+                                                                inputs: {},
+                                                                outputs: {},
+                                                                status: 'pending',
+                                                                progress: 0
+                                                            }
+                                                        }));
+                                                    }}
+                                                >
+                                                    Add Step After This
+                                                </button>
+                                            </div>
                                         </div>
 
                                         {/* Step Details */}
@@ -636,26 +668,111 @@ const InteractiveWorkflowTest: React.FC = () => {
                                             </h3>
                                             {currentStep ? (
                                                 <div className="space-y-4">
-                                                    <div>
+                                                    <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                            Inputs
+                                                            Description
                                                         </h4>
-                                                        <pre className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg text-sm overflow-auto">
-                                                            {JSON.stringify(currentStepDetails.inputs, null, 2)}
-                                                        </pre>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {currentStep.description}
+                                                        </p>
                                                     </div>
-                                                    <div>
+                                                    <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                            Outputs
+                                                            Agent Type
                                                         </h4>
-                                                        <pre className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg text-sm overflow-auto">
-                                                            {JSON.stringify(currentStepDetails.outputs, null, 2)}
-                                                        </pre>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {currentStep.agentType}
+                                                        </p>
+                                                    </div>
+                                                    <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                            Status
+                                                        </h4>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${currentStep.status === 'completed'
+                                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                                : currentStep.status === 'running'
+                                                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                                                    : currentStep.status === 'failed'
+                                                                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                                                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                                                                }`}>
+                                                                {currentStep.status}
+                                                            </span>
+                                                            {currentStep.status === 'running' && (
+                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {currentStepDetails.progress}%
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <p className="text-gray-500 dark:text-gray-400">
                                                     Select a step to view details
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Information Palette (formerly Variables) */}
+                                        <div className="col-span-2 overflow-y-auto">
+                                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+                                                Information Palette
+                                            </h3>
+                                            {currentStep ? (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {Object.entries({
+                                                        ...currentStepDetails.inputs,
+                                                        ...currentStepDetails.outputs
+                                                    }).map(([key, value]) => (
+                                                        <div
+                                                            key={key}
+                                                            className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+                                                            draggable
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                {/* Icon based on value type */}
+                                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                                                    {Array.isArray(value) ? (
+                                                                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                                                        </svg>
+                                                                    ) : typeof value === 'object' ? (
+                                                                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                                                                        </svg>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                                            {key}
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                            {Array.isArray(value) ? `${value.length} items` :
+                                                                                typeof value === 'object' ? 'Object' :
+                                                                                    typeof value}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                                                        {Array.isArray(value) ?
+                                                                            `${value.length} items` :
+                                                                            typeof value === 'object' ?
+                                                                                Object.keys(value).length + ' properties' :
+                                                                                String(value)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-500 dark:text-gray-400">
+                                                    Select a step to view information
                                                 </p>
                                             )}
                                         </div>
