@@ -7,6 +7,7 @@ export type SetupSubPhase =
 
 export type SetupStage =
     | 'initial'                    // Initial welcome message
+    | 'question_received'          // User has submitted their question
     | 'clarification_requested'    // User's question submitted and bot asking for clarification
     | 'request_confirmation'       // User confirmed lyrics requirement
     | 'workflow_designing'         // Bot showing "Designing workflow steps..."
@@ -71,4 +72,12 @@ export type ToolTemplate = {
     description: string;
     category: 'search' | 'list' | 'analysis' | 'generation';
     icon: string;
-}; 
+};
+
+export interface Asset {
+    id: string;
+    title: string;
+    data: Record<string, any>;
+    icon: string;
+    type: string;
+} 

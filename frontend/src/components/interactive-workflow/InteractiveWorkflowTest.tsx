@@ -12,7 +12,8 @@ import {
     StepDetails,
     WorkflowState,
     SetupStage,
-    ExecutionStage
+    ExecutionStage,
+    WorkflowPhase
 } from './types';
 import {
     TOOL_TEMPLATES,
@@ -21,11 +22,12 @@ import {
     STAGE_MESSAGE_BLOCKS,
     SAMPLE_WORKFLOW_STEPS
 } from './workflow_data_sample';
-import { v4 as uuidv4 } from 'uuid';
+import WorkflowStatusSummary from './WorkflowStatusSummary';
 
 const InteractiveWorkflowTest: React.FC = () => {
     const [messages, setMessages] = useState<ChatMessage[]>(STAGE_MESSAGE_BLOCKS.initial);
     const [inputMessage, setInputMessage] = useState('');
+    const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
     const [workflowState, setWorkflowState] = useState<WorkflowState>({
         phase: 'setup',
         setupStage: 'initial',
@@ -46,74 +48,120 @@ const InteractiveWorkflowTest: React.FC = () => {
         setMessages(STAGE_MESSAGE_BLOCKS.initial);
     }, []);
 
+    // Helper functions for state transitions
+    const getStageSequence = (phase: WorkflowPhase) => {
+        return phase === 'setup'
+            ? ['initial', 'question_received', 'clarification_requested', 'request_confirmation', 'workflow_designing', 'workflow_explanation', 'workflow_ready'] as SetupStage[]
+            : ['workflow_started', 'compiling_songs', 'retrieving_lyrics', 'analyzing_lyrics', 'tabulating_results', 'workflow_complete'] as ExecutionStage[];
+    };
+
+    const updateMessagesForStage = (stages: (SetupStage | ExecutionStage)[], nextIndex: number, direction: 'forward' | 'backward') => {
+        if (direction === 'forward') {
+            const nextStage = stages[nextIndex];
+            setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS[nextStage as keyof typeof STAGE_MESSAGE_BLOCKS]]);
+        } else {
+            const previousMessages = stages
+                .slice(0, nextIndex + 1)
+                .flatMap(stage => STAGE_MESSAGE_BLOCKS[stage as keyof typeof STAGE_MESSAGE_BLOCKS]);
+            setMessages(previousMessages);
+        }
+    };
+
+    const getStepIndexForStage = (stage: ExecutionStage): number => {
+        switch (stage) {
+            case 'workflow_started': return 0;
+            case 'compiling_songs': return 0;
+            case 'retrieving_lyrics': return 1;
+            case 'analyzing_lyrics': return 2;
+            case 'tabulating_results': return 3;
+            case 'workflow_complete': return workflowSteps.length - 1;
+            default: return 0;
+        }
+    };
+
+    const updateStepStatuses = (executionStage: ExecutionStage) => {
+        const stageToStepIndex = {
+            'workflow_started': -1,
+            'compiling_songs': 0,
+            'retrieving_lyrics': 1,
+            'analyzing_lyrics': 2,
+            'tabulating_results': 3,
+            'workflow_complete': 4
+        };
+
+        const currentStageIndex = stageToStepIndex[executionStage];
+
+        setWorkflowSteps(prev => prev.map((step, index) => ({
+            ...step,
+            status: index < currentStageIndex ? 'completed'
+                : index === currentStageIndex ? 'running'
+                    : 'pending'
+        })));
+    };
+
     const handleStateTransition = async (direction: 'forward' | 'backward' = 'forward') => {
-        console.log('handleStateTransition', workflowState, direction);
         if (workflowState.isProcessing) return;
 
         setWorkflowState(prev => ({ ...prev, isProcessing: true }));
 
         try {
-            if (workflowState.phase === 'setup') {
-                const setupStages: SetupStage[] = ['initial', 'clarification_requested', 'request_confirmation', 'workflow_designing', 'workflow_explanation', 'workflow_ready'];
-                const currentIndex = setupStages.indexOf(workflowState.setupStage);
-                const nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
+            const currentPhase = workflowState.phase;
+            const stages = getStageSequence(currentPhase);
+            const currentStage = currentPhase === 'setup' ? workflowState.setupStage : workflowState.executionStage;
+            const currentIndex = stages.indexOf(currentStage as (typeof stages)[number]);
+            const nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
 
-                if (nextIndex >= 0 && nextIndex < setupStages.length) {
-                    const nextStage = setupStages[nextIndex];
+            // Check if transition is valid
+            if (nextIndex < 0 || nextIndex >= stages.length) return;
 
-                    // Add messages for the next stage
-                    if (direction === 'forward') {
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS[nextStage]]);
-                    } else {
-                        // For backward navigation, reset messages to the previous stage
-                        const previousMessages = [];
-                        for (let i = 0; i <= nextIndex; i++) {
-                            previousMessages.push(...STAGE_MESSAGE_BLOCKS[setupStages[i]]);
-                        }
-                        setMessages(previousMessages);
-                    }
+            const nextStage = stages[nextIndex];
 
-                    // Update workflow steps if needed
-                    if (nextStage === 'workflow_designing' || nextStage === 'workflow_explanation') {
-                        setWorkflowSteps(SAMPLE_WORKFLOW_STEPS);
-                    }
+            // Update messages for the new stage
+            updateMessagesForStage(stages, nextIndex, direction);
 
-                    // Handle transition to execution phase
-                    if (nextStage === 'workflow_ready' && direction === 'forward') {
-                        setWorkflowState(prev => ({
-                            ...prev,
-                            phase: 'execution',
-                            executionStage: 'workflow_started',
-                            setupStage: nextStage
-                        }));
-                    } else {
-                        setWorkflowState(prev => ({ ...prev, setupStage: nextStage }));
-                    }
+            // Handle special setup phase transitions
+            if (currentPhase === 'setup') {
+                // Initialize workflow steps when entering design or explanation stages
+                if (nextStage === 'workflow_designing' || nextStage === 'workflow_explanation') {
+                    setWorkflowSteps(SAMPLE_WORKFLOW_STEPS);
                 }
-            } else if (workflowState.phase === 'execution') {
-                const executionStages: ExecutionStage[] = ['workflow_started', 'compiling_songs', 'retrieving_lyrics', 'analyzing_lyrics', 'tabulating_results', 'workflow_complete'];
-                const currentIndex = executionStages.indexOf(workflowState.executionStage);
-                const nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
 
-                if (nextIndex >= 0 && nextIndex < executionStages.length) {
-                    const nextStage = executionStages[nextIndex];
-
-                    // Add messages for the next stage
-                    if (direction === 'forward') {
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS[nextStage]]);
-                    } else {
-                        // For backward navigation, reset messages to the previous stage
-                        const previousMessages = [];
-                        for (let i = 0; i <= nextIndex; i++) {
-                            previousMessages.push(...STAGE_MESSAGE_BLOCKS[executionStages[i]]);
-                        }
-                        setMessages(previousMessages);
-                    }
-
-                    setWorkflowState(prev => ({ ...prev, executionStage: nextStage }));
+                // Transition to execution phase if moving forward from workflow_ready
+                if (nextStage === 'workflow_ready' && direction === 'forward') {
+                    setWorkflowState(prev => ({
+                        ...prev,
+                        phase: 'execution',
+                        executionStage: 'workflow_started',
+                        setupStage: nextStage,
+                        currentStepIndex: 0,
+                        isProcessing: false
+                    }));
+                    return;
                 }
+
+                // Update setup stage
+                setWorkflowState(prev => ({
+                    ...prev,
+                    setupStage: nextStage as SetupStage,
+                    isProcessing: false
+                }));
+            } else {
+                // In execution phase, sync the step index with the stage
+                const newStepIndex = getStepIndexForStage(nextStage as ExecutionStage);
+
+                // Update step statuses based on the new stage
+                updateStepStatuses(nextStage as ExecutionStage);
+
+                // Update execution stage and step index
+                setWorkflowState(prev => ({
+                    ...prev,
+                    executionStage: nextStage as ExecutionStage,
+                    currentStepIndex: newStepIndex,
+                    isProcessing: false
+                }));
             }
-        } finally {
+        } catch (error) {
+            console.error('Error during state transition:', error);
             setWorkflowState(prev => ({ ...prev, isProcessing: false }));
         }
     };
@@ -315,27 +363,63 @@ const InteractiveWorkflowTest: React.FC = () => {
                         ) : workflowState.phase === 'execution' ? (
                             // Execution - Show three-panel layout
                             <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
-                                <div className="grid grid-cols-12 gap-6 h-full p-6">
-                                    {/* Step List Panel */}
-                                    <div className="col-span-3">
-                                        <StepList
-                                            steps={workflowSteps}
-                                            currentStepIndex={workflowState.currentStepIndex}
-                                            stepDetails={stepDetails}
-                                            onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
-                                        />
+                                <div className="grid grid-cols-12 gap-6 h-full">
+                                    {/* Left and Center Columns with Status Summary */}
+                                    <div className={`${isRightSidebarOpen ? 'col-span-9' : 'col-span-12'} flex flex-col`}>
+                                        {/* Status Summary */}
+                                        <div className="p-6 pb-0">
+                                            <WorkflowStatusSummary
+                                                steps={workflowSteps}
+                                                stepDetails={stepDetails}
+                                                currentStepIndex={workflowState.currentStepIndex}
+                                            />
+                                        </div>
+
+                                        {/* Steps and Work Area */}
+                                        <div className="flex-1 grid grid-cols-9 gap-6 p-6 pt-0">
+                                            {/* Step List Panel */}
+                                            <div className="col-span-3">
+                                                <StepList
+                                                    steps={workflowSteps}
+                                                    currentStepIndex={workflowState.currentStepIndex}
+                                                    stepDetails={stepDetails}
+                                                    onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
+                                                />
+                                            </div>
+
+                                            {/* Work Area Panel */}
+                                            <div className="col-span-6">
+                                                <WorkArea
+                                                    currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
+                                                    stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* Work Area Panel */}
-                                    <div className="col-span-6">
-                                        <WorkArea
-                                            currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
-                                            stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
-                                        />
-                                    </div>
+                                    {/* Toggle Button */}
+                                    <button
+                                        onClick={() => setIsRightSidebarOpen(prev => !prev)}
+                                        className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg z-10 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                        aria-label={isRightSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                                    >
+                                        <svg
+                                            className={`w-4 h-4 text-gray-600 dark:text-gray-300 transform transition-transform ${isRightSidebarOpen ? 'rotate-180' : ''}`}
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d={isRightSidebarOpen ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"}
+                                            />
+                                        </svg>
+                                    </button>
 
                                     {/* Right Sidebar */}
-                                    <div className="col-span-3 flex flex-col gap-6">
+                                    <div className={`${isRightSidebarOpen ? 'col-span-3' : 'hidden'} h-full flex flex-col gap-6 p-6 transition-all duration-300 ease-in-out`}>
                                         <div className="flex-1 overflow-hidden">
                                             <InformationPalette
                                                 messages={messages}

@@ -184,7 +184,7 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
             }
         }
     ],
-    clarification_requested: [
+    question_received: [
         {
             id: uuidv4(),
             role: 'user',
@@ -195,11 +195,13 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
                 subPhase: 'question_development',
                 type: 'question'
             }
-        },
+        }
+    ],
+    clarification_requested: [
         {
             id: uuidv4(),
             role: 'assistant',
-            content: 'Just to clarify - do you want to count songs where the word "love" appears in the lyrics, or just in the title?',
+            content: 'I will help develop a workflow to answer that question. But first let me clarify the question - do you want to count songs where the word "love" appears in the lyrics, or just in the title?',
             timestamp: new Date().toISOString(),
             metadata: {
                 phase: 'setup',
@@ -283,8 +285,19 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
     workflow_ready: [
         {
             id: uuidv4(),
+            role: 'user',
+            content: 'Great!',
+            timestamp: new Date().toISOString(),
+            metadata: {
+                phase: 'setup',
+                subPhase: 'question_development',
+                type: 'question'
+            }
+        },
+        {
+            id: uuidv4(),
             role: 'assistant',
-            content: 'The workflow is ready to begin. Click "Start Workflow" when you\'re ready to proceed.',
+            content: 'The workflow is underway. You can see the progress in the pane .',
             timestamp: new Date().toISOString(),
             metadata: {
                 phase: 'setup',
@@ -367,4 +380,93 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
             }
         }
     ]
+};
+
+// Add sample asset data
+export const SAMPLE_ASSET_DATA = {
+    question: {
+        question: "How many Beatles songs contain the word 'love'?",
+        clarification: "Looking for occurrences in lyrics, not just titles",
+        timestamp: new Date().toISOString()
+    },
+    songList: {
+        totalSongs: 213,
+        albums: [
+            {
+                name: "Please Please Me",
+                year: 1963,
+                songs: ["Love Me Do", "P.S. I Love You", "Do You Want to Know a Secret"]
+            },
+            {
+                name: "With the Beatles",
+                year: 1963,
+                songs: ["All My Loving", "Hold Me Tight", "You Really Got a Hold on Me"]
+            },
+            {
+                name: "A Hard Day's Night",
+                year: 1964,
+                songs: ["And I Love Her", "Can't Buy Me Love", "If I Fell"]
+            }
+        ],
+        status: "Sample of first 3 albums"
+    },
+    lyricsDatabase: {
+        sampleEntries: [
+            {
+                title: "Love Me Do",
+                album: "Please Please Me",
+                year: 1963,
+                lyrics: [
+                    "Love, love me do",
+                    "You know I love you",
+                    "I'll always be true",
+                    "So please, love me do",
+                    "Whoa, love me do"
+                ],
+                loveCount: 6
+            },
+            {
+                title: "All My Loving",
+                album: "With the Beatles",
+                year: 1963,
+                lyrics: [
+                    "Close your eyes and I'll kiss you",
+                    "Tomorrow I'll miss you",
+                    "Remember I'll always be true",
+                    "And then while I'm away",
+                    "I'll write home every day",
+                    "And I'll send all my loving to you"
+                ],
+                loveCount: 1
+            }
+        ],
+        totalProcessed: 52,
+        remainingToProcess: 161
+    },
+    analysis: {
+        totalSongs: 213,
+        songsWithLove: 98,
+        topSongs: [
+            { title: "All You Need Is Love", count: 12 },
+            { title: "Love Me Do", count: 6 },
+            { title: "She Loves You", count: 5 },
+            { title: "P.S. I Love You", count: 4 },
+            { title: "Can't Buy Me Love", count: 4 }
+        ],
+        byYear: [
+            { year: 1963, count: 14 },
+            { year: 1964, count: 21 },
+            { year: 1965, count: 18 },
+            { year: 1966, count: 15 },
+            { year: 1967, count: 12 },
+            { year: 1968, count: 8 },
+            { year: 1969, count: 6 },
+            { year: 1970, count: 4 }
+        ]
+    },
+    result: {
+        summary: "Found 98 Beatles songs containing the word 'love' in their lyrics",
+        details: "The word 'love' appears most frequently in their early work (1963-1965), with usage declining in later years. 'All You Need Is Love' contains the most occurrences.",
+        timestamp: new Date().toISOString()
+    }
 }; 
