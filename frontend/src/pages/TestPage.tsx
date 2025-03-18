@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
 import TestComponent from '../components/TestComponent';
 import AgentWorkflowOrchestratorTest from '../components/AgentWorkflowOrchestratorTest';
-import InteractiveWorkflowTest from '../components/InteractiveWorkflowTest';
 import { PageLayout } from '../components/layout/PageLayout';
 
 /**
  * Enum for the different test components
  */
 enum TestComponentType {
-    WORKFLOW_ENGINE = 'workflow_engine',
-    WORKFLOW_ORCHESTRATOR = 'workflow_orchestrator',
-    INTERACTIVE_WORKFLOW = 'interactive_workflow'
+    WORKFLOW_ENGINE = 'WORKFLOW_ENGINE',
+    WORKFLOW_ORCHESTRATOR = 'WORKFLOW_ORCHESTRATOR'
 }
 
 /**
@@ -18,21 +16,17 @@ enum TestComponentType {
  */
 const TestPage: React.FC = () => {
     // State for the selected test component
-    const [selectedComponent, setSelectedComponent] = useState<TestComponentType>(
-        TestComponentType.INTERACTIVE_WORKFLOW
-    );
+    const [selectedTest, setSelectedTest] = useState<TestComponentType>(TestComponentType.WORKFLOW_ENGINE);
 
     // Render the selected test component
-    const renderComponent = () => {
-        switch (selectedComponent) {
+    const renderTestComponent = () => {
+        switch (selectedTest) {
             case TestComponentType.WORKFLOW_ENGINE:
                 return <TestComponent />;
             case TestComponentType.WORKFLOW_ORCHESTRATOR:
                 return <AgentWorkflowOrchestratorTest />;
-            case TestComponentType.INTERACTIVE_WORKFLOW:
-                return <InteractiveWorkflowTest />;
             default:
-                return null;
+                return <div>Select a test component</div>;
         }
     };
 
@@ -44,8 +38,8 @@ const TestPage: React.FC = () => {
                 </h2>
                 <div className="flex flex-wrap gap-3 mb-6">
                     <button
-                        onClick={() => setSelectedComponent(TestComponentType.WORKFLOW_ENGINE)}
-                        className={`px-4 py-2 rounded-md font-medium transition-colors ${selectedComponent === TestComponentType.WORKFLOW_ENGINE
+                        onClick={() => setSelectedTest(TestComponentType.WORKFLOW_ENGINE)}
+                        className={`px-4 py-2 rounded-md font-medium transition-colors ${selectedTest === TestComponentType.WORKFLOW_ENGINE
                             ? 'bg-blue-500 text-white'
                             : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
                             }`}
@@ -53,26 +47,17 @@ const TestPage: React.FC = () => {
                         Workflow Engine Test
                     </button>
                     <button
-                        onClick={() => setSelectedComponent(TestComponentType.WORKFLOW_ORCHESTRATOR)}
-                        className={`px-4 py-2 rounded-md font-medium transition-colors ${selectedComponent === TestComponentType.WORKFLOW_ORCHESTRATOR
+                        onClick={() => setSelectedTest(TestComponentType.WORKFLOW_ORCHESTRATOR)}
+                        className={`px-4 py-2 rounded-md font-medium transition-colors ${selectedTest === TestComponentType.WORKFLOW_ORCHESTRATOR
                             ? 'bg-blue-500 text-white'
                             : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
                             }`}
                     >
                         Workflow Orchestrator Test
                     </button>
-                    <button
-                        onClick={() => setSelectedComponent(TestComponentType.INTERACTIVE_WORKFLOW)}
-                        className={`px-4 py-2 rounded-md font-medium transition-colors ${selectedComponent === TestComponentType.INTERACTIVE_WORKFLOW
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
-                            }`}
-                    >
-                        Interactive Workflow Test
-                    </button>
                 </div>
             </div>
-            {renderComponent()}
+            {renderTestComponent()}
         </PageLayout>
     );
 };
