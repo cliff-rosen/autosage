@@ -52,42 +52,37 @@ const InteractiveWorkflowTest: React.FC = () => {
             if (workflowState.phase === 'setup') {
                 switch (workflowState.setupStage) {
                     case 'initial':
+                        console.log('initial');
                         setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.clarification_requested]);
                         setWorkflowState(prev => ({ ...prev, setupStage: 'clarification_requested' }));
                         break;
 
                     case 'clarification_requested':
+                        console.log('clarification_requested');
                         setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_explanation]);
                         setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_explanation' }));
                         break;
 
                     case 'workflow_explanation':
                         console.log('workflow_explanation');
-
                         setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_designing]);
-
                         setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_designing' }));
-
                         break;
 
                     case 'workflow_designing':
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_desi]);
-
-                        // Set up timeout to transition to workflow_ready after 3 seconds
-                        setTimeout(() => {
-                            console.log('workflow_designing');
-                            setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_ready' }));
-                        }, 1000);
-
+                        console.log('workflow_designing');
+                        setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_ready' }));
                         break;
 
                     case 'workflow_ready':
+                        console.log('workflow_ready');
                         setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_started]);
                         setWorkflowState(prev => ({
                             ...prev,
                             phase: 'execution',
                             executionStage: 'workflow_started'
                         }));
+
                         break;
                 }
             } else if (workflowState.phase === 'execution') {
@@ -223,7 +218,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                             <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                                 <p>Please enter your question in the chat window on the left.</p>
                             </div>
-                        ) : workflowState.phase === 'execution' ? (
+                        ) : workflowState.phase === 'executionx' ? (
                             // Execution - Show three-panel layout
                             <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
                                 <div className="grid grid-cols-12 gap-6 h-full p-6">
