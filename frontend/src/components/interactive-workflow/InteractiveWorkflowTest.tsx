@@ -317,7 +317,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                                 <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
                                     <div className="grid grid-cols-12 gap-6 h-full p-6">
                                         {/* Step List Panel */}
-                                        <div className="col-span-3">
+                                        <div className="col-span-4">
                                             <StepList
                                                 steps={workflowSteps}
                                                 currentStepIndex={workflowState.currentStepIndex}
@@ -327,7 +327,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                                         </div>
 
                                         {/* Work Area Panel */}
-                                        <div className="col-span-6">
+                                        <div className="col-span-3">
                                             <WorkArea
                                                 currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
                                                 stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
@@ -335,7 +335,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                                         </div>
 
                                         {/* Right Sidebar */}
-                                        <div className="col-span-3 flex flex-col gap-6">
+                                        <div className="col-span-5 flex flex-col gap-6">
                                             <div className="flex-1 overflow-hidden">
                                                 <InformationPalette
                                                     messages={messages}
@@ -365,30 +365,31 @@ const InteractiveWorkflowTest: React.FC = () => {
                             <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
                                 <div className="grid grid-cols-12 gap-6 h-full">
                                     {/* Left and Center Columns with Status Summary */}
-                                    <div className={`${isRightSidebarOpen ? 'col-span-9' : 'col-span-12'} flex flex-col`}>
-                                        {/* Status Summary */}
-                                        <div className="p-6 pb-0">
-                                            <WorkflowStatusSummary
-                                                steps={workflowSteps}
-                                                stepDetails={stepDetails}
-                                                currentStepIndex={workflowState.currentStepIndex}
-                                            />
-                                        </div>
-
-                                        {/* Steps and Work Area */}
-                                        <div className="flex-1 grid grid-cols-9 gap-6 p-6 pt-0">
-                                            {/* Step List Panel */}
-                                            <div className="col-span-3">
-                                                <StepList
-                                                    steps={workflowSteps}
-                                                    currentStepIndex={workflowState.currentStepIndex}
-                                                    stepDetails={stepDetails}
-                                                    onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
-                                                />
+                                    <div className={`${isRightSidebarOpen ? 'col-span-7' : 'col-span-12'} flex flex-col`}>
+                                        <div className="grid grid-cols-7 gap-6 h-full">
+                                            {/* Left Column - Steps and Status */}
+                                            <div className="col-span-4 flex flex-col gap-6">
+                                                {/* Status Summary */}
+                                                <div className="flex-none">
+                                                    <WorkflowStatusSummary
+                                                        steps={workflowSteps}
+                                                        stepDetails={stepDetails}
+                                                        currentStepIndex={workflowState.currentStepIndex}
+                                                    />
+                                                </div>
+                                                {/* Step List */}
+                                                <div className="flex-1">
+                                                    <StepList
+                                                        steps={workflowSteps}
+                                                        currentStepIndex={workflowState.currentStepIndex}
+                                                        stepDetails={stepDetails}
+                                                        onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
+                                                    />
+                                                </div>
                                             </div>
 
-                                            {/* Work Area Panel */}
-                                            <div className="col-span-6">
+                                            {/* Work Area */}
+                                            <div className="col-span-3">
                                                 <WorkArea
                                                     currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
                                                     stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
@@ -397,29 +398,8 @@ const InteractiveWorkflowTest: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Toggle Button */}
-                                    <button
-                                        onClick={() => setIsRightSidebarOpen(prev => !prev)}
-                                        className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg z-10 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                                        aria-label={isRightSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-                                    >
-                                        <svg
-                                            className={`w-4 h-4 text-gray-600 dark:text-gray-300 transform transition-transform ${isRightSidebarOpen ? 'rotate-180' : ''}`}
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d={isRightSidebarOpen ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"}
-                                            />
-                                        </svg>
-                                    </button>
-
                                     {/* Right Sidebar */}
-                                    <div className={`${isRightSidebarOpen ? 'col-span-3' : 'hidden'} h-full flex flex-col gap-6 p-6 transition-all duration-300 ease-in-out`}>
+                                    <div className={`${isRightSidebarOpen ? 'col-span-5' : 'hidden'} h-full flex flex-col gap-6 p-6 transition-all duration-300 ease-in-out`}>
                                         <div className="flex-1 overflow-hidden">
                                             <InformationPalette
                                                 messages={messages}
