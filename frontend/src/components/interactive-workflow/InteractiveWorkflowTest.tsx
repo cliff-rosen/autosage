@@ -20,7 +20,8 @@ import {
     SAMPLE_STEP_DETAILS,
     SAMPLE_WORKFLOW_INPUTS,
     STAGE_MESSAGE_BLOCKS,
-    SAMPLE_WORKFLOW_STEPS
+    SAMPLE_WORKFLOW_STEPS,
+    SAMPLE_ASSET_DATA
 } from './workflow_data_sample';
 import WorkflowStatusSummary from './WorkflowStatusSummary';
 
@@ -233,44 +234,44 @@ const InteractiveWorkflowTest: React.FC = () => {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-hidden">
-                <div className="flex gap-6 h-full p-4">
-                    {/* Chat Panel */}
-                    <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                        {/* Bot Status Indicator */}
-                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                            <div className="relative">
-                                <div className={`w-3 h-3 rounded-full ${workflowState.isProcessing ? 'bg-green-500' : 'bg-gray-400'}`} />
-                                {workflowState.isProcessing && (
-                                    <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
-                                )}
+            <div className="flex-1 flex overflow-hidden">
+                {workflowState.phase === 'setup' ? (
+                    // Setup Phase Layout
+                    <div className="flex gap-6 h-full p-4">
+                        {/* Chat Panel */}
+                        <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                            {/* Bot Status Indicator */}
+                            <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                                <div className="relative">
+                                    <div className={`w-3 h-3 rounded-full ${workflowState.isProcessing ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                    {workflowState.isProcessing && (
+                                        <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
+                                    )}
+                                </div>
+                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                    {workflowState.isProcessing ? 'Bot is thinking...' : 'Bot is ready'}
+                                </span>
                             </div>
-                            <span className="text-sm text-gray-600 dark:text-gray-300">
-                                {workflowState.isProcessing ? 'Bot is thinking...' : 'Bot is ready'}
-                            </span>
+                            <ChatPanel
+                                messages={messages}
+                                inputMessage={inputMessage}
+                                isProcessing={workflowState.isProcessing}
+                                currentPhase={workflowState.phase}
+                                currentSubPhase={workflowState.setupStage === 'workflow_designing' ? 'workflow_designing' : workflowState.setupStage === 'workflow_ready' ? 'workflow_ready' : 'question_development'}
+                                currentStepIndex={workflowState.currentStepIndex}
+                                workflowSteps={workflowSteps}
+                                isQuestionComplete={workflowState.setupStage === 'workflow_ready'}
+                                isWorkflowAgreed={workflowState.setupStage === 'workflow_ready'}
+                                onSendMessage={() => handleStateTransition('forward')}
+                                onInputChange={setInputMessage}
+                                onCompleteWorkflow={handleCompleteWorkflow}
+                                onPhaseTransition={() => handleStateTransition('forward')}
+                            />
                         </div>
-                        <ChatPanel
-                            messages={messages}
-                            inputMessage={inputMessage}
-                            isProcessing={workflowState.isProcessing}
-                            currentPhase={workflowState.phase}
-                            currentSubPhase={workflowState.setupStage === 'workflow_designing' ? 'workflow_designing' : workflowState.setupStage === 'workflow_ready' ? 'workflow_ready' : 'question_development'}
-                            currentStepIndex={workflowState.currentStepIndex}
-                            workflowSteps={workflowSteps}
-                            isQuestionComplete={workflowState.setupStage === 'workflow_ready'}
-                            isWorkflowAgreed={workflowState.setupStage === 'workflow_ready'}
-                            onSendMessage={() => handleStateTransition('forward')}
-                            onInputChange={setInputMessage}
-                            onCompleteWorkflow={handleCompleteWorkflow}
-                            onPhaseTransition={() => handleStateTransition('forward')}
-                        />
-                    </div>
 
-                    {/* Main Content Panel */}
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                        {workflowState.phase === 'setup' ? (
-                            // Setup - Show chat or loading animation
-                            workflowState.setupStage === 'workflow_designing' ? (
+                        {/* Main Content Panel */}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                            {workflowState.setupStage === 'workflow_designing' ? (
                                 <div className="h-full flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow">
                                     <div className="text-center space-y-8">
                                         {/* Flowing Dots Animation */}
@@ -298,7 +299,6 @@ const InteractiveWorkflowTest: React.FC = () => {
                                     </div>
                                 </div>
                             ) : workflowState.setupStage === 'workflow_explanation' ? (
-                                // Simple workflow steps presentation
                                 <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow p-8">
                                     <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-6">
                                         Proposed Workflow Steps
@@ -324,125 +324,194 @@ const InteractiveWorkflowTest: React.FC = () => {
                                         ))}
                                     </div>
                                 </div>
-                            ) : workflowState.setupStage === 'workflow_ready' ? (
-                                // Show the workflow steps in a three-panel layout
-                                <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
-                                    <div className="grid grid-cols-12 gap-6 h-full p-6">
-                                        {/* Step List Panel */}
-                                        <div className="col-span-4">
-                                            <StepList
-                                                steps={workflowSteps}
-                                                currentStepIndex={workflowState.currentStepIndex}
-                                                stepDetails={stepDetails}
-                                                onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
-                                            />
-                                        </div>
-
-                                        {/* Work Area Panel */}
-                                        <div className="col-span-3">
-                                            <WorkArea
-                                                currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
-                                                stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
-                                            />
-                                        </div>
-
-                                        {/* Right Sidebar */}
-                                        <div className="col-span-5 flex flex-col gap-6">
-                                            <div className="flex-1 overflow-hidden">
-                                                <InformationPalette
-                                                    messages={messages}
-                                                    workflowInputs={workflowInputs}
-                                                    workflowSteps={workflowSteps}
-                                                    currentStepIndex={workflowState.currentStepIndex}
-                                                    stepDetails={stepDetails}
-                                                />
-                                            </div>
-                                            <div className="flex-1 overflow-hidden">
-                                                <ToolPalette
-                                                    tools={TOOL_TEMPLATES}
-                                                    currentStepIndex={workflowState.currentStepIndex}
-                                                    onAddStep={handleAddStep}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             ) : (
                                 <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                                     <p>Please use the navigation controls above to move through the workflow stages.</p>
                                 </div>
-                            )
-                        ) : workflowState.phase === 'execution' ? (
-                            // Execution - Show three-panel layout
-                            <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
-                                <div className="grid grid-cols-12 gap-6 h-full">
-                                    {/* Left and Center Columns with Status Summary */}
-                                    <div className={`${isRightSidebarOpen ? 'col-span-7' : 'col-span-12'} flex flex-col gap-6 p-6`}>
-                                        {/* Status Summary - Full Width */}
-                                        <div className="flex-none w-full">
-                                            <div className="relative">
-                                                {workflowState.isProcessing && workflowState.phase === 'execution' && (
-                                                    <div className="absolute inset-0 rounded-lg">
-                                                        <div className="absolute inset-0 rounded-lg border-2 border-blue-500 animate-pulse" />
-                                                        <div className="absolute bottom-0 left-0 h-1 w-full bg-blue-500/20">
-                                                            <div className="absolute h-full bg-blue-500 animate-pulse" style={{ width: '50%' }} />
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    // Execution Phase Layout - Three Panel Design
+                    <div className="flex h-full">
+                        {/* Chat Panel */}
+                        <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden m-4">
+                            {/* Bot Status Indicator */}
+                            <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                                <div className="relative">
+                                    <div className={`w-3 h-3 rounded-full ${workflowState.isProcessing ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                    {workflowState.isProcessing && (
+                                        <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
+                                    )}
+                                </div>
+                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                    {workflowState.isProcessing ? 'Bot is thinking...' : 'Bot is ready'}
+                                </span>
+                            </div>
+                            <ChatPanel
+                                messages={messages}
+                                inputMessage={inputMessage}
+                                isProcessing={workflowState.isProcessing}
+                                currentPhase={workflowState.phase}
+                                currentSubPhase={workflowState.setupStage === 'workflow_designing' ? 'workflow_designing' : workflowState.setupStage === 'workflow_ready' ? 'workflow_ready' : 'question_development'}
+                                currentStepIndex={workflowState.currentStepIndex}
+                                workflowSteps={workflowSteps}
+                                isQuestionComplete={workflowState.setupStage === 'workflow_ready'}
+                                isWorkflowAgreed={workflowState.setupStage === 'workflow_ready'}
+                                onSendMessage={() => handleStateTransition('forward')}
+                                onInputChange={setInputMessage}
+                                onCompleteWorkflow={handleCompleteWorkflow}
+                                onPhaseTransition={() => handleStateTransition('forward')}
+                            />
+                        </div>
+
+                        {/* Main Content Area */}
+                        <div className="flex-1 flex">
+                            {/* Workflow Steps List */}
+                            <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow m-4 mr-0 p-4 overflow-y-auto">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Workflow Steps</h3>
+                                <div className="space-y-2 pr-4">
+                                    {workflowSteps.map((step, index) => (
+                                        <div
+                                            key={step.id}
+                                            className={`flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 ${index === workflowState.currentStepIndex
+                                                ? 'bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-500 mr-[-2rem] pr-8 rounded-r-none'
+                                                : step.status === 'completed'
+                                                    ? 'bg-green-50 dark:bg-green-900/30'
+                                                    : 'bg-gray-50 dark:bg-gray-700/50'
+                                                }`}
+                                            onClick={() => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
+                                        >
+                                            <div className="flex items-center space-x-2 flex-1">
+                                                <div className={`w-2 h-2 rounded-full ${step.status === 'running' ? 'bg-blue-500 animate-pulse' :
+                                                    step.status === 'completed' ? 'bg-green-500' :
+                                                        step.status === 'failed' ? 'bg-red-500' :
+                                                            'bg-gray-500'
+                                                    }`} />
+                                                <span className="text-sm text-gray-700 dark:text-gray-300">{step.name}</span>
+                                            </div>
+                                            {index === workflowState.currentStepIndex && (
+                                                <div className="ml-2">
+                                                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Current Step Details */}
+                            <div className="w-[600px] bg-white dark:bg-gray-800 rounded-lg shadow m-4 ml-0 p-4 overflow-y-auto">
+                                <div className={`h-full ${workflowState.currentStepIndex >= 0 && workflowSteps.length > 0
+                                    ? 'border-l-2 border-blue-500 pl-4 -ml-4'
+                                    : ''
+                                    }`}>
+                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Step Details</h3>
+                                    {workflowState.currentStepIndex >= 0 && workflowSteps.length > 0 && workflowSteps[workflowState.currentStepIndex] && (
+                                        <div className="space-y-4">
+                                            {/* Step Description with Status */}
+                                            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                                                        {workflowSteps[workflowState.currentStepIndex].name}
+                                                    </h4>
+                                                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-600">
+                                                        <div className={`w-2 h-2 rounded-full ${workflowSteps[workflowState.currentStepIndex].status === 'running' ? 'bg-blue-500 animate-pulse' :
+                                                            workflowSteps[workflowState.currentStepIndex].status === 'completed' ? 'bg-green-500' :
+                                                                workflowSteps[workflowState.currentStepIndex].status === 'failed' ? 'bg-red-500' :
+                                                                    'bg-gray-500'
+                                                            }`} />
+                                                        <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                                                            {workflowSteps[workflowState.currentStepIndex].status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                    {workflowSteps[workflowState.currentStepIndex].description}
+                                                </p>
+                                            </div>
+
+                                            {/* Asset Visualization */}
+                                            {workflowState.executionStage === 'compiling_songs' && (
+                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
+                                                    <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                                    </svg>
+                                                    <div className="text-center">
+                                                        <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Song List</div>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {SAMPLE_ASSET_DATA.songList.totalSongs} songs across {SAMPLE_ASSET_DATA.songList.albums.length} albums
                                                         </div>
                                                     </div>
-                                                )}
-                                                <WorkflowStatusSummary
-                                                    steps={workflowSteps}
-                                                    stepDetails={stepDetails}
-                                                    currentStepIndex={workflowState.currentStepIndex}
-                                                />
-                                            </div>
+                                                </div>
+                                            )}
+
+                                            {workflowState.executionStage === 'retrieving_lyrics' && (
+                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
+                                                    <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    <div className="text-center">
+                                                        <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Lyrics Database</div>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            Processing lyrics: {SAMPLE_ASSET_DATA.lyricsDatabase.totalProcessed} of {SAMPLE_ASSET_DATA.lyricsDatabase.totalProcessed + SAMPLE_ASSET_DATA.lyricsDatabase.remainingToProcess}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {workflowState.executionStage === 'analyzing_lyrics' && (
+                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
+                                                    <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
+                                                    <div className="text-center">
+                                                        <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Analysis Results</div>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            Found "love" in {SAMPLE_ASSET_DATA.analysis.songsWithLove} of {SAMPLE_ASSET_DATA.analysis.totalSongs} songs
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {workflowState.executionStage === 'workflow_complete' && (
+                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
+                                                    <svg className="w-16 h-16 text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <div className="text-center">
+                                                        <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Final Results</div>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {SAMPLE_ASSET_DATA.result.summary}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
+                                    )}
+                                </div>
+                            </div>
 
-                                        {/* Steps and Work Area Grid */}
-                                        <div className="flex-1 grid grid-cols-7 gap-6 min-h-0">
-                                            {/* Step List */}
-                                            <div className="col-span-4 overflow-auto">
-                                                <StepList
-                                                    steps={workflowSteps}
-                                                    currentStepIndex={workflowState.currentStepIndex}
-                                                    stepDetails={stepDetails}
-                                                    onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
-                                                />
-                                            </div>
-
-                                            {/* Work Area */}
-                                            <div className="col-span-3 overflow-auto">
-                                                <WorkArea
-                                                    currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
-                                                    stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
-                                                />
-                                            </div>
+                            {/* Side Panel with Palettes */}
+                            <div className={`fixed right-0 top-0 h-full w-[400px] bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 transform ${isRightSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                                <div className="h-full flex flex-col">
+                                    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Palettes</h3>
+                                            <button
+                                                onClick={() => setIsRightSidebarOpen(false)}
+                                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
                                         </div>
                                     </div>
-
-                                    {/* Right Sidebar Toggle */}
-                                    <button
-                                        onClick={() => setIsRightSidebarOpen(prev => !prev)}
-                                        className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg z-10 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                                        aria-label={isRightSidebarOpen ? "Close palette" : "Open palette"}
-                                    >
-                                        <svg
-                                            className={`w-4 h-4 text-gray-600 dark:text-gray-300 transform transition-transform ${isRightSidebarOpen ? 'rotate-180' : ''}`}
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d={isRightSidebarOpen ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"}
-                                            />
-                                        </svg>
-                                    </button>
-
-                                    {/* Right Sidebar */}
-                                    <div className={`${isRightSidebarOpen ? 'col-span-5' : 'hidden'} h-full flex flex-col gap-6 p-6 transition-all duration-300 ease-in-out border-l border-gray-200 dark:border-gray-700`}>
-                                        <div className="flex-1 overflow-hidden">
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                        <div className="h-[70%]">
                                             <InformationPalette
                                                 messages={messages}
                                                 workflowInputs={workflowInputs}
@@ -451,7 +520,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                                                 stepDetails={stepDetails}
                                             />
                                         </div>
-                                        <div className="flex-1 overflow-hidden">
+                                        <div className="h-[30%]">
                                             <ToolPalette
                                                 tools={TOOL_TEMPLATES}
                                                 currentStepIndex={workflowState.currentStepIndex}
@@ -461,16 +530,19 @@ const InteractiveWorkflowTest: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            // Setup - Show workflow steps
-                            <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
-                                    Hmm, something went wrong.
-                                </h3>
-                            </div>
-                        )}
+
+                            {/* Toggle Button for Side Panel */}
+                            <button
+                                onClick={() => setIsRightSidebarOpen(true)}
+                                className={`fixed right-4 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 rounded-l-lg shadow-lg p-2 transition-all duration-300 z-50 ${isRightSidebarOpen ? 'translate-x-[400px]' : 'translate-x-0'}`}
+                            >
+                                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );
