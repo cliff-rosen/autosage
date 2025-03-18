@@ -236,22 +236,9 @@ const InteractiveWorkflowTest: React.FC = () => {
             {/* Main Content Area */}
             <div className="flex-1 flex overflow-hidden">
                 {workflowState.phase === 'setup' ? (
-                    // Setup Phase Layout
-                    <div className="flex gap-6 h-full p-4">
+                    <>
                         {/* Chat Panel */}
-                        <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                            {/* Bot Status Indicator */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                                <div className="relative">
-                                    <div className={`w-3 h-3 rounded-full ${workflowState.isProcessing ? 'bg-green-500' : 'bg-gray-400'}`} />
-                                    {workflowState.isProcessing && (
-                                        <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
-                                    )}
-                                </div>
-                                <span className="text-sm text-gray-600 dark:text-gray-300">
-                                    {workflowState.isProcessing ? 'Bot is thinking...' : 'Bot is ready'}
-                                </span>
-                            </div>
+                        <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden m-4">
                             <ChatPanel
                                 messages={messages}
                                 inputMessage={inputMessage}
@@ -270,9 +257,9 @@ const InteractiveWorkflowTest: React.FC = () => {
                         </div>
 
                         {/* Main Content Panel */}
-                        <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow m-4">
                             {workflowState.setupStage === 'workflow_designing' ? (
-                                <div className="h-full flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow">
+                                <div className="h-full w-full flex flex-col items-center justify-center">
                                     <div className="text-center space-y-8">
                                         {/* Flowing Dots Animation */}
                                         <div className="relative px-8">
@@ -330,7 +317,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </>
                 ) : (
                     // Execution Phase Layout - Three Panel Design
                     <div className="flex h-full">

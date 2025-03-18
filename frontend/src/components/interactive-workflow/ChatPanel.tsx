@@ -85,13 +85,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div className="h-full flex flex-col">
             {/* Chat Header */}
             <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                    {currentPhase === 'execution' && currentStepIndex >= 0
-                        ? `Step ${currentStepIndex + 1}: ${workflowSteps[currentStepIndex]?.name}`
-                        : currentPhase === 'setup'
-                            ? 'AutoSage'
-                            : 'Execution'}
-                </h3>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        {currentPhase === 'execution' && currentStepIndex >= 0
+                            ? `Step ${currentStepIndex + 1}: ${workflowSteps[currentStepIndex]?.name}`
+                            : currentPhase === 'setup'
+                                ? 'AutoSage'
+                                : 'Execution'}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
+                        </div>
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Autosave enabled</span>
+                    </div>
+                </div>
             </div>
 
             {/* Chat Messages */}
