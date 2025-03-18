@@ -188,7 +188,7 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
         {
             id: uuidv4(),
             role: 'user',
-            content: 'How many Beatles songs contain the word "love" in their lyrics?',
+            content: 'How many Beatles songs contain the word "love"?',
             timestamp: new Date().toISOString(),
             metadata: {
                 phase: 'setup',
@@ -223,7 +223,7 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
         {
             id: uuidv4(),
             role: 'assistant',
-            content: 'I understand you want to count songs where "love" appears in the lyrics. I\'ll create a custom workflow to analyze this.',
+            content: 'I understand you want to count all Beatles songs where "love" appears in the lyrics regardless of whether it\'s in the title or not. I\'ll create a custom workflow to analyze this.',
             timestamp: new Date().toISOString(),
             metadata: {
                 phase: 'setup',

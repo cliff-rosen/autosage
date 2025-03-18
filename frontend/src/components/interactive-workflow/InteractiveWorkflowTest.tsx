@@ -5,11 +5,14 @@ import { StepList } from './StepList';
 import { WorkArea } from './WorkArea';
 import { InformationPalette } from './InformationPalette';
 import { ToolPalette } from './ToolPalette';
+import WorkflowNavigation from './WorkflowNavigation';
 import {
     WorkflowStep,
     ChatMessage,
     StepDetails,
-    WorkflowState
+    WorkflowState,
+    SetupStage,
+    ExecutionStage
 } from './types';
 import {
     TOOL_TEMPLATES,
@@ -43,83 +46,71 @@ const InteractiveWorkflowTest: React.FC = () => {
         setMessages(STAGE_MESSAGE_BLOCKS.initial);
     }, []);
 
-    const handleStateTransition = async () => {
-
+    const handleStateTransition = async (direction: 'forward' | 'backward' = 'forward') => {
+        console.log('handleStateTransition', workflowState, direction);
         if (workflowState.isProcessing) return;
 
         setWorkflowState(prev => ({ ...prev, isProcessing: true }));
 
         try {
             if (workflowState.phase === 'setup') {
-                switch (workflowState.setupStage) {
-                    case 'initial':
-                        console.log('initial');
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.clarification_requested]);
-                        setWorkflowState(prev => ({ ...prev, setupStage: 'clarification_requested' }));
-                        break;
+                const setupStages: SetupStage[] = ['initial', 'clarification_requested', 'request_confirmation', 'workflow_designing', 'workflow_explanation', 'workflow_ready'];
+                const currentIndex = setupStages.indexOf(workflowState.setupStage);
+                const nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
 
-                    case 'clarification_requested':
-                        console.log('clarification_requested');
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.request_confirmation]);
-                        setWorkflowState(prev => ({ ...prev, setupStage: 'request_confirmation' }));
-                        break;
+                if (nextIndex >= 0 && nextIndex < setupStages.length) {
+                    const nextStage = setupStages[nextIndex];
 
-                    case 'request_confirmation':
-                        console.log('request_confirmation');
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_designing]);
+                    // Add messages for the next stage
+                    if (direction === 'forward') {
+                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS[nextStage]]);
+                    } else {
+                        // For backward navigation, reset messages to the previous stage
+                        const previousMessages = [];
+                        for (let i = 0; i <= nextIndex; i++) {
+                            previousMessages.push(...STAGE_MESSAGE_BLOCKS[setupStages[i]]);
+                        }
+                        setMessages(previousMessages);
+                    }
+
+                    // Update workflow steps if needed
+                    if (nextStage === 'workflow_designing' || nextStage === 'workflow_explanation') {
                         setWorkflowSteps(SAMPLE_WORKFLOW_STEPS);
-                        setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_designing' }));
-                        break;
+                    }
 
-                    case 'workflow_designing':
-                        console.log('workflow_designing');
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_explanation]);
-                        setWorkflowSteps(SAMPLE_WORKFLOW_STEPS);
-                        setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_explanation' }));
-                        break;
-
-                    case 'workflow_explanation':
-                        console.log('workflow_explanation');
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_ready]);
-                        setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_ready' }));
-                        break;
-
-                    case 'workflow_ready':
-                        console.log('workflow_ready');
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_started]);
+                    // Handle transition to execution phase
+                    if (nextStage === 'workflow_ready' && direction === 'forward') {
                         setWorkflowState(prev => ({
                             ...prev,
                             phase: 'execution',
-                            executionStage: 'workflow_started'
+                            executionStage: 'workflow_started',
+                            setupStage: nextStage
                         }));
-                        break;
+                    } else {
+                        setWorkflowState(prev => ({ ...prev, setupStage: nextStage }));
+                    }
                 }
             } else if (workflowState.phase === 'execution') {
-                switch (workflowState.executionStage) {
-                    case 'workflow_started':
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.compiling_songs]);
-                        setWorkflowState(prev => ({ ...prev, executionStage: 'compiling_songs' }));
-                        break;
+                const executionStages: ExecutionStage[] = ['workflow_started', 'compiling_songs', 'retrieving_lyrics', 'analyzing_lyrics', 'tabulating_results', 'workflow_complete'];
+                const currentIndex = executionStages.indexOf(workflowState.executionStage);
+                const nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
 
-                    case 'compiling_songs':
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.retrieving_lyrics]);
-                        setWorkflowState(prev => ({ ...prev, executionStage: 'retrieving_lyrics' }));
-                        break;
+                if (nextIndex >= 0 && nextIndex < executionStages.length) {
+                    const nextStage = executionStages[nextIndex];
 
-                    case 'retrieving_lyrics':
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.analyzing_lyrics]);
-                        setWorkflowState(prev => ({ ...prev, executionStage: 'analyzing_lyrics' }));
-                        break;
+                    // Add messages for the next stage
+                    if (direction === 'forward') {
+                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS[nextStage]]);
+                    } else {
+                        // For backward navigation, reset messages to the previous stage
+                        const previousMessages = [];
+                        for (let i = 0; i <= nextIndex; i++) {
+                            previousMessages.push(...STAGE_MESSAGE_BLOCKS[executionStages[i]]);
+                        }
+                        setMessages(previousMessages);
+                    }
 
-                    case 'analyzing_lyrics':
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.tabulating_results]);
-                        setWorkflowState(prev => ({ ...prev, executionStage: 'tabulating_results' }));
-                        break;
-
-                    case 'tabulating_results':
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_complete]);
-                        setWorkflowState(prev => ({ ...prev, executionStage: 'workflow_complete' }));
-                        break;
+                    setWorkflowState(prev => ({ ...prev, executionStage: nextStage }));
                 }
             }
         } finally {
@@ -176,27 +167,22 @@ const InteractiveWorkflowTest: React.FC = () => {
     return (
         <div className="flex flex-col h-screen">
             {/* Header */}
-            <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                     Interactive Workflow Test
                 </h2>
-                <button
-                    onClick={handleRestart}
-                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors duration-200"
-                >
-                    Restart Workflow
-                </button>
             </div>
 
-            {/* Phase Indicator */}
-            <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
-                <PhaseIndicator
-                    currentPhase={workflowState.phase}
-                    currentSubPhase={workflowState.setupStage === 'workflow_designing' ? 'workflow_designing' : workflowState.setupStage === 'workflow_ready' ? 'workflow_ready' : 'question_development'}
-                    isQuestionComplete={workflowState.setupStage === 'workflow_ready'}
-                    isWorkflowAgreed={workflowState.setupStage === 'workflow_ready'}
-                />
-            </div>
+            {/* Navigation */}
+            <WorkflowNavigation
+                phase={workflowState.phase}
+                setupStage={workflowState.setupStage}
+                executionStage={workflowState.executionStage}
+                isProcessing={workflowState.isProcessing}
+                onNext={() => handleStateTransition('forward')}
+                onBack={() => handleStateTransition('backward')}
+                onRestart={handleRestart}
+            />
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-hidden">
@@ -213,10 +199,10 @@ const InteractiveWorkflowTest: React.FC = () => {
                             workflowSteps={workflowSteps}
                             isQuestionComplete={workflowState.setupStage === 'workflow_ready'}
                             isWorkflowAgreed={workflowState.setupStage === 'workflow_ready'}
-                            onSendMessage={handleStateTransition}
+                            onSendMessage={() => handleStateTransition('forward')}
                             onInputChange={setInputMessage}
                             onCompleteWorkflow={handleCompleteWorkflow}
-                            onPhaseTransition={handleStateTransition}
+                            onPhaseTransition={() => handleStateTransition('forward')}
                         />
                     </div>
 
@@ -323,7 +309,7 @@ const InteractiveWorkflowTest: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                                    <p>Please enter your question in the chat window on the left.</p>
+                                    <p>Please use the navigation controls above to move through the workflow stages.</p>
                                 </div>
                             )
                         ) : workflowState.phase === 'execution' ? (
