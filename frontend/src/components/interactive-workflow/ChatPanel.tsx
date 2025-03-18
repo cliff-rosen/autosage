@@ -99,7 +99,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 {messages.map((message) => (
                     <div
                         key={message.id}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
                     >
                         <div
                             className={`max-w-[80%] rounded-lg p-3 ${message.role === 'user'
@@ -114,6 +114,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         </div>
                     </div>
                 ))}
+                {isProcessing && (
+                    <div className="flex justify-start">
+                        <div className="max-w-[80%] rounded-lg p-3 bg-gray-100 dark:bg-gray-700">
+                            <div className="flex space-x-2">
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '400ms' }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div ref={messagesEndRef} />
             </div>
 

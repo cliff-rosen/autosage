@@ -50,14 +50,14 @@ const WorkflowStatusSummary: React.FC<WorkflowStatusSummaryProps> = ({
                         <div
                             key={step.id}
                             className={`flex-1 h-2 rounded-full transition-all duration-200 ${isActive
-                                    ? 'bg-blue-500 dark:bg-blue-400'
-                                    : isPending
-                                        ? 'bg-gray-200 dark:bg-gray-700'
-                                        : isRunning
-                                            ? 'bg-yellow-400 dark:bg-yellow-500'
-                                            : isCompleted
-                                                ? 'bg-green-500 dark:bg-green-400'
-                                                : 'bg-red-500 dark:bg-red-400'
+                                ? 'bg-blue-500 dark:bg-blue-400 animate-pulse'
+                                : isPending
+                                    ? 'bg-gray-200 dark:bg-gray-700'
+                                    : isRunning
+                                        ? 'bg-yellow-400 dark:bg-yellow-500 animate-pulse'
+                                        : isCompleted
+                                            ? 'bg-green-500 dark:bg-green-400'
+                                            : 'bg-red-500 dark:bg-red-400'
                                 }`}
                         />
                     );
@@ -75,9 +75,12 @@ const WorkflowStatusSummary: React.FC<WorkflowStatusSummaryProps> = ({
                     </p>
                     {stepDetails[steps[currentStepIndex].id]?.progress > 0 && (
                         <div className="mt-2">
-                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5 overflow-hidden">
                                 <div
-                                    className="bg-blue-500 dark:bg-blue-400 h-1.5 rounded-full transition-all duration-300"
+                                    className={`bg-blue-500 dark:bg-blue-400 h-1.5 rounded-full transition-all duration-300 ${steps[currentStepIndex].status === 'running'
+                                        ? 'animate-workflow-progress'
+                                        : 'animate-pulse'
+                                        }`}
                                     style={{ width: `${stepDetails[steps[currentStepIndex].id].progress}%` }}
                                 />
                             </div>

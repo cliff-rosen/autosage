@@ -237,6 +237,18 @@ const InteractiveWorkflowTest: React.FC = () => {
                 <div className="flex gap-6 h-full p-4">
                     {/* Chat Panel */}
                     <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                        {/* Bot Status Indicator */}
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                            <div className="relative">
+                                <div className={`w-3 h-3 rounded-full ${workflowState.isProcessing ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                {workflowState.isProcessing && (
+                                    <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
+                                )}
+                            </div>
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                                {workflowState.isProcessing ? 'Bot is thinking...' : 'Bot is ready'}
+                            </span>
+                        </div>
                         <ChatPanel
                             messages={messages}
                             inputMessage={inputMessage}
@@ -365,31 +377,40 @@ const InteractiveWorkflowTest: React.FC = () => {
                             <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
                                 <div className="grid grid-cols-12 gap-6 h-full">
                                     {/* Left and Center Columns with Status Summary */}
-                                    <div className={`${isRightSidebarOpen ? 'col-span-7' : 'col-span-12'} flex flex-col`}>
-                                        <div className="grid grid-cols-7 gap-6 h-full">
-                                            {/* Left Column - Steps and Status */}
-                                            <div className="col-span-4 flex flex-col gap-6">
-                                                {/* Status Summary */}
-                                                <div className="flex-none">
-                                                    <WorkflowStatusSummary
-                                                        steps={workflowSteps}
-                                                        stepDetails={stepDetails}
-                                                        currentStepIndex={workflowState.currentStepIndex}
-                                                    />
-                                                </div>
-                                                {/* Step List */}
-                                                <div className="flex-1">
-                                                    <StepList
-                                                        steps={workflowSteps}
-                                                        currentStepIndex={workflowState.currentStepIndex}
-                                                        stepDetails={stepDetails}
-                                                        onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
-                                                    />
-                                                </div>
+                                    <div className={`${isRightSidebarOpen ? 'col-span-7' : 'col-span-12'} flex flex-col gap-6 p-6`}>
+                                        {/* Status Summary - Full Width */}
+                                        <div className="flex-none w-full">
+                                            <div className="relative">
+                                                {workflowState.isProcessing && workflowState.phase === 'execution' && (
+                                                    <div className="absolute inset-0 rounded-lg">
+                                                        <div className="absolute inset-0 rounded-lg border-2 border-blue-500 animate-pulse" />
+                                                        <div className="absolute bottom-0 left-0 h-1 w-full bg-blue-500/20">
+                                                            <div className="absolute h-full bg-blue-500 animate-pulse" style={{ width: '50%' }} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <WorkflowStatusSummary
+                                                    steps={workflowSteps}
+                                                    stepDetails={stepDetails}
+                                                    currentStepIndex={workflowState.currentStepIndex}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Steps and Work Area Grid */}
+                                        <div className="flex-1 grid grid-cols-7 gap-6 min-h-0">
+                                            {/* Step List */}
+                                            <div className="col-span-4 overflow-auto">
+                                                <StepList
+                                                    steps={workflowSteps}
+                                                    currentStepIndex={workflowState.currentStepIndex}
+                                                    stepDetails={stepDetails}
+                                                    onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
+                                                />
                                             </div>
 
                                             {/* Work Area */}
-                                            <div className="col-span-3">
+                                            <div className="col-span-3 overflow-auto">
                                                 <WorkArea
                                                     currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
                                                     stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
@@ -398,8 +419,29 @@ const InteractiveWorkflowTest: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {/* Right Sidebar Toggle */}
+                                    <button
+                                        onClick={() => setIsRightSidebarOpen(prev => !prev)}
+                                        className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg z-10 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                        aria-label={isRightSidebarOpen ? "Close palette" : "Open palette"}
+                                    >
+                                        <svg
+                                            className={`w-4 h-4 text-gray-600 dark:text-gray-300 transform transition-transform ${isRightSidebarOpen ? 'rotate-180' : ''}`}
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d={isRightSidebarOpen ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"}
+                                            />
+                                        </svg>
+                                    </button>
+
                                     {/* Right Sidebar */}
-                                    <div className={`${isRightSidebarOpen ? 'col-span-5' : 'hidden'} h-full flex flex-col gap-6 p-6 transition-all duration-300 ease-in-out`}>
+                                    <div className={`${isRightSidebarOpen ? 'col-span-5' : 'hidden'} h-full flex flex-col gap-6 p-6 transition-all duration-300 ease-in-out border-l border-gray-200 dark:border-gray-700`}>
                                         <div className="flex-1 overflow-hidden">
                                             <InformationPalette
                                                 messages={messages}
