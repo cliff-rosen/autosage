@@ -323,18 +323,6 @@ const InteractiveWorkflowTest: React.FC = () => {
                     <div className="flex h-full">
                         {/* Chat Panel */}
                         <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden m-4">
-                            {/* Bot Status Indicator */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                                <div className="relative">
-                                    <div className={`w-3 h-3 rounded-full ${workflowState.isProcessing ? 'bg-green-500' : 'bg-gray-400'}`} />
-                                    {workflowState.isProcessing && (
-                                        <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
-                                    )}
-                                </div>
-                                <span className="text-sm text-gray-600 dark:text-gray-300">
-                                    {workflowState.isProcessing ? 'Bot is thinking...' : 'Bot is ready'}
-                                </span>
-                            </div>
                             <ChatPanel
                                 messages={messages}
                                 inputMessage={inputMessage}
