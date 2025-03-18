@@ -378,7 +378,18 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
                 phase: 'execution',
                 type: 'result'
             }
+        },
+        {
+            id: uuidv4(),
+            role: 'assistant',
+            content: 'Found 98 Beatles songs containing the word "love" in their lyrics',
+            timestamp: new Date().toISOString(),
+            metadata: {
+                phase: 'execution',
+                type: 'result'
+            }
         }
+
     ]
 };
 
