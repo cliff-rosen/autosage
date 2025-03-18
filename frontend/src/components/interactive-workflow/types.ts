@@ -8,10 +8,10 @@ export type SetupSubPhase =
 export type SetupStage =
     | 'initial'                    // Initial welcome message
     | 'clarification_requested'    // User's question submitted and bot asking for clarification
-    | 'clarification_provided'     // User confirmed lyrics requirement
-    | 'workflow_explanation'       // Bot explaining it will create a workflow
+    | 'request_confirmation'       // User confirmed lyrics requirement
     | 'workflow_designing'         // Bot showing "Designing workflow steps..."
-    | 'workflow_ready';            // Workflow is ready to be shown
+    | 'workflow_explanation'       // Bot explaining the workflow that has been created
+    | 'workflow_ready';           // Workflow is ready to start
 
 export type ExecutionStage =
     | 'workflow_started'          // Workflow execution has begun

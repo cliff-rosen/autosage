@@ -208,7 +208,7 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
             }
         }
     ],
-    workflow_explanation: [
+    request_confirmation: [
         {
             id: uuidv4(),
             role: 'user',
@@ -219,8 +219,7 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
                 subPhase: 'question_development',
                 type: 'question'
             }
-        }
-        ,
+        },
         {
             id: uuidv4(),
             role: 'assistant',
@@ -246,7 +245,54 @@ export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessa
             }
         }
     ],
-    workflow_ready: [], // No new messages, just shows the workflow
+    workflow_explanation: [
+        {
+            id: uuidv4(),
+            role: 'assistant',
+            content: 'I\'ve designed a workflow to analyze the Beatles songs for the word "love" in their lyrics. Here\'s what the workflow will do:',
+            timestamp: new Date().toISOString(),
+            metadata: {
+                phase: 'setup',
+                subPhase: 'workflow_development',
+                type: 'workflow'
+            }
+        },
+        {
+            id: uuidv4(),
+            role: 'assistant',
+            content: '1. First, we\'ll compile a comprehensive list of all Beatles songs from their official discography.\n2. Then, we\'ll retrieve the lyrics for each song from a reliable source.\n3. Next, we\'ll analyze the lyrics to count occurrences of the word "love".\n4. Finally, we\'ll create a summary table of the results.',
+            timestamp: new Date().toISOString(),
+            metadata: {
+                phase: 'setup',
+                subPhase: 'workflow_development',
+                type: 'workflow'
+            }
+        },
+        {
+            id: uuidv4(),
+            role: 'assistant',
+            content: 'Would you like to proceed with this workflow?',
+            timestamp: new Date().toISOString(),
+            metadata: {
+                phase: 'setup',
+                subPhase: 'workflow_development',
+                type: 'workflow'
+            }
+        }
+    ],
+    workflow_ready: [
+        {
+            id: uuidv4(),
+            role: 'assistant',
+            content: 'The workflow is ready to begin. Click "Start Workflow" when you\'re ready to proceed.',
+            timestamp: new Date().toISOString(),
+            metadata: {
+                phase: 'setup',
+                subPhase: 'workflow_development',
+                type: 'workflow'
+            }
+        }
+    ],
 
     // Execution Phase Message Blocks
     workflow_started: [

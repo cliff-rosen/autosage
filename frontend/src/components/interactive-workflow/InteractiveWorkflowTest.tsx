@@ -15,7 +15,8 @@ import {
     TOOL_TEMPLATES,
     SAMPLE_STEP_DETAILS,
     SAMPLE_WORKFLOW_INPUTS,
-    STAGE_MESSAGE_BLOCKS
+    STAGE_MESSAGE_BLOCKS,
+    SAMPLE_WORKFLOW_STEPS
 } from './workflow_data_sample';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -59,18 +60,27 @@ const InteractiveWorkflowTest: React.FC = () => {
 
                     case 'clarification_requested':
                         console.log('clarification_requested');
-                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_explanation]);
-                        setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_explanation' }));
+                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.request_confirmation]);
+                        setWorkflowState(prev => ({ ...prev, setupStage: 'request_confirmation' }));
                         break;
 
-                    case 'workflow_explanation':
-                        console.log('workflow_explanation');
+                    case 'request_confirmation':
+                        console.log('request_confirmation');
                         setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_designing]);
+                        setWorkflowSteps(SAMPLE_WORKFLOW_STEPS);
                         setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_designing' }));
                         break;
 
                     case 'workflow_designing':
                         console.log('workflow_designing');
+                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_explanation]);
+                        setWorkflowSteps(SAMPLE_WORKFLOW_STEPS);
+                        setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_explanation' }));
+                        break;
+
+                    case 'workflow_explanation':
+                        console.log('workflow_explanation');
+                        setMessages(prev => [...prev, ...STAGE_MESSAGE_BLOCKS.workflow_ready]);
                         setWorkflowState(prev => ({ ...prev, setupStage: 'workflow_ready' }));
                         break;
 
@@ -82,7 +92,6 @@ const InteractiveWorkflowTest: React.FC = () => {
                             phase: 'execution',
                             executionStage: 'workflow_started'
                         }));
-
                         break;
                 }
             } else if (workflowState.phase === 'execution') {
@@ -190,10 +199,10 @@ const InteractiveWorkflowTest: React.FC = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 min-h-0 p-4">
-                <div className="flex gap-6 h-full">
+            <div className="flex-1 overflow-hidden">
+                <div className="flex gap-6 h-full p-4">
                     {/* Chat Panel */}
-                    <div className="w-[400px] flex flex-col min-h-0">
+                    <div className="w-[400px] flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                         <ChatPanel
                             messages={messages}
                             inputMessage={inputMessage}
@@ -212,13 +221,112 @@ const InteractiveWorkflowTest: React.FC = () => {
                     </div>
 
                     {/* Main Content Panel */}
-                    <div className="flex-1 min-w-0 min-h-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                         {workflowState.phase === 'setup' ? (
-                            // Setup - Only show chat
-                            <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                                <p>Please enter your question in the chat window on the left.</p>
-                            </div>
-                        ) : workflowState.phase === 'executionx' ? (
+                            // Setup - Show chat or loading animation
+                            workflowState.setupStage === 'workflow_designing' ? (
+                                <div className="h-full flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow">
+                                    <div className="text-center space-y-8">
+                                        {/* Flowing Dots Animation */}
+                                        <div className="relative px-8">
+                                            <div className="flex space-x-6">
+                                                {[0, 1, 2, 3, 4].map((i) => (
+                                                    <div
+                                                        key={i}
+                                                        className={`w-4 h-4 rounded-full 
+                                                            bg-blue-500 
+                                                            ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900
+                                                            dark:bg-blue-400
+                                                            animate-pulse`}
+                                                        style={{ animationDelay: `${i * 0.15}s` }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="text-xl font-semibold text-gray-700 dark:text-gray-300">
+                                            Designing your workflow...
+                                        </div>
+                                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                                            This will only take a moment
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : workflowState.setupStage === 'workflow_explanation' ? (
+                                // Simple workflow steps presentation
+                                <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow p-8">
+                                    <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-6">
+                                        Proposed Workflow Steps
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {workflowSteps.map((step, index) => (
+                                            <div
+                                                key={step.id}
+                                                className="flex items-start space-x-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+                                            >
+                                                <div className="flex-none w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-semibold">
+                                                    {index + 1}
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                                                        {step.name}
+                                                    </h4>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                                        {step.description}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : workflowState.setupStage === 'workflow_ready' ? (
+                                // Show the workflow steps in a three-panel layout
+                                <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
+                                    <div className="grid grid-cols-12 gap-6 h-full p-6">
+                                        {/* Step List Panel */}
+                                        <div className="col-span-3">
+                                            <StepList
+                                                steps={workflowSteps}
+                                                currentStepIndex={workflowState.currentStepIndex}
+                                                stepDetails={stepDetails}
+                                                onStepSelect={(index) => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
+                                            />
+                                        </div>
+
+                                        {/* Work Area Panel */}
+                                        <div className="col-span-6">
+                                            <WorkArea
+                                                currentStep={workflowState.currentStepIndex >= 0 ? workflowSteps[workflowState.currentStepIndex] : null}
+                                                stepDetails={workflowState.currentStepIndex >= 0 ? stepDetails[workflowSteps[workflowState.currentStepIndex].id] : null}
+                                            />
+                                        </div>
+
+                                        {/* Right Sidebar */}
+                                        <div className="col-span-3 flex flex-col gap-6">
+                                            <div className="flex-1 overflow-hidden">
+                                                <InformationPalette
+                                                    messages={messages}
+                                                    workflowInputs={workflowInputs}
+                                                    workflowSteps={workflowSteps}
+                                                    currentStepIndex={workflowState.currentStepIndex}
+                                                    stepDetails={stepDetails}
+                                                />
+                                            </div>
+                                            <div className="flex-1 overflow-hidden">
+                                                <ToolPalette
+                                                    tools={TOOL_TEMPLATES}
+                                                    currentStepIndex={workflowState.currentStepIndex}
+                                                    onAddStep={handleAddStep}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                    <p>Please enter your question in the chat window on the left.</p>
+                                </div>
+                            )
+                        ) : workflowState.phase === 'execution' ? (
                             // Execution - Show three-panel layout
                             <div className="h-full bg-white dark:bg-gray-800 rounded-lg shadow">
                                 <div className="grid grid-cols-12 gap-6 h-full p-6">

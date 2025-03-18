@@ -82,9 +82,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     return (
-        <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="h-full flex flex-col">
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                     {currentPhase === 'execution' && currentStepIndex >= 0
                         ? `Step ${currentStepIndex + 1}: ${workflowSteps[currentStepIndex]?.name}`
@@ -118,7 +118,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
 
             {/* Chat Input */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex-none p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                 <div className="flex gap-2">
                     <input
                         type="text"
