@@ -86,14 +86,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             {/* Chat Header */}
             <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-gray-300">AutoSage</span>
-                    <div className="flex items-center gap-2">
-                        <div className="relative">
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
-                            <span className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
-                        </div>
-                        <span className="text-sm text-gray-600 dark:text-gray-300">Bot is ready</span>
-                    </div>
+                    <span className="text-lg font-semibold text-gray-900 dark:text-gray-300">Chat</span>
                 </div>
             </div>
 

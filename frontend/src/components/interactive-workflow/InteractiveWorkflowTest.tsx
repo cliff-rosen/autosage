@@ -343,30 +343,28 @@ const InteractiveWorkflowTest: React.FC = () => {
                         {/* Main Content Area */}
                         <div className="flex-1 flex">
                             {/* Workflow Steps List */}
-                            <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow m-4 mr-0 p-4 overflow-y-auto">
-                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Workflow Steps</h3>
-                                <div className="space-y-2 pr-4">
+                            <div className="w-[300px] bg-gray-800 shadow-sm m-4 mr-0 p-4 overflow-y-auto">
+                                <h3 className="font-semibold text-gray-100 mb-4">Workflow Steps</h3>
+                                <div className="space-y-2">
                                     {workflowSteps.map((step, index) => (
                                         <div
                                             key={step.id}
-                                            className={`flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 ${index === workflowState.currentStepIndex
-                                                ? 'bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-500 mr-[-2rem] pr-8 rounded-r-none'
-                                                : step.status === 'completed'
-                                                    ? 'bg-green-50 dark:bg-green-900/30'
-                                                    : 'bg-gray-50 dark:bg-gray-700/50'
+                                            className={`flex items-center p-3 cursor-pointer transition-all duration-200 ${index === workflowState.currentStepIndex
+                                                ? 'bg-gray-900 border-l-4 border-blue-500 relative -mr-4 pr-8'
+                                                : 'bg-gray-800'
                                                 }`}
                                             onClick={() => setWorkflowState(prev => ({ ...prev, currentStepIndex: index }))}
                                         >
-                                            <div className="flex items-center space-x-2 flex-1">
-                                                <div className={`w-2 h-2 rounded-full ${step.status === 'running' ? 'bg-blue-500 animate-pulse' :
+                                            <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${step.status === 'running' ? 'bg-blue-500 animate-pulse' :
                                                     step.status === 'completed' ? 'bg-green-500' :
                                                         step.status === 'failed' ? 'bg-red-500' :
                                                             'bg-gray-500'
                                                     }`} />
-                                                <span className="text-sm text-gray-700 dark:text-gray-300">{step.name}</span>
+                                                <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{step.name}</span>
                                             </div>
                                             {index === workflowState.currentStepIndex && (
-                                                <div className="ml-2">
+                                                <div className="ml-2 flex-shrink-0">
                                                     <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                                     </svg>
@@ -378,27 +376,24 @@ const InteractiveWorkflowTest: React.FC = () => {
                             </div>
 
                             {/* Current Step Details */}
-                            <div className="w-[600px] bg-white dark:bg-gray-800 rounded-lg shadow m-4 ml-0 p-4 overflow-y-auto">
-                                <div className={`h-full ${workflowState.currentStepIndex >= 0 && workflowSteps.length > 0
-                                    ? 'border-l-2 border-blue-500 pl-4 -ml-4'
-                                    : ''
-                                    }`}>
-                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Step Details</h3>
+                            <div className="w-[600px] bg-gray-900 shadow-sm m-4 ml-0 p-4 overflow-y-auto">
+                                <div className="h-full">
+                                    <h3 className="font-semibold text-gray-100 mb-4">Step Details</h3>
                                     {workflowState.currentStepIndex >= 0 && workflowSteps.length > 0 && workflowSteps[workflowState.currentStepIndex] && (
                                         <div className="space-y-4">
                                             {/* Step Description with Status */}
-                                            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                            <div className="p-4">
                                                 <div className="flex items-center justify-between mb-3">
-                                                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                                                    <h4 className="font-medium text-gray-100">
                                                         {workflowSteps[workflowState.currentStepIndex].name}
                                                     </h4>
-                                                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-600">
+                                                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-800">
                                                         <div className={`w-2 h-2 rounded-full ${workflowSteps[workflowState.currentStepIndex].status === 'running' ? 'bg-blue-500 animate-pulse' :
                                                             workflowSteps[workflowState.currentStepIndex].status === 'completed' ? 'bg-green-500' :
                                                                 workflowSteps[workflowState.currentStepIndex].status === 'failed' ? 'bg-red-500' :
                                                                     'bg-gray-500'
                                                             }`} />
-                                                        <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                                                        <span className="text-sm text-blue-700 dark:text-blue-300 capitalize">
                                                             {workflowSteps[workflowState.currentStepIndex].status}
                                                         </span>
                                                     </div>
@@ -410,10 +405,13 @@ const InteractiveWorkflowTest: React.FC = () => {
 
                                             {/* Asset Visualization */}
                                             {workflowState.executionStage === 'compiling_songs' && (
-                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
-                                                    <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                                    </svg>
+                                                <div className="p-8 flex flex-col items-center animate-pulse">
+                                                    <div className="relative">
+                                                        <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                                        </svg>
+                                                        <div className="absolute inset-0 rounded-full bg-blue-400 opacity-20 animate-ping"></div>
+                                                    </div>
                                                     <div className="text-center">
                                                         <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Song List</div>
                                                         <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -424,10 +422,13 @@ const InteractiveWorkflowTest: React.FC = () => {
                                             )}
 
                                             {workflowState.executionStage === 'retrieving_lyrics' && (
-                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
-                                                    <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
+                                                <div className="p-8 flex flex-col items-center animate-pulse">
+                                                    <div className="relative">
+                                                        <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                        <div className="absolute inset-0 rounded-full bg-blue-400 opacity-20 animate-ping"></div>
+                                                    </div>
                                                     <div className="text-center">
                                                         <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Lyrics Database</div>
                                                         <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -438,10 +439,13 @@ const InteractiveWorkflowTest: React.FC = () => {
                                             )}
 
                                             {workflowState.executionStage === 'analyzing_lyrics' && (
-                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
-                                                    <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                                    </svg>
+                                                <div className="p-8 flex flex-col items-center animate-pulse">
+                                                    <div className="relative">
+                                                        <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                        </svg>
+                                                        <div className="absolute inset-0 rounded-full bg-blue-400 opacity-20 animate-ping"></div>
+                                                    </div>
                                                     <div className="text-center">
                                                         <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Analysis Results</div>
                                                         <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -451,11 +455,31 @@ const InteractiveWorkflowTest: React.FC = () => {
                                                 </div>
                                             )}
 
+                                            {workflowState.executionStage === 'tabulating_results' && (
+                                                <div className="p-8 flex flex-col items-center animate-pulse">
+                                                    <div className="relative">
+                                                        <svg className="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                        <div className="absolute inset-0 rounded-full bg-blue-400 opacity-20 animate-ping"></div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Results Summary</div>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            Generating final statistics and report...
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {workflowState.executionStage === 'workflow_complete' && (
-                                                <div className="p-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex flex-col items-center">
-                                                    <svg className="w-16 h-16 text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
+                                                <div className="p-8 flex flex-col items-center">
+                                                    <div className="relative">
+                                                        <svg className="w-16 h-16 text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        <div className="absolute inset-0 rounded-full bg-green-400 opacity-20 animate-ping"></div>
+                                                    </div>
                                                     <div className="text-center">
                                                         <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">Final Results</div>
                                                         <div className="text-sm text-gray-600 dark:text-gray-400">
