@@ -21,6 +21,7 @@ import Job from './pages/Job';
 import AgentWorkflowPage from './pages/AgentWorkflow';
 import TestPage from './pages/TestPage';
 import InteractiveWorkflowTest from './components/interactive-workflow/InteractiveWorkflowTest';
+import FractalBot from './components/fractal-bot/FractalBot';
 
 function App() {
   const { handleSessionExpired, isAuthenticated, login, register, error: authError } = useAuth();
@@ -124,9 +125,11 @@ function App() {
             <Route path="/jobs/:id" element={<Job />} />
             <Route path="/job/:id" element={<Job />} />
 
+            {/* Test routes */}
             <Route path="/agent-workflow" element={<AgentWorkflowPage />} />
             <Route path="/test" element={<TestPage />} />
             <Route path="/interactive-workflow" element={<InteractiveWorkflowTest />} />
+            <Route path="/fractal-bot" element={<FractalBot />} />
 
             {/* Catch-all route for unmatched paths */}
             <Route path="*" element={<Navigate to="/" replace />} />

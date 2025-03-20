@@ -37,6 +37,10 @@ export type WorkflowStep = {
     status: 'pending' | 'running' | 'completed' | 'failed';
     agentType: string;
     result?: any;
+    subSteps?: WorkflowStep[];  // Add support for nested steps
+    parentId?: string;          // Reference to parent step if this is a sub-step
+    level: number;              // Depth in the tree (0 for main steps)
+    tools?: string[];          // Tools that can be used in this step
 };
 
 export type ChatMessage = {
@@ -59,11 +63,24 @@ export type WorkflowStepTemplate = {
     agentType: string;
 };
 
+export type InformationAsset = {
+    id: string;
+    stepId: string;            // ID of the step that generated this asset
+    type: 'search_result' | 'generated_content' | 'analysis_output' | 'intermediate_finding';
+    content: any;              // The actual content of the asset
+    metadata: {
+        tool?: string;         // Tool used to generate this asset
+        timestamp: string;     // When the asset was created
+        tags: string[];       // For organization/filtering
+    };
+};
+
 export type StepDetails = {
     inputs: Record<string, any>;
     outputs: Record<string, any>;
     status: string;
     progress: number;
+    assets: InformationAsset[];  // Track assets generated in this step
 };
 
 export type ToolTemplate = {

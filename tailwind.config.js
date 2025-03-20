@@ -1,7 +1,11 @@
+/** @type {import('tailwindcss').Config} */
 module.exports = {
-  // ... other config
-  plugins: [
-    require('tailwind-scrollbar')({ nocompatible: true }),
-    // ... other plugins
+  content: [
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
+  darkMode: 'class',
+  theme: {
+    extend: {},
+  },
+  plugins: [],
 } 

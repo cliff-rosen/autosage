@@ -44,30 +44,38 @@ export const SAMPLE_WORKFLOW_STEPS: WorkflowStep[] = [
         description: 'Retrieve a comprehensive list of all Beatles songs from their official discography',
         status: 'pending',
         agentType: 'retrieval',
+        level: 0,
+        tools: ['search', 'list_builder'],
         result: null
     },
     {
         id: uuidv4(),
-        name: 'Retrieve Song Lyrics',
-        description: 'Fetch lyrics for each Beatles song from a reliable source',
+        name: 'Retrieve Lyrics',
+        description: 'Fetch lyrics for each song in the compiled list',
         status: 'pending',
         agentType: 'retrieval',
+        level: 0,
+        tools: ['search', 'text_generator'],
         result: null
     },
     {
         id: uuidv4(),
-        name: 'Analyze Love References',
-        description: 'Count occurrences of the word "love" in each song\'s lyrics',
+        name: 'Analyze Lyrics',
+        description: 'Search through lyrics for occurrences of the word "love"',
         status: 'pending',
         agentType: 'analysis',
+        level: 0,
+        tools: ['data_analyzer'],
         result: null
     },
     {
         id: uuidv4(),
-        name: 'Tabulate Results',
-        description: 'Create a summary table of songs containing the word "love" and their counts',
+        name: 'Generate Report',
+        description: 'Create a summary of findings with statistics',
         status: 'pending',
-        agentType: 'answer',
+        agentType: 'generation',
+        level: 0,
+        tools: ['text_generator'],
         result: null
     }
 ];
@@ -128,36 +136,40 @@ export const WORKFLOW_DEVELOPMENT_MESSAGES: ChatMessage[] = [
 export const SAMPLE_STEP_DETAILS: Record<string, StepDetails> = {
     [SAMPLE_WORKFLOW_STEPS[0].id]: {
         inputs: {
-            query: 'List all Beatles songs',
-            timeRange: '1963-1970',
-            source: 'Official Beatles Discography'
+            query: 'Beatles official discography',
+            timeRange: '1960-1970',
+            source: 'official_records'
         },
         outputs: {},
         status: 'pending',
-        progress: 0
+        progress: 0,
+        assets: []
     },
     [SAMPLE_WORKFLOW_STEPS[1].id]: {
         inputs: {
             songs: {
                 totalCount: 213,
-                albums: ['Please Please Me', 'With The Beatles', 'A Hard Day\'s Night', 'Beatles for Sale', 'Help!', 'Rubber Soul', 'Revolver', 'Sgt. Pepper\'s Lonely Hearts Club Band', 'Magical Mystery Tour', 'The Beatles (White Album)', 'Yellow Submarine', 'Abbey Road', 'Let It Be']
+                albums: ['Please Please Me', 'With the Beatles', 'A Hard Day\'s Night', /* ... */]
             }
         },
         outputs: {},
         status: 'pending',
-        progress: 0
+        progress: 0,
+        assets: []
     },
     [SAMPLE_WORKFLOW_STEPS[2].id]: {
         inputs: {},
         outputs: {},
         status: 'pending',
-        progress: 0
+        progress: 0,
+        assets: []
     },
     [SAMPLE_WORKFLOW_STEPS[3].id]: {
         inputs: {},
         outputs: {},
         status: 'pending',
-        progress: 0
+        progress: 0,
+        assets: []
     }
 };
 
@@ -168,8 +180,10 @@ export const SAMPLE_WORKFLOW_INPUTS: Record<string, any> = {
     outputFormat: 'table'
 };
 
+export type StageMessageBlocks = Record<SetupStage | ExecutionStage, ChatMessage[]>;
+
 // Define message blocks for each stage transition
-export const STAGE_MESSAGE_BLOCKS: Record<SetupStage | ExecutionStage, ChatMessage[]> = {
+export const STAGE_MESSAGE_BLOCKS: StageMessageBlocks = {
     // Setup Phase Message Blocks
     initial: [
         {
