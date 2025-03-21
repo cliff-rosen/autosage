@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { ChatSection } from './components/ChatSection';
 import { WorkspaceSection } from './components/WorkspaceSection';
 import { AssetsSection } from './components/AssetsSection';
-import { ToolsSection } from './components/ToolsSection';
 import { demoStates } from './data/fractal_bot_data';
 import { FractalBotState, createInitialState } from './types/state';
 
@@ -14,9 +13,6 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
     const [state, setState] = useState<FractalBotState>(createInitialState());
     const [currentDemoIndex, setCurrentDemoIndex] = useState(0);
     const [pendingActionState, setPendingActionState] = useState<typeof demoStates[0] | null>(null);
-    const [isToolSearchOpen, setIsToolSearchOpen] = useState(false);
-    const [isMoreToolsOpen, setIsMoreToolsOpen] = useState(false);
-    const [toolSearchQuery, setToolSearchQuery] = useState('');
 
     // Initialize with the first demo state
     useEffect(() => {
@@ -31,22 +27,34 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
             const newMessages = demoState.addedMessages.filter(m => !existingMessageIds.has(m.id));
             const messages = [...prev.messages, ...newMessages];
 
-            // Add new tasks and update existing ones
-            const tasks = { ...prev.tasks };
+            // Add new agents and update existing ones
+            const agents = { ...prev.agents };
 
-            // Add new tasks
+            // Add new agents
             demoState.addedWorkspaceItems.forEach(item => {
-                tasks[item.id] = item;
+                agents[item.id] = item;
             });
 
-            // Update existing tasks based on stage
+            // Update existing agents based on stage
             if (demoState.stage === 'songs_compiled') {
-                // Find and update the song generation task
-                Object.keys(tasks).forEach(taskId => {
-                    const task = tasks[taskId];
-                    if (task.title === 'Generate Beatles Song List') {
-                        tasks[taskId] = {
-                            ...task,
+                // Find and update the song generation agent
+                Object.keys(agents).forEach(agentId => {
+                    const agent = agents[agentId];
+                    if (agent.title === 'Generate Beatles Song List') {
+                        agents[agentId] = {
+                            ...agent,
+                            status: 'completed',
+                            completedAt: new Date().toISOString()
+                        };
+                    }
+                });
+            } else if (demoState.stage === 'analysis_started') {
+                // Find and update the lyrics retrieval agent
+                Object.keys(agents).forEach(agentId => {
+                    const agent = agents[agentId];
+                    if (agent.title === 'Retrieve Lyrics') {
+                        agents[agentId] = {
+                            ...agent,
                             status: 'completed',
                             completedAt: new Date().toISOString()
                         };
@@ -62,7 +70,7 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
             return {
                 ...prev,
                 messages,
-                tasks,
+                agents,
                 assets,
                 phase: demoState.phase,
                 metadata: {
@@ -109,7 +117,7 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
 
             {/* Main Content Area */}
             <div className="flex-1 flex overflow-hidden p-4 pb-2">
-                {/* Chat Section */}
+                {/* Left Column: Chat */}
                 <div className="w-[400px] flex-shrink-0 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
                     <ChatSection
                         messages={state.messages}
@@ -121,33 +129,21 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                     />
                 </div>
 
-                {/* Assets Section */}
-                <div className="w-[400px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
-                    <AssetsSection
-                        assets={state.assets}
-                    />
-                </div>
+                {/* Right Column: Workspace and Assets */}
+                <div className="flex-1 flex flex-col space-y-4">
+                    {/* Workspace Section */}
+                    <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                        <WorkspaceSection
+                            agents={Object.values(state.agents)}
+                        />
+                    </div>
 
-                {/* Work Area */}
-                <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
-                    <WorkspaceSection
-                        tasks={Object.values(state.tasks)}
-                    />
-                </div>
-
-                {/* Tools Section */}
-                <div className="w-[400px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                    <ToolsSection
-                        currentStep={null}
-                        isToolSearchOpen={isToolSearchOpen}
-                        isMoreToolsOpen={isMoreToolsOpen}
-                        toolSearchQuery={toolSearchQuery}
-                        onToolSearch={() => setIsToolSearchOpen(true)}
-                        onMoreTools={() => setIsMoreToolsOpen(true)}
-                        onSearchClose={() => setIsToolSearchOpen(false)}
-                        onMoreToolsClose={() => setIsMoreToolsOpen(false)}
-                        onToolSearchQueryChange={setToolSearchQuery}
-                    />
+                    {/* Assets Section */}
+                    <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                        <AssetsSection
+                            assets={state.assets}
+                        />
+                    </div>
                 </div>
             </div>
 

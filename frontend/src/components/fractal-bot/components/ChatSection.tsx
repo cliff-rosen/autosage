@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ChatMessage } from '../types/state';
+import { MarkdownRenderer } from '../../common/MarkdownRenderer';
 
 export interface ChatSectionProps {
     messages: ChatMessage[];
@@ -60,9 +61,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
                                     : 'bg-blue-500 text-white'
                                     }`}
                             >
-                                <p className="text-sm whitespace-pre-wrap">
-                                    {message.content}
-                                </p>
+                                <div className={message.role === 'user' ? 'text-white' : ''}>
+                                    <MarkdownRenderer content={message.content} />
+                                </div>
                                 {message.actionButton && (
                                     <button
                                         onClick={() => onActionButtonClick(message.actionButton!.action)}

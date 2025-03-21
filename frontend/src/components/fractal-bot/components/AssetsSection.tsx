@@ -3,6 +3,7 @@ import { Asset } from '../types/state';
 
 interface AssetsSectionProps {
     assets: Asset[];
+    onUpload?: (file: File) => void;
 }
 
 const getAssetIcon = (type: string) => {
@@ -28,9 +29,10 @@ const getAssetIcon = (type: string) => {
     }
 };
 
-export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets }) => {
+export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }) => {
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [previewAsset, setPreviewAsset] = useState<{ asset: Asset; position: { x: number; y: number } } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleMouseEnter = (asset: Asset, event: React.MouseEvent) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -47,16 +49,66 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets }) => {
         setPreviewAsset(null);
     };
 
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file && onUpload) {
+            onUpload(file);
+        }
+        // Reset the input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleDownload = (asset: Asset) => {
+        const content = typeof asset.content === 'string'
+            ? asset.content
+            : JSON.stringify(asset.content, null, 2);
+
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${asset.name}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="h-full flex flex-col">
             <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    Assets
-                </h3>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        Assets
+                    </h3>
+                    <button
+                        onClick={handleUploadClick}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 
+                                 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 
+                                 rounded-lg transition-colors duration-200"
+                        title="Upload Asset"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileChange}
+                    />
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {assets.map(asset => (
                         <div
                             key={asset.id}
@@ -64,7 +116,6 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets }) => {
                                      hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-md transition-all duration-200 p-3"
                             onMouseEnter={(e) => handleMouseEnter(asset, e)}
                             onMouseLeave={handleMouseLeave}
-                            onClick={() => setSelectedAsset(asset)}
                         >
                             <div className="flex items-center gap-3">
                                 <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center
@@ -80,6 +131,20 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets }) => {
                                     <p className="text-xs text-gray-500 dark:text-gray-400">
                                         {asset.type} • {new Date(asset.metadata.timestamp).toLocaleDateString()}
                                     </p>
+                                </div>
+                                <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDownload(asset);
+                                        }}
+                                        className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                        title="Download Asset"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -137,14 +202,25 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets }) => {
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                                     {selectedAsset.name}
                                 </h3>
-                                <button
-                                    onClick={() => setSelectedAsset(null)}
-                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleDownload(selectedAsset)}
+                                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                        title="Download Asset"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedAsset(null)}
+                                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4">

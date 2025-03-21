@@ -4,7 +4,7 @@ export type Phase = 'setup' | 'execution' | 'complete';
 export type MessageType =
     | 'text'
     | 'action_prompt'
-    | 'task_update'
+    | 'agent_update'
     | 'asset_added';
 
 // Message types
@@ -21,14 +21,14 @@ export interface ChatMessage {
     };
 }
 
-// Task types
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'error';
+// Agent types
+export type AgentStatus = 'pending' | 'in_progress' | 'completed' | 'error';
 
-export interface Task {
+export interface Agent {
     id: string;
     title: string;
     description: string;
-    status: TaskStatus;
+    status: AgentStatus;
     createdAt: string;
     completedAt?: string;
     metadata?: Record<string, any>;
@@ -43,7 +43,7 @@ export interface Asset {
     metadata: {
         timestamp: string;
         tags: string[];
-        taskId?: string;
+        agentId?: string;
         [key: string]: any;
     };
 }
@@ -51,8 +51,8 @@ export interface Asset {
 // Turn state represents a single interaction cycle
 export interface TurnState {
     messages: ChatMessage[];
-    newTasks: Task[];
-    updatedTasks: Record<string, Partial<Task>>;
+    newAgents: Agent[];
+    updatedAgents: Record<string, Partial<Agent>>;
     newAssets: Asset[];
 }
 
@@ -60,7 +60,7 @@ export interface TurnState {
 export interface FractalBotState {
     phase: Phase;
     messages: ChatMessage[];
-    tasks: Record<string, Task>;
+    agents: Record<string, Agent>;
     assets: Asset[];
     currentTurn?: TurnState;
     metadata: {
@@ -73,8 +73,8 @@ export interface FractalBotState {
 // Action creators for managing turns
 export const createTurn = (): TurnState => ({
     messages: [],
-    newTasks: [],
-    updatedTasks: {},
+    newAgents: [],
+    updatedAgents: {},
     newAssets: []
 });
 
@@ -82,7 +82,7 @@ export const createTurn = (): TurnState => ({
 export const createInitialState = (): FractalBotState => ({
     phase: 'setup',
     messages: [],
-    tasks: {},
+    agents: {},
     assets: [],
     metadata: {
         lastUpdated: new Date().toISOString(),
