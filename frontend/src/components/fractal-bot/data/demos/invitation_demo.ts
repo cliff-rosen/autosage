@@ -27,7 +27,7 @@ const demoStates: DemoState[] = [
             id: uuidv4(),
             role: 'assistant',
             type: 'text',
-            content: 'Hello! I\'m FractalBot. I can help you create various documents and drafts. What would you like me to help you with?',
+            content: 'Hello! I\'m FractalBot. What question can I help you with today?',
             timestamp: new Date().toISOString()
         }],
         addedAssets: [],
