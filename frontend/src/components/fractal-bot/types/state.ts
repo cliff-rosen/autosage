@@ -1,14 +1,15 @@
-import { ChatMessage } from '../../interactive-workflow/types';
-import { Stage } from '../data/fractal_bot_data';
-
 // Asset types
 export interface InformationAsset {
     id: string;
-    type: 'document' | 'image' | 'data' | 'chart';
-    name: string;
+    type: 'data' | 'analysis' | 'chart' | 'document' | 'analysis_output';
+    title?: string;
+    name?: string;
     content: any;
-    metadata?: Record<string, any>;
-    createdAt: string;
+    metadata?: {
+        timestamp: string;
+        tags: string[];
+    };
+    stepId?: string;
 }
 
 // Workspace item types (for the third column)
@@ -20,6 +21,69 @@ export interface WorkspaceItem {
     status: 'pending' | 'active' | 'completed' | 'failed';
     metadata?: Record<string, any>;
     createdAt: string;
+}
+
+// Step types
+export interface WorkflowStep {
+    id: string;
+    name: string;
+    title?: string;
+    description: string;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    subSteps?: WorkflowStep[];
+    parentId?: string;
+    level: number;
+    agentType?: string;
+    tools?: string[];
+}
+
+// Step details including assets
+export interface StepDetails {
+    id: string;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    assets: InformationAsset[];
+    content?: string;
+}
+
+// Message types
+export interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    metadata?: {
+        phase?: 'setup' | 'execution';
+        type?: 'question' | 'clarification' | 'workflow' | 'result' | 'error';
+    };
+}
+
+// Workflow state
+export interface WorkflowState {
+    phase: 'setup' | 'execution';
+    currentStepIndex: number;
+    isProcessing: boolean;
+}
+
+// Stage types
+export type Stage =
+    | 'initial'
+    | 'question_received'
+    | 'workflow_designing'
+    | 'workflow_ready'
+    | 'workflow_started'
+    | 'compiling_songs'
+    | 'retrieving_lyrics'
+    | 'analyzing_lyrics'
+    | 'workflow_complete';
+
+// Stage data structure
+export interface StageData {
+    stage: Stage;
+    messages: ChatMessage[];
+    assets: InformationAsset[];
+    nextStages: Stage[];
+    prevStages: Stage[];
+    workspaceItems: WorkspaceItem[];
 }
 
 // State snapshot for a particular stage
