@@ -31,6 +31,16 @@ interface DemoState {
     addedWorkspaceItems: Agent[];
 }
 
+// FIXME: Current design quirk - Agent status updates (completed/failed) are handled directly in applyDemoState
+// rather than through state transitions. This means:
+// 1. Agent completion status is not represented in the demo states
+// 2. Status updates rely on the applyDemoState implementation
+// 3. For future improvements, consider moving status management into the state transitions
+//
+// Required status updates in applyDemoState:
+// - When stage === 'comparison_completed': 
+//   Find agent where title === 'List Comparison Agent' and update status to 'completed'
+
 // Create the demo states array
 export const demoStates: DemoState[] = [
     {
@@ -190,6 +200,83 @@ export const demoStates: DemoState[] = [
             metadata: {
                 timestamp: new Date().toISOString(),
                 tags: ['lyrics', 'beatles']
+            }
+        }]
+    },
+    {
+        stage: 'user_added_asset',
+        description: 'User mentions adding a new asset for comparison',
+        phase: 'execution',
+        addedMessages: [{
+            id: uuidv4(),
+            role: 'user',
+            type: 'text',
+            content: "Actually I added a new asset to the list which is an old list of Beatles songs. Can you analyze that and compare it with the song list you created?",
+            timestamp: new Date().toISOString()
+        }],
+        addedWorkspaceItems: [],
+        addedAssets: []
+    },
+    {
+        stage: 'comparison_proposed',
+        description: 'FractalBot proposes to launch List Comparison Agent',
+        phase: 'execution',
+        addedMessages: [{
+            id: uuidv4(),
+            role: 'assistant',
+            type: 'action_prompt',
+            content: "I'll help you compare the two song lists. I'll launch the List Comparison Agent to analyze both lists and generate a detailed comparison report. Would you like me to proceed?",
+            timestamp: new Date().toISOString(),
+            actionButton: {
+                label: 'Start Comparison',
+                action: 'start_comparison'
+            }
+        }],
+        addedWorkspaceItems: [],
+        addedAssets: []
+    },
+    {
+        stage: 'comparison_started',
+        description: 'List Comparison Agent begins analysis',
+        phase: 'execution',
+        addedMessages: [{
+            id: uuidv4(),
+            role: 'assistant',
+            type: 'text',
+            content: "I've launched the List Comparison Agent. It will analyze both song lists and generate a detailed comparison report.",
+            timestamp: new Date().toISOString()
+        }],
+        addedWorkspaceItems: [{
+            id: uuidv4(),
+            title: 'List Comparison Agent',
+            description: 'Comparing the original and user-provided Beatles song lists',
+            status: 'in_progress',
+            createdAt: new Date().toISOString()
+        }],
+        addedAssets: []
+    },
+    {
+        stage: 'comparison_completed',
+        description: 'List Comparison Agent completes analysis',
+        phase: 'execution',
+        addedMessages: [{
+            id: uuidv4(),
+            role: 'assistant',
+            type: 'text',
+            content: "The List Comparison Agent has completed its analysis. I've added the comparison report to your assets. Would you like me to walk you through the key findings?",
+            timestamp: new Date().toISOString()
+        }],
+        addedWorkspaceItems: [],
+        addedAssets: [{
+            id: 'songListComparison',
+            type: 'data',
+            name: 'Beatles Song Lists Comparison Report',
+            content: 'Detailed comparison of original and user-provided Beatles song lists',
+            metadata: {
+                timestamp: new Date().toISOString(),
+                tags: ['comparison', 'analysis', 'beatles', 'songs'],
+                icon: '🔄',
+                type: 'comparison'
             }
         }]
     }

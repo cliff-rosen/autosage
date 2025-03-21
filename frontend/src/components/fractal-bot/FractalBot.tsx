@@ -61,6 +61,18 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                         };
                     }
                 });
+            } else if (demoState.stage === 'comparison_completed') {
+                // Find and update the list comparison agent
+                Object.keys(agents).forEach(agentId => {
+                    const agent = agents[agentId];
+                    if (agent.title === 'List Comparison Agent') {
+                        agents[agentId] = {
+                            ...agent,
+                            status: 'completed',
+                            completedAt: new Date().toISOString()
+                        };
+                    }
+                });
             }
 
             // Add new assets, preventing duplicates by ID

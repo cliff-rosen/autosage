@@ -1,12 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { Asset } from '../types/state';
+import { AssetModal } from './AssetModal';
 
 interface AssetsSectionProps {
     assets: Asset[];
     onUpload?: (file: File) => void;
 }
 
-const getAssetIcon = (type: string, metadata?: { type?: string; name?: string; timestamp?: string; tags?: string[];[key: string]: any }) => {
+export const getAssetIcon = (type: string, metadata?: { type?: string; name?: string; timestamp?: string; tags?: string[];[key: string]: any }) => {
     // Get file extension and type
     const fileType = metadata?.type || '';
     const fileName = metadata?.name || '';
@@ -69,6 +70,13 @@ const getAssetIcon = (type: string, metadata?: { type?: string; name?: string; t
     // Asset type icons (fallback)
     switch (type) {
         case 'data':
+            if (metadata?.type === 'comparison') {
+                return (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                );
+            }
             return (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
@@ -89,11 +97,16 @@ const getAssetIcon = (type: string, metadata?: { type?: string; name?: string; t
     }
 };
 
-const getAssetColor = (type: string, metadata?: { type?: string; name?: string; timestamp?: string; tags?: string[];[key: string]: any }) => {
+export const getAssetColor = (type: string, metadata?: { type?: string; name?: string; timestamp?: string; tags?: string[];[key: string]: any }) => {
     // Get file extension and type
     const fileType = metadata?.type || '';
     const fileName = metadata?.name || '';
     const extension = fileName.split('.').pop()?.toLowerCase() || '';
+
+    // Special case for comparison type
+    if (metadata?.type === 'comparison') {
+        return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+    }
 
     // Images
     if (fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(extension)) {
@@ -297,44 +310,10 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
 
             {/* Asset Modal */}
             {selectedAsset && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-                        <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                                    {selectedAsset.name}
-                                </h3>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => handleDownload(selectedAsset)}
-                                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                        title="Download Asset"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={() => setSelectedAsset(null)}
-                                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4">
-                            <pre className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
-                                {typeof selectedAsset.content === 'string'
-                                    ? selectedAsset.content
-                                    : JSON.stringify(selectedAsset.content, null, 2)
-                                }
-                            </pre>
-                        </div>
-                    </div>
-                </div>
+                <AssetModal
+                    asset={selectedAsset}
+                    onClose={() => setSelectedAsset(null)}
+                />
             )}
         </div>
     );
