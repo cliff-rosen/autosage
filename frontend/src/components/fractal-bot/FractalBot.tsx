@@ -135,18 +135,18 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
     };
 
     return (
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
             {/* Header */}
-            <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <div className="flex-none px-6 py-3 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50">
+                <h2 className="text-xl font-medium text-gray-800 dark:text-gray-200">
                     FractalBot Demo
                 </h2>
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex overflow-hidden p-4 pb-2">
+            <div className="flex-1 flex overflow-hidden p-4 gap-4">
                 {/* Left Column: Chat */}
-                <div className="w-[400px] flex-shrink-0 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
+                <div className="w-[400px] flex-shrink-0 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
                     <ChatSection
                         messages={state.messages}
                         inputMessage=""
@@ -157,32 +157,33 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                     />
                 </div>
 
-                {/* Right Column: Workspace and Assets */}
-                <div className="flex-1 flex flex-col space-y-4">
-                    {/* Workspace Section */}
-                    <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                        <WorkspaceSection
-                            agents={Object.values(state.agents)}
-                        />
-                    </div>
-
-                    {/* Assets Section */}
-                    <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                {/* Middle Column: Assets */}
+                <div className="w-[800px] flex-shrink-0 flex flex-col">
+                    <div className="flex-1 bg-transparent backdrop-blur-[2px] rounded-xl overflow-hidden">
                         <AssetsSection
                             assets={state.assets}
                             onUpload={handleFileUpload}
                         />
                     </div>
                 </div>
+
+                {/* Right Column: Agents */}
+                <div className="flex-1 flex flex-col">
+                    <div className="flex-1 bg-white/20 dark:bg-gray-800/20 backdrop-blur-[2px] rounded-lg border border-gray-200/30 dark:border-gray-700/30 overflow-hidden">
+                        <WorkspaceSection
+                            agents={Object.values(state.agents)}
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* Navigation Controls */}
-            <div className="flex-none p-4 pt-2">
+            <div className="flex-none px-6 py-3">
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
                         <button
                             onClick={handleRestart}
-                            className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center gap-2"
+                            className="px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500/30 flex items-center gap-2 transition-colors"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -194,7 +195,7 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                         <button
                             onClick={handleNext}
                             disabled={currentDemoIndex >= demoStates.length - 1}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-4 py-2 bg-blue-500/80 hover:bg-blue-500 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-400/50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors backdrop-blur-sm"
                         >
                             Next
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

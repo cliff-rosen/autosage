@@ -228,44 +228,52 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-6">
                     {assets.map(asset => (
                         <div
                             key={asset.id}
                             className={`
-                                group relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 
-                                hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-md transition-all duration-200 p-3 cursor-pointer
+                                group relative bg-white/90 dark:bg-gray-800/90 rounded-lg 
+                                hover:shadow-xl hover:scale-[1.01] transition-all duration-200 p-4 cursor-pointer
+                                backdrop-blur-sm
                                 ${!asset.ready ? 'animate-pulse opacity-70' : ''}
                             `}
                             onMouseEnter={(e) => handleMouseEnter(asset, e)}
                             onMouseLeave={handleMouseLeave}
                             onClick={() => setSelectedAsset(asset)}
                         >
-                            <div className="flex items-center gap-3">
-                                <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${getAssetColor(asset.type, asset.metadata)}`}>
-                                    {getAssetIcon(asset.type, asset.metadata)}
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${getAssetColor(asset.type, asset.metadata)}`}>
+                                        {getAssetIcon(asset.type, asset.metadata)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h5 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            {asset.name}
+                                        </h5>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {asset.type} • {new Date(asset.metadata.timestamp).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDownload(asset);
+                                            }}
+                                            className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                            title="Download Asset"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <h5 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                        {asset.name}
-                                    </h5>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        {asset.type} • {new Date(asset.metadata.timestamp).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDownload(asset);
-                                        }}
-                                        className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                        title="Download Asset"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                    </button>
+                                <div className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 break-all">
+                                    {typeof asset.content === 'string'
+                                        ? asset.content
+                                        : JSON.stringify(asset.content)}
                                 </div>
                             </div>
                         </div>
@@ -276,31 +284,31 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
             {/* Asset Preview */}
             {previewAsset && (
                 <div
-                    className="fixed z-50 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 
-                              animate-fade-in pointer-events-none"
+                    className="fixed z-50 w-[500px] bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200/50 dark:border-gray-700/50 
+                              animate-fade-in pointer-events-none backdrop-blur-sm"
                     style={{
                         left: `${previewAsset.position.x + 16}px`,
                         top: `${previewAsset.position.y}px`,
-                        maxHeight: '400px',
-                        overflow: 'hidden'
+                        maxHeight: '80vh',
+                        overflow: 'auto'
                     }}
                 >
-                    <div className="p-4">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${getAssetColor(previewAsset.asset.type, previewAsset.asset.metadata)}`}>
+                    <div className="p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${getAssetColor(previewAsset.asset.type, previewAsset.asset.metadata)}`}>
                                 {getAssetIcon(previewAsset.asset.type, previewAsset.asset.metadata)}
                             </div>
                             <div>
-                                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">
                                     {previewAsset.asset.name}
                                 </h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
                                     {previewAsset.asset.type} • {new Date(previewAsset.asset.metadata.timestamp).toLocaleDateString()}
                                 </p>
                             </div>
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-300 overflow-hidden">
-                            <pre className="whitespace-pre-wrap">
+                        <div className="text-sm text-gray-600 dark:text-gray-300">
+                            <pre className="whitespace-pre-wrap break-all">
                                 {typeof previewAsset.asset.content === 'string'
                                     ? previewAsset.asset.content
                                     : JSON.stringify(previewAsset.asset.content, null, 2)
