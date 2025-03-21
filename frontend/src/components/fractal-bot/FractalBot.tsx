@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { ChatSection } from './components/ChatSection';
 import { AssetsSection } from './components/AssetsSection';
@@ -39,6 +39,53 @@ const FractalBot: React.FC = () => {
         setMessages(initialState.addedMessages);
         setWorkflowState(prev => ({ ...prev, phase: initialState.phase }));
     }, []);
+
+    // Get current step data
+    const getCurrentStepData = useCallback(() => {
+        if (!workflowSteps.length || workflowState.currentStepIndex < 0) return null;
+
+        const step = workflowSteps[workflowState.currentStepIndex];
+        if (!step) return null;
+
+        const details = stepDetails[step.id];
+        return {
+            id: step.id,
+            name: step.name,
+            description: step.description,
+            status: step.status,
+            content: details?.content
+        };
+    }, [workflowSteps, workflowState.currentStepIndex, stepDetails]);
+
+    // Get previous step data
+    const getPreviousStepData = useCallback(() => {
+        if (!workflowSteps.length || workflowState.currentStepIndex <= 0) return undefined;
+
+        const prevStep = workflowSteps[workflowState.currentStepIndex - 1];
+        if (!prevStep) return undefined;
+
+        const details = stepDetails[prevStep.id];
+        return {
+            id: prevStep.id,
+            name: prevStep.name,
+            description: prevStep.description,
+            status: prevStep.status as 'completed' | 'error',
+            content: details?.content
+        };
+    }, [workflowSteps, workflowState.currentStepIndex, stepDetails]);
+
+    // Get current work items
+    const getCurrentWorkItems = useCallback(() => {
+        if (!workflowSteps.length || workflowState.currentStepIndex < 0) return [];
+
+        const currentStep = workflowSteps[workflowState.currentStepIndex];
+        if (!currentStep) return [];
+
+        return workspaceItems.filter(item =>
+            item.stepId === currentStep.id ||
+            (workflowState.currentStepIndex > 0 && item.stepId === workflowSteps[workflowState.currentStepIndex - 1].id)
+        );
+    }, [workflowSteps, workflowState.currentStepIndex, workspaceItems]);
 
     // Handle state transitions
     const handleStateTransition = async (direction: 'forward' | 'backward' = 'forward') => {
@@ -190,6 +237,29 @@ const FractalBot: React.FC = () => {
         handleStateTransition('forward');
     };
 
+    // Handle file upload
+    const handleFileUpload = useCallback((file: File) => {
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            const content = e.target?.result;
+            const newAsset: InformationAsset = {
+                id: uuidv4(),
+                type: 'data',
+                name: file.name,
+                content: content,
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    tags: ['uploaded', file.type],
+                }
+            };
+
+            setAssets(prev => [...prev, newAsset]);
+        };
+
+        reader.readAsText(file);
+    }, []);
+
     return (
         <div className="flex flex-col h-screen">
             {/* Header */}
@@ -224,6 +294,7 @@ const FractalBot: React.FC = () => {
                     <AssetsSection
                         assets={assets}
                         currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
+                        onUpload={handleFileUpload}
                     />
                 </div>
 
@@ -231,10 +302,9 @@ const FractalBot: React.FC = () => {
                 <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                     <div className="flex-1 overflow-hidden">
                         <WorkspaceSection
-                            steps={workflowSteps}
-                            stepDetails={stepDetails}
-                            currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
-                            workspaceItems={workspaceItems}
+                            currentStep={getCurrentStepData()}
+                            previousStep={getPreviousStepData()}
+                            workItems={getCurrentWorkItems()}
                         >
                             <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
                                 <ToolsSection

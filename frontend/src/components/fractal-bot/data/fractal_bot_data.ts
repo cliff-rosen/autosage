@@ -40,57 +40,144 @@ export const BEATLES_LYRICS = {
     'A Day in the Life': "I read the news today, oh boy\nAbout a lucky man who made the grade..."
 };
 
-// Stage-specific data generators
-export const generateSongListStep = (): { step: WorkflowStep; asset: InformationAsset } => {
-    const step: WorkflowStep = {
-        id: uuidv4(),
-        name: 'Generate Beatles Song List',
-        description: 'Create a comprehensive list of Beatles songs',
-        status: 'running',
-        agentType: 'user',
-        level: 0,
-        tools: []
-    };
+// Define fixed step IDs for consistent tracking
+const WORKFLOW_STEP_IDS = {
+    GENERATE_SONGS: 'step_generate_songs',
+    RETRIEVE_LYRICS: 'step_retrieve_lyrics',
+    ANALYZE_LYRICS: 'step_analyze_lyrics'
+} as const;
 
-    const asset: InformationAsset = {
-        id: 'beatlesSongList',
-        stepId: step.id,
-        type: 'data',
-        name: 'Beatles Song List',
-        content: BEATLES_SONGS,
-        metadata: {
-            timestamp: new Date().toISOString(),
-            tags: ['songs', 'beatles', 'list']
-        }
-    };
+// Helper to create workflow steps with consistent IDs
+const createWorkflowStep = (
+    id: string,
+    name: string,
+    description: string,
+    status: WorkflowStep['status'],
+    agentType: WorkflowStep['agentType']
+): WorkflowStep => ({
+    id,
+    name,
+    description,
+    status,
+    agentType,
+    level: 0,
+    tools: []
+});
 
-    return { step, asset };
+// Create base workflow steps
+const baseWorkflowSteps: Record<string, WorkflowStep> = {
+    [WORKFLOW_STEP_IDS.GENERATE_SONGS]: createWorkflowStep(
+        WORKFLOW_STEP_IDS.GENERATE_SONGS,
+        'Generate Beatles Song List',
+        'Create a comprehensive list of Beatles songs',
+        'pending',
+        'user'
+    ),
+    [WORKFLOW_STEP_IDS.RETRIEVE_LYRICS]: createWorkflowStep(
+        WORKFLOW_STEP_IDS.RETRIEVE_LYRICS,
+        'Retrieve Song Lyrics',
+        'Fetch lyrics for all Beatles songs',
+        'pending',
+        'user'
+    ),
+    [WORKFLOW_STEP_IDS.ANALYZE_LYRICS]: createWorkflowStep(
+        WORKFLOW_STEP_IDS.ANALYZE_LYRICS,
+        'Analyze Love References',
+        'Count and analyze occurrences of "love" in lyrics',
+        'pending',
+        'assistant'
+    )
 };
 
-export const generateLyricsStep = (): { step: WorkflowStep; asset: InformationAsset } => {
-    const step: WorkflowStep = {
-        id: uuidv4(),
-        name: 'Retrieve Song Lyrics',
-        description: 'Fetch lyrics for all Beatles songs',
-        status: 'running',
-        agentType: 'user',
-        level: 0,
-        tools: []
-    };
+// Helper to get workflow steps for a stage with proper status
+const getWorkflowStepsForStage = (stage: Stage): WorkflowStep[] => {
+    const steps = { ...baseWorkflowSteps };
 
-    const asset: InformationAsset = {
-        id: 'lyricsDatabase',
-        stepId: step.id,
-        type: 'data',
-        name: 'Beatles Lyrics Database',
-        content: BEATLES_LYRICS,
-        metadata: {
-            timestamp: new Date().toISOString(),
-            tags: ['lyrics', 'beatles', 'database']
-        }
-    };
+    switch (stage) {
+        case 'workflow_started':
+            return [{ ...steps[WORKFLOW_STEP_IDS.GENERATE_SONGS] }];
 
-    return { step, asset };
+        case 'compiling_songs':
+            return [{
+                ...steps[WORKFLOW_STEP_IDS.GENERATE_SONGS],
+                status: 'running'
+            }];
+
+        case 'songs_compiled':
+            return [
+                {
+                    ...steps[WORKFLOW_STEP_IDS.GENERATE_SONGS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.RETRIEVE_LYRICS],
+                    status: 'pending'
+                }
+            ];
+
+        case 'retrieving_lyrics':
+            return [
+                {
+                    ...steps[WORKFLOW_STEP_IDS.GENERATE_SONGS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.RETRIEVE_LYRICS],
+                    status: 'running'
+                }
+            ];
+
+        case 'lyrics_retrieved':
+            return [
+                {
+                    ...steps[WORKFLOW_STEP_IDS.GENERATE_SONGS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.RETRIEVE_LYRICS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.ANALYZE_LYRICS],
+                    status: 'pending'
+                }
+            ];
+
+        case 'analyzing_lyrics':
+            return [
+                {
+                    ...steps[WORKFLOW_STEP_IDS.GENERATE_SONGS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.RETRIEVE_LYRICS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.ANALYZE_LYRICS],
+                    status: 'running'
+                }
+            ];
+
+        case 'workflow_complete':
+            return [
+                {
+                    ...steps[WORKFLOW_STEP_IDS.GENERATE_SONGS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.RETRIEVE_LYRICS],
+                    status: 'completed'
+                },
+                {
+                    ...steps[WORKFLOW_STEP_IDS.ANALYZE_LYRICS],
+                    status: 'completed'
+                }
+            ];
+
+        default:
+            return [];
+    }
 };
 
 // Sample assets and workspace items
@@ -127,6 +214,23 @@ const sampleWorkspaceItems: Record<string, WorkspaceItem> = {
         createdAt: new Date().toISOString()
     }
 };
+
+// Helper to create workspace items for steps
+const createWorkspaceItemForStep = (
+    stepId: string,
+    title: string,
+    description: string,
+    status: WorkspaceItem['status'],
+    statusMessage?: string
+): WorkspaceItem => ({
+    id: stepId,
+    type: 'step',
+    title,
+    description,
+    status,
+    statusMessage,
+    createdAt: new Date().toISOString()
+});
 
 // Stage data
 export const FRACTAL_BOT_STATE: StageDataBlocks = {
@@ -197,7 +301,15 @@ export const FRACTAL_BOT_STATE: StageDataBlocks = {
         assets: [],
         nextStages: ['compiling_songs'],
         prevStages: ['workflow_ready'],
-        workspaceItems: []
+        workspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'active',
+                'Starting song list compilation...'
+            )
+        ]
     },
 
     compiling_songs: {
@@ -211,7 +323,15 @@ export const FRACTAL_BOT_STATE: StageDataBlocks = {
         assets: [],
         nextStages: ['songs_compiled'],
         prevStages: ['workflow_started'],
-        workspaceItems: [sampleWorkspaceItems.songAnalysis]
+        workspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'active',
+                'Compiling Beatles song list...'
+            )
+        ]
     },
 
     songs_compiled: {
@@ -225,7 +345,21 @@ export const FRACTAL_BOT_STATE: StageDataBlocks = {
         assets: [sampleAssets.beatlesSongList],
         nextStages: ['retrieving_lyrics'],
         prevStages: ['compiling_songs'],
-        workspaceItems: [sampleWorkspaceItems.songAnalysis]
+        workspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.RETRIEVE_LYRICS,
+                'Retrieve Song Lyrics',
+                'Fetching lyrics for all Beatles songs',
+                'active',
+                'Starting lyrics retrieval...'
+            )
+        ]
     },
 
     retrieving_lyrics: {
@@ -236,10 +370,58 @@ export const FRACTAL_BOT_STATE: StageDataBlocks = {
             content: 'Retrieving lyrics for analysis...',
             timestamp: new Date().toISOString()
         }],
-        assets: [sampleAssets.lyricsDatabase],
-        nextStages: ['analyzing_lyrics'],
+        assets: [],
+        nextStages: ['lyrics_retrieved'],
         prevStages: ['songs_compiled'],
-        workspaceItems: [sampleWorkspaceItems.songAnalysis]
+        workspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.RETRIEVE_LYRICS,
+                'Retrieve Song Lyrics',
+                'Fetching lyrics for all Beatles songs',
+                'active',
+                'Fetching lyrics from database...'
+            )
+        ]
+    },
+
+    lyrics_retrieved: {
+        stage: 'lyrics_retrieved',
+        messages: [{
+            id: uuidv4(),
+            role: 'assistant',
+            content: 'Lyrics retrieval complete. Starting analysis...',
+            timestamp: new Date().toISOString()
+        }],
+        assets: [sampleAssets.beatlesSongList, sampleAssets.lyricsDatabase],
+        nextStages: ['analyzing_lyrics'],
+        prevStages: ['retrieving_lyrics'],
+        workspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.RETRIEVE_LYRICS,
+                'Retrieve Song Lyrics',
+                'Fetching lyrics for all Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.ANALYZE_LYRICS,
+                'Analyze Love References',
+                'Counting occurrences of "love" in lyrics',
+                'active',
+                'Preparing to analyze lyrics...'
+            )
+        ]
     },
 
     analyzing_lyrics: {
@@ -252,8 +434,28 @@ export const FRACTAL_BOT_STATE: StageDataBlocks = {
         }],
         assets: [sampleAssets.beatlesSongList, sampleAssets.lyricsDatabase],
         nextStages: ['workflow_complete'],
-        prevStages: ['retrieving_lyrics'],
-        workspaceItems: [sampleWorkspaceItems.songAnalysis]
+        prevStages: ['lyrics_retrieved'],
+        workspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.RETRIEVE_LYRICS,
+                'Retrieve Song Lyrics',
+                'Fetching lyrics for all Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.ANALYZE_LYRICS,
+                'Analyze Love References',
+                'Counting occurrences of "love" in lyrics',
+                'active',
+                'Analyzing lyrics for love references...'
+            )
+        ]
     },
 
     workflow_complete: {
@@ -267,7 +469,26 @@ export const FRACTAL_BOT_STATE: StageDataBlocks = {
         assets: [sampleAssets.beatlesSongList, sampleAssets.lyricsDatabase],
         nextStages: [],
         prevStages: ['analyzing_lyrics'],
-        workspaceItems: [{ ...sampleWorkspaceItems.songAnalysis, status: 'completed' }]
+        workspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.RETRIEVE_LYRICS,
+                'Retrieve Song Lyrics',
+                'Fetching lyrics for all Beatles songs',
+                'completed'
+            ),
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.ANALYZE_LYRICS,
+                'Analyze Love References',
+                'Counting occurrences of "love" in lyrics',
+                'completed'
+            )
+        ]
     }
 };
 
@@ -352,8 +573,17 @@ export const demoStates: DemoState[] = [
             timestamp: new Date().toISOString()
         }],
         addedAssets: [],
-        addedWorkspaceItems: [],
-        workflowSteps: []
+        addedWorkspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.GENERATE_SONGS,
+                'Generate Beatles Song List',
+                'Creating a comprehensive list of Beatles songs',
+                'active',
+                'Starting song list compilation...'
+            )
+        ],
+        workflowSteps: getWorkflowStepsForStage('workflow_started'),
+        stepDetails: {}
     },
     {
         stage: 'compiling_songs',
@@ -366,24 +596,15 @@ export const demoStates: DemoState[] = [
             timestamp: new Date().toISOString()
         }],
         addedAssets: [],
-        addedWorkspaceItems: [{
-            id: 'songAnalysis',
-            type: 'step',
-            title: 'Analyze Beatles Songs',
-            description: 'Count occurrences of "love" in Beatles songs',
-            status: 'pending',
-            createdAt: new Date().toISOString()
-        }],
-        workflowSteps: [{
-            id: uuidv4(),
-            name: 'Generate Beatles Song List',
-            description: 'Create a comprehensive list of Beatles songs',
-            status: 'running',
-            agentType: 'user',
-            level: 0,
-            tools: []
-        }],
-        stepDetails: {}
+        addedWorkspaceItems: [],
+        workflowSteps: getWorkflowStepsForStage('compiling_songs'),
+        stepDetails: {
+            [WORKFLOW_STEP_IDS.GENERATE_SONGS]: {
+                status: 'running',
+                content: 'Compiling Beatles song list...',
+                assets: []
+            }
+        }
     },
     {
         stage: 'songs_compiled',
@@ -405,18 +626,18 @@ export const demoStates: DemoState[] = [
                 tags: ['songs', 'beatles']
             }
         }],
-        addedWorkspaceItems: [],
-        workflowSteps: [{
-            id: uuidv4(),
-            name: 'Generate Beatles Song List',
-            description: 'Create a comprehensive list of Beatles songs',
-            status: 'completed',
-            agentType: 'user',
-            level: 0,
-            tools: []
-        }],
+        addedWorkspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.RETRIEVE_LYRICS,
+                'Retrieve Song Lyrics',
+                'Fetching lyrics for all Beatles songs',
+                'active',
+                'Starting lyrics retrieval...'
+            )
+        ],
+        workflowSteps: getWorkflowStepsForStage('songs_compiled'),
         stepDetails: {
-            'step1': {
+            [WORKFLOW_STEP_IDS.GENERATE_SONGS]: {
                 status: 'completed',
                 content: 'Beatles song list generated successfully.',
                 assets: [{
@@ -442,6 +663,41 @@ export const demoStates: DemoState[] = [
             content: 'Retrieving lyrics for analysis...',
             timestamp: new Date().toISOString()
         }],
+        addedAssets: [],
+        addedWorkspaceItems: [],
+        workflowSteps: getWorkflowStepsForStage('retrieving_lyrics'),
+        stepDetails: {
+            [WORKFLOW_STEP_IDS.GENERATE_SONGS]: {
+                status: 'completed',
+                content: 'Beatles song list generated successfully.',
+                assets: [{
+                    id: 'beatlesSongList',
+                    type: 'data',
+                    name: 'Beatles Song List',
+                    content: BEATLES_SONGS,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['songs', 'beatles']
+                    }
+                }]
+            },
+            [WORKFLOW_STEP_IDS.RETRIEVE_LYRICS]: {
+                status: 'running',
+                content: 'Fetching lyrics for all songs...',
+                assets: []
+            }
+        }
+    },
+    {
+        stage: 'lyrics_retrieved',
+        description: 'Lyrics retrieval completed',
+        phase: 'execution',
+        addedMessages: [{
+            id: uuidv4(),
+            role: 'assistant',
+            content: 'Lyrics retrieval complete. Starting analysis...',
+            timestamp: new Date().toISOString()
+        }],
         addedAssets: [{
             id: 'lyricsDatabase',
             type: 'data',
@@ -452,18 +708,32 @@ export const demoStates: DemoState[] = [
                 tags: ['lyrics', 'beatles', 'database']
             }
         }],
-        addedWorkspaceItems: [],
-        workflowSteps: [{
-            id: uuidv4(),
-            name: 'Retrieve Song Lyrics',
-            description: 'Fetch lyrics for all Beatles songs',
-            status: 'completed',
-            agentType: 'user',
-            level: 0,
-            tools: []
-        }],
+        addedWorkspaceItems: [
+            createWorkspaceItemForStep(
+                WORKFLOW_STEP_IDS.ANALYZE_LYRICS,
+                'Analyze Love References',
+                'Counting occurrences of "love" in lyrics',
+                'active',
+                'Preparing to analyze lyrics...'
+            )
+        ],
+        workflowSteps: getWorkflowStepsForStage('lyrics_retrieved'),
         stepDetails: {
-            'step2': {
+            [WORKFLOW_STEP_IDS.GENERATE_SONGS]: {
+                status: 'completed',
+                content: 'Beatles song list generated successfully.',
+                assets: [{
+                    id: 'beatlesSongList',
+                    type: 'data',
+                    name: 'Beatles Song List',
+                    content: BEATLES_SONGS,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['songs', 'beatles']
+                    }
+                }]
+            },
+            [WORKFLOW_STEP_IDS.RETRIEVE_LYRICS]: {
                 status: 'completed',
                 content: 'Lyrics database generated successfully.',
                 assets: [{
@@ -491,15 +761,42 @@ export const demoStates: DemoState[] = [
         }],
         addedAssets: [],
         addedWorkspaceItems: [],
-        workflowSteps: [{
-            id: uuidv4(),
-            name: 'Analyze Love References',
-            description: 'Count and analyze occurrences of "love" in lyrics',
-            status: 'running',
-            agentType: 'assistant',
-            level: 0,
-            tools: []
-        }]
+        workflowSteps: getWorkflowStepsForStage('analyzing_lyrics'),
+        stepDetails: {
+            [WORKFLOW_STEP_IDS.GENERATE_SONGS]: {
+                status: 'completed',
+                content: 'Beatles song list generated successfully.',
+                assets: [{
+                    id: 'beatlesSongList',
+                    type: 'data',
+                    name: 'Beatles Song List',
+                    content: BEATLES_SONGS,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['songs', 'beatles']
+                    }
+                }]
+            },
+            [WORKFLOW_STEP_IDS.RETRIEVE_LYRICS]: {
+                status: 'completed',
+                content: 'Lyrics database generated successfully.',
+                assets: [{
+                    id: 'lyricsDatabase',
+                    type: 'data',
+                    name: 'Beatles Lyrics Database',
+                    content: BEATLES_LYRICS,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['lyrics', 'beatles', 'database']
+                    }
+                }]
+            },
+            [WORKFLOW_STEP_IDS.ANALYZE_LYRICS]: {
+                status: 'running',
+                content: 'Analyzing lyrics for "love" occurrences...',
+                assets: []
+            }
+        }
     },
     {
         stage: 'workflow_complete',
@@ -529,14 +826,57 @@ export const demoStates: DemoState[] = [
             }
         }],
         addedWorkspaceItems: [],
-        workflowSteps: [{
-            id: uuidv4(),
-            name: 'Generate Analysis Report',
-            description: 'Create final report of love word usage',
-            status: 'completed',
-            agentType: 'assistant',
-            level: 0,
-            tools: []
-        }]
+        workflowSteps: getWorkflowStepsForStage('workflow_complete'),
+        stepDetails: {
+            [WORKFLOW_STEP_IDS.GENERATE_SONGS]: {
+                status: 'completed',
+                content: 'Beatles song list generated successfully.',
+                assets: [{
+                    id: 'beatlesSongList',
+                    type: 'data',
+                    name: 'Beatles Song List',
+                    content: BEATLES_SONGS,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['songs', 'beatles']
+                    }
+                }]
+            },
+            [WORKFLOW_STEP_IDS.RETRIEVE_LYRICS]: {
+                status: 'completed',
+                content: 'Lyrics database generated successfully.',
+                assets: [{
+                    id: 'lyricsDatabase',
+                    type: 'data',
+                    name: 'Beatles Lyrics Database',
+                    content: BEATLES_LYRICS,
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['lyrics', 'beatles', 'database']
+                    }
+                }]
+            },
+            [WORKFLOW_STEP_IDS.ANALYZE_LYRICS]: {
+                status: 'completed',
+                content: 'Analysis completed successfully.',
+                assets: [{
+                    id: 'analysisResults',
+                    type: 'analysis_output',
+                    name: 'Love Word Analysis',
+                    content: {
+                        totalOccurrences: 42,
+                        songsByLoveCount: {
+                            'All You Need Is Love': 12,
+                            'She Loves You': 8,
+                            'Love Me Do': 6
+                        }
+                    },
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['analysis', 'beatles', 'love']
+                    }
+                }]
+            }
+        }
     }
 ]; 

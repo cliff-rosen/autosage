@@ -15,10 +15,12 @@ export interface InformationAsset {
 // Workspace item types (for the third column)
 export interface WorkspaceItem {
     id: string;
-    type: 'step' | 'note' | 'decision' | 'checkpoint';
+    stepId: string;
+    type: 'step' | 'note' | 'decision' | 'checkpoint' | 'task' | 'result';
     title: string;
     description: string;
-    status: 'pending' | 'active' | 'completed' | 'failed';
+    status: 'pending' | 'active' | 'completed' | 'failed' | 'error';
+    statusMessage?: string;
     metadata?: Record<string, any>;
     createdAt: string;
 }
@@ -38,7 +40,7 @@ export interface WorkflowStep {
 // Step details including assets
 export interface StepDetails {
     id: string;
-    status: 'running' | 'completed' | 'error';
+    status: 'pending' | 'running' | 'completed' | 'error';
     content?: string;
     assets?: InformationAsset[];
 }
@@ -73,6 +75,7 @@ export type Stage =
     | 'compiling_songs'
     | 'songs_compiled'
     | 'retrieving_lyrics'
+    | 'lyrics_retrieved'
     | 'analyzing_lyrics'
     | 'workflow_complete';
 

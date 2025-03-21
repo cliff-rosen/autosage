@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { InformationAsset } from '../types/state';
 import { AssetModal } from './AssetModal';
 
 interface AssetsSectionProps {
     assets: InformationAsset[];
     currentStepId: string | null;
+    onUpload?: (file: File) => void;
 }
 
 const getAssetIcon = (type: string) => {
@@ -28,6 +29,23 @@ const getAssetIcon = (type: string) => {
                 </svg>
             );
     }
+};
+
+// Helper function to download asset content
+const downloadAsset = (asset: InformationAsset) => {
+    const content = typeof asset.content === 'string'
+        ? asset.content
+        : JSON.stringify(asset.content, null, 2);
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${asset.name || asset.title || 'asset'}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 };
 
 const HoverPreview: React.FC<{ asset: InformationAsset; position: { x: number; y: number } }> = ({ asset, position }) => {
@@ -102,10 +120,13 @@ const HoverPreview: React.FC<{ asset: InformationAsset; position: { x: number; y
 
 export const AssetsSection: React.FC<AssetsSectionProps> = ({
     assets,
-    currentStepId
+    currentStepId,
+    onUpload
 }) => {
     const [selectedAsset, setSelectedAsset] = useState<InformationAsset | null>(null);
     const [previewAsset, setPreviewAsset] = useState<{ asset: InformationAsset; position: { x: number; y: number } } | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleMouseEnter = (asset: InformationAsset, event: React.MouseEvent) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -122,23 +143,80 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({
         setPreviewAsset(null);
     };
 
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && onUpload) {
+            onUpload(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0 && onUpload) {
+            onUpload(e.target.files[0]);
+        }
+    };
+
     return (
-        <div className="h-full flex flex-col">
+        <div
+            className="h-full flex flex-col"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
             <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    Information Palette
-                </h3>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        Information Palette
+                    </h3>
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md
+                                 text-gray-700 bg-white hover:bg-gray-50
+                                 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
+                                 border border-gray-300 dark:border-gray-600
+                                 transition-colors duration-200"
+                    >
+                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Upload
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                    />
+                </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+
+            <div className="flex-1 overflow-y-auto p-4 relative">
+                {isDragging && (
+                    <div className="absolute inset-0 bg-blue-500/10 dark:bg-blue-400/10 border-2 border-dashed border-blue-500 dark:border-blue-400 rounded-lg flex items-center justify-center">
+                        <div className="text-blue-500 dark:text-blue-400 text-lg font-medium">
+                            Drop file to upload
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-3">
                     {assets.map(asset => (
                         <div
                             key={asset.id}
-                            onClick={() => setSelectedAsset(asset)}
-                            onMouseEnter={(e) => handleMouseEnter(asset, e)}
-                            onMouseLeave={handleMouseLeave}
                             className="group relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 
-                                     hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-md transition-all duration-200 cursor-pointer p-3"
+                                     hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-md transition-all duration-200 p-3"
                         >
                             <div className="flex items-center gap-3">
                                 <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center
@@ -148,8 +226,7 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({
                                     {getAssetIcon(asset.type)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h5 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 
-                                                 dark:group-hover:text-blue-400 transition-colors">
+                                    <h5 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                                         {asset.name || asset.title}
                                     </h5>
                                     <div className="flex items-center gap-2 mt-0.5">
@@ -175,10 +252,33 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex-shrink-0 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            downloadAsset(asset);
+                                        }}
+                                        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 dark:text-gray-500 
+                                                 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+                                                 opacity-0 group-hover:opacity-100 transition-all"
+                                        title="Download asset"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedAsset(asset)}
+                                        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 dark:text-gray-500 
+                                                 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+                                                 opacity-0 group-hover:opacity-100 transition-all"
+                                        title="View details"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -186,7 +286,6 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({
                 </div>
             </div>
 
-            {/* Hover Preview */}
             {previewAsset && (
                 <HoverPreview
                     asset={previewAsset.asset}
@@ -194,7 +293,6 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({
                 />
             )}
 
-            {/* Full Modal */}
             <AssetModal
                 asset={selectedAsset}
                 onClose={() => setSelectedAsset(null)}
