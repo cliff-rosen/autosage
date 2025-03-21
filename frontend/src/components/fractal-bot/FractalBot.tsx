@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { ChatSection } from './components/ChatSection';
 import { WorkspaceSection } from './components/WorkspaceSection';
 import { AssetsSection } from './components/AssetsSection';
 import { demoStates } from './data/fractal_bot_data';
-import { FractalBotState, createInitialState } from './types/state';
+import { FractalBotState, createInitialState, Asset } from './types/state';
 
 interface FractalBotProps {
     onComplete?: (result: any) => void;
@@ -37,10 +38,10 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
 
             // Update existing agents based on stage
             if (demoState.stage === 'songs_compiled') {
-                // Find and update the song generation agent
+                // Find and update the song list agent
                 Object.keys(agents).forEach(agentId => {
                     const agent = agents[agentId];
-                    if (agent.title === 'Generate Beatles Song List') {
+                    if (agent.title === 'Song List Agent') {
                         agents[agentId] = {
                             ...agent,
                             status: 'completed',
@@ -52,7 +53,7 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                 // Find and update the lyrics retrieval agent
                 Object.keys(agents).forEach(agentId => {
                     const agent = agents[agentId];
-                    if (agent.title === 'Retrieve Lyrics') {
+                    if (agent.title === 'Lyrics Retrieval Agent') {
                         agents[agentId] = {
                             ...agent,
                             status: 'completed',
@@ -106,6 +107,33 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
         applyDemoState(demoStates[0]);
     };
 
+    const handleFileUpload = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const content = e.target?.result;
+            if (content) {
+                const newAsset: Asset = {
+                    id: uuidv4(),
+                    type: 'data',
+                    name: file.name,
+                    content: content.toString(),
+                    metadata: {
+                        timestamp: new Date().toISOString(),
+                        tags: ['uploaded'],
+                        size: file.size,
+                        type: file.type
+                    }
+                };
+
+                setState(prev => ({
+                    ...prev,
+                    assets: [...prev.assets, newAsset]
+                }));
+            }
+        };
+        reader.readAsText(file);
+    };
+
     return (
         <div className="flex flex-col h-screen">
             {/* Header */}
@@ -142,6 +170,7 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                     <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                         <AssetsSection
                             assets={state.assets}
+                            onUpload={handleFileUpload}
                         />
                     </div>
                 </div>
