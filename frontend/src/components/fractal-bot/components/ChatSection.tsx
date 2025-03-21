@@ -1,35 +1,22 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { ChatMessage, WorkflowStep } from '../types/state';
+import { ChatMessage } from '../types/state';
 
-interface ChatSectionProps {
+export interface ChatSectionProps {
     messages: ChatMessage[];
     inputMessage: string;
     isProcessing: boolean;
-    currentPhase: 'setup' | 'execution';
-    currentStepIndex: number;
-    workflowSteps: WorkflowStep[];
-    isQuestionComplete: boolean;
-    isWorkflowAgreed: boolean;
     onSendMessage: () => void;
-    onInputChange: (value: string) => void;
-    onCompleteWorkflow: () => void;
-    onPhaseTransition: () => void;
+    onInputChange: (message: string) => void;
+    onActionButtonClick: (action: string) => void;
 }
 
 export const ChatSection: React.FC<ChatSectionProps> = ({
     messages,
     inputMessage,
     isProcessing,
-    currentPhase,
-    currentStepIndex,
-    workflowSteps,
-    isQuestionComplete,
-    isWorkflowAgreed,
     onSendMessage,
     onInputChange,
-    onCompleteWorkflow,
-    onPhaseTransition
+    onActionButtonClick
 }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [localInputMessage, setLocalInputMessage] = useState(inputMessage);
@@ -47,56 +34,51 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
     }, [inputMessage]);
 
     const handleSendMessage = () => {
-        if (!inputMessage.trim()) return;
+        if (!localInputMessage.trim()) return;
         onSendMessage();
         setLocalInputMessage('');
     };
 
     return (
         <div className="h-full flex flex-col">
-            {/* Chat Header */}
             <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                    <span className="text-lg font-semibold text-gray-900 dark:text-gray-300">Chat</span>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Chat
+                </h3>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-4">
+                    {messages.map((message, index) => (
+                        <div
+                            key={message.id}
+                            className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+                        >
+                            <div
+                                className={`max-w-[80%] rounded-lg p-4 ${message.role === 'assistant'
+                                    ? 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100'
+                                    : 'bg-blue-500 text-white'
+                                    }`}
+                            >
+                                <p className="text-sm whitespace-pre-wrap">
+                                    {message.content}
+                                </p>
+                                {message.actionButton && (
+                                    <button
+                                        onClick={() => onActionButtonClick(message.actionButton!.action)}
+                                        className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    >
+                                        {message.actionButton.label}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    <div ref={messagesEndRef} />
                 </div>
             </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => (
-                    <div
-                        key={message.id}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
-                    >
-                        <div
-                            className={`max-w-[80%] rounded-lg p-3 ${message.role === 'user'
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
-                                }`}
-                        >
-                            <p className="whitespace-pre-wrap">{message.content}</p>
-                            <div className="mt-1 text-xs opacity-70">
-                                {new Date(message.timestamp).toLocaleTimeString()}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                {isProcessing && (
-                    <div className="flex justify-start">
-                        <div className="max-w-[80%] rounded-lg p-3 bg-gray-100 dark:bg-gray-700">
-                            <div className="flex space-x-2">
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '400ms' }} />
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Chat Input */}
-            <div className="flex-none p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div className="flex-none p-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex gap-2">
                     <input
                         type="text"
@@ -106,9 +88,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
                             onInputChange(e.target.value);
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                        placeholder="Type your message..."
+                        placeholder="Type a message..."
+                        className="flex-1 px-4 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         disabled={isProcessing}
-                        className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 disabled:bg-gray-100 dark:disabled:bg-gray-800"
                     />
                     <button
                         onClick={handleSendMessage}
@@ -117,14 +99,6 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
                     >
                         {isProcessing ? 'Processing...' : 'Send'}
                     </button>
-                    {currentPhase === 'setup' && isQuestionComplete && (
-                        <button
-                            onClick={onCompleteWorkflow}
-                            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        >
-                            Develop Workflow
-                        </button>
-                    )}
                 </div>
             </div>
         </div>

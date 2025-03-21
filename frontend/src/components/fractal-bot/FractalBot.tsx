@@ -1,341 +1,183 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import React, { useState, useEffect } from 'react';
 import { ChatSection } from './components/ChatSection';
-import { AssetsSection } from './components/AssetsSection';
 import { WorkspaceSection } from './components/WorkspaceSection';
+import { AssetsSection } from './components/AssetsSection';
 import { ToolsSection } from './components/ToolsSection';
-import { WorkflowNavigation } from './components/WorkflowNavigation';
-import {
-    WorkflowStep,
-    ChatMessage,
-    StepDetails,
-    WorkflowState,
-    Stage,
-    InformationAsset,
-    WorkspaceItem
-} from './types/state';
 import { demoStates } from './data/fractal_bot_data';
+import { FractalBotState, createInitialState } from './types/state';
 
-const FractalBot: React.FC = () => {
-    const [currentStateIndex, setCurrentStateIndex] = useState<number>(0);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [inputMessage, setInputMessage] = useState('');
-    const [workflowState, setWorkflowState] = useState<WorkflowState>({
-        phase: 'setup',
-        currentStepIndex: 0,
-        isProcessing: false
-    });
-    const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
-    const [stepDetails, setStepDetails] = useState<Record<string, StepDetails>>({});
-    const [assets, setAssets] = useState<InformationAsset[]>([]);
-    const [workspaceItems, setWorkspaceItems] = useState<WorkspaceItem[]>([]);
+interface FractalBotProps {
+    onComplete?: (result: any) => void;
+}
+
+export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
+    const [state, setState] = useState<FractalBotState>(createInitialState());
+    const [currentDemoIndex, setCurrentDemoIndex] = useState(0);
+    const [pendingActionState, setPendingActionState] = useState<typeof demoStates[0] | null>(null);
     const [isToolSearchOpen, setIsToolSearchOpen] = useState(false);
     const [isMoreToolsOpen, setIsMoreToolsOpen] = useState(false);
     const [toolSearchQuery, setToolSearchQuery] = useState('');
 
-    // Initialize with initial state
+    // Initialize with the first demo state
     useEffect(() => {
-        const initialState = demoStates[0];
-        setMessages(initialState.addedMessages);
-        setWorkflowState(prev => ({ ...prev, phase: initialState.phase }));
+        applyDemoState(demoStates[0]);
     }, []);
 
-    // Get current step data
-    const getCurrentStepData = useCallback(() => {
-        if (!workflowSteps.length || workflowState.currentStepIndex < 0) return null;
+    // Apply the changes from a demo state
+    const applyDemoState = (demoState: typeof demoStates[0]) => {
+        setState(prev => {
+            // Add new messages, preventing duplicates by ID
+            const existingMessageIds = new Set(prev.messages.map(m => m.id));
+            const newMessages = demoState.addedMessages.filter(m => !existingMessageIds.has(m.id));
+            const messages = [...prev.messages, ...newMessages];
 
-        const step = workflowSteps[workflowState.currentStepIndex];
-        if (!step) return null;
+            // Add new tasks and update existing ones
+            const tasks = { ...prev.tasks };
 
-        const details = stepDetails[step.id];
-        return {
-            id: step.id,
-            name: step.name,
-            description: step.description,
-            status: step.status,
-            content: details?.content
-        };
-    }, [workflowSteps, workflowState.currentStepIndex, stepDetails]);
+            // Add new tasks
+            demoState.addedWorkspaceItems.forEach(item => {
+                tasks[item.id] = item;
+            });
 
-    // Get previous step data
-    const getPreviousStepData = useCallback(() => {
-        if (!workflowSteps.length || workflowState.currentStepIndex <= 0) return undefined;
-
-        const prevStep = workflowSteps[workflowState.currentStepIndex - 1];
-        if (!prevStep) return undefined;
-
-        const details = stepDetails[prevStep.id];
-        return {
-            id: prevStep.id,
-            name: prevStep.name,
-            description: prevStep.description,
-            status: prevStep.status as 'completed' | 'error',
-            content: details?.content
-        };
-    }, [workflowSteps, workflowState.currentStepIndex, stepDetails]);
-
-    // Get current work items
-    const getCurrentWorkItems = useCallback(() => {
-        if (!workflowSteps.length || workflowState.currentStepIndex < 0) return [];
-
-        const currentStep = workflowSteps[workflowState.currentStepIndex];
-        if (!currentStep) return [];
-
-        return workspaceItems.filter(item =>
-            item.stepId === currentStep.id ||
-            (workflowState.currentStepIndex > 0 && item.stepId === workflowSteps[workflowState.currentStepIndex - 1].id)
-        );
-    }, [workflowSteps, workflowState.currentStepIndex, workspaceItems]);
-
-    // Handle state transitions
-    const handleStateTransition = async (direction: 'forward' | 'backward' = 'forward') => {
-        if (workflowState.isProcessing) return;
-
-        setWorkflowState(prev => ({ ...prev, isProcessing: true }));
-
-        try {
-            const nextIndex = direction === 'forward'
-                ? Math.min(currentStateIndex + 1, demoStates.length - 1)
-                : Math.max(currentStateIndex - 1, 0);
-
-            if (nextIndex === currentStateIndex) {
-                setWorkflowState(prev => ({ ...prev, isProcessing: false }));
-                return;
+            // Update existing tasks based on stage
+            if (demoState.stage === 'songs_compiled') {
+                // Find and update the song generation task
+                Object.keys(tasks).forEach(taskId => {
+                    const task = tasks[taskId];
+                    if (task.title === 'Generate Beatles Song List') {
+                        tasks[taskId] = {
+                            ...task,
+                            status: 'completed',
+                            completedAt: new Date().toISOString()
+                        };
+                    }
+                });
             }
 
-            const currentState = demoStates[currentStateIndex];
-            const nextState = demoStates[nextIndex];
+            // Add new assets, preventing duplicates by ID
+            const existingAssetIds = new Set(prev.assets.map(a => a.id));
+            const newAssets = demoState.addedAssets.filter(a => !existingAssetIds.has(a.id));
+            const assets = [...prev.assets, ...newAssets];
 
-            if (direction === 'backward') {
-                // When going backward, rebuild state up to this point
-                const messageHistory: ChatMessage[] = [];
-                const assetHistory: InformationAsset[] = [];
-                const workspaceHistory: WorkspaceItem[] = [];
-                let steps: WorkflowStep[] = [];
-                let details: Record<string, StepDetails> = {};
-
-                // Rebuild state by accumulating changes up to the target index
-                for (let i = 0; i <= nextIndex; i++) {
-                    const state = demoStates[i];
-                    messageHistory.push(...state.addedMessages);
-                    assetHistory.push(...state.addedAssets);
-                    workspaceHistory.push(...state.addedWorkspaceItems);
-
-                    if (state.workflowSteps) {
-                        steps = state.workflowSteps;
-                    }
-                    if (state.stepDetails) {
-                        details = { ...details, ...state.stepDetails };
-                    }
-                }
-
-                setMessages(messageHistory);
-                setAssets(assetHistory);
-                setWorkspaceItems(workspaceHistory);
-                setWorkflowSteps(steps);
-                setStepDetails(details);
-            } else {
-                // When going forward, append new state data
-                setMessages(prev => [...prev, ...nextState.addedMessages]);
-                setAssets(prev => [...prev, ...nextState.addedAssets]);
-                setWorkspaceItems(prev => [...prev, ...nextState.addedWorkspaceItems]);
-
-                if (nextState.workflowSteps) {
-                    setWorkflowSteps(nextState.workflowSteps);
-                }
-                if (nextState.stepDetails) {
-                    setStepDetails(prev => ({ ...prev, ...nextState.stepDetails }));
-                }
-            }
-
-            // Update phase
-            setWorkflowState(prev => ({
+            return {
                 ...prev,
-                phase: nextState.phase,
-                currentStepIndex: nextState.workflowSteps ? nextState.workflowSteps.length - 1 : 0,
-                isProcessing: false
-            }));
+                messages,
+                tasks,
+                assets,
+                phase: demoState.phase,
+                metadata: {
+                    ...prev.metadata,
+                    lastUpdated: new Date().toISOString()
+                }
+            };
+        });
+    };
 
-            setCurrentStateIndex(nextIndex);
-
-        } catch (error) {
-            console.error('Error during state transition:', error);
-            setWorkflowState(prev => ({ ...prev, isProcessing: false }));
+    // Handle moving to the next demo state
+    const handleNext = () => {
+        if (currentDemoIndex < demoStates.length - 1) {
+            const nextState = demoStates[currentDemoIndex + 1];
+            // Apply the full next state immediately
+            applyDemoState(nextState);
+            setCurrentDemoIndex(currentDemoIndex + 1);
         }
     };
 
-    // Handle completing the workflow
-    const handleCompleteWorkflow = () => {
-        const currentState = demoStates[currentStateIndex];
-        if (currentState.stage === 'workflow_ready') {
-            handleStateTransition('forward');
-        }
-    };
-
-    // Handle step selection
-    const handleStepSelect = (stepId: string) => {
-        const findStepIndex = (steps: WorkflowStep[], id: string): number => {
-            for (let i = 0; i < steps.length; i++) {
-                if (steps[i].id === id) return i;
-                const subSteps = steps[i].subSteps || [];
-                const subIndex = findStepIndex(subSteps, id);
-                if (subIndex !== -1) return i;
-            }
-            return -1;
-        };
-
-        const steps = workflowSteps || [];
-        const index = findStepIndex(steps, stepId);
-        if (index !== -1) {
-            setWorkflowState(prev => ({ ...prev, currentStepIndex: index }));
-        }
+    // Simplified action button handler for demo purposes
+    const handleActionButton = (action: string) => {
+        // In demo mode, action buttons are just for show
+        console.log('Demo action button clicked:', action);
     };
 
     // Handle restart
     const handleRestart = () => {
-        const initialState = demoStates[0];
-        setCurrentStateIndex(0);
-        setWorkflowState({
-            phase: initialState.phase,
-            currentStepIndex: 0,
-            isProcessing: false
-        });
-        setMessages(initialState.addedMessages);
-        setAssets([]);
-        setWorkspaceItems([]);
-        setWorkflowSteps([]);
-        setStepDetails({});
-        setInputMessage('');
-        setIsToolSearchOpen(false);
-        setIsMoreToolsOpen(false);
-        setToolSearchQuery('');
+        setState(createInitialState());
+        setCurrentDemoIndex(0);
+        setPendingActionState(null);
+        // Apply the initial state after reset
+        applyDemoState(demoStates[0]);
     };
-
-    // Handle sending a message
-    const handleSendMessage = () => {
-        if (!inputMessage.trim()) return;
-
-        // Create and add the user message
-        const userMessage: ChatMessage = {
-            id: uuidv4(),
-            role: 'user',
-            content: inputMessage,
-            timestamp: new Date().toISOString(),
-            metadata: {
-                phase: workflowState.phase,
-                type: 'question'
-            }
-        };
-
-        // Add the message to the chat
-        setMessages(prev => [...prev, userMessage]);
-
-        // Clear the input
-        setInputMessage('');
-
-        // Trigger the state transition
-        handleStateTransition('forward');
-    };
-
-    // Handle file upload
-    const handleFileUpload = useCallback((file: File) => {
-        const reader = new FileReader();
-
-        reader.onload = (e) => {
-            const content = e.target?.result;
-            const newAsset: InformationAsset = {
-                id: uuidv4(),
-                type: 'data',
-                name: file.name,
-                content: content,
-                metadata: {
-                    timestamp: new Date().toISOString(),
-                    tags: ['uploaded', file.type],
-                }
-            };
-
-            setAssets(prev => [...prev, newAsset]);
-        };
-
-        reader.readAsText(file);
-    }, []);
 
     return (
         <div className="flex flex-col h-screen">
             {/* Header */}
             <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    FractalBot Demonstration
+                    FractalBot Demo
                 </h2>
             </div>
 
             {/* Main Content Area */}
             <div className="flex-1 flex overflow-hidden p-4 pb-2">
-                {/* Chat */}
+                {/* Chat Section */}
                 <div className="w-[400px] flex-shrink-0 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
                     <ChatSection
-                        messages={messages}
-                        inputMessage={inputMessage}
-                        isProcessing={workflowState.isProcessing}
-                        currentPhase={workflowState.phase}
-                        currentStepIndex={workflowState.currentStepIndex}
-                        workflowSteps={workflowSteps}
-                        isQuestionComplete={demoStates[currentStateIndex].stage === 'workflow_ready'}
-                        isWorkflowAgreed={demoStates[currentStateIndex].stage === 'workflow_ready'}
-                        onSendMessage={handleSendMessage}
-                        onInputChange={setInputMessage}
-                        onCompleteWorkflow={handleCompleteWorkflow}
-                        onPhaseTransition={() => handleStateTransition('forward')}
+                        messages={state.messages}
+                        inputMessage=""
+                        isProcessing={false}
+                        onSendMessage={() => { }}
+                        onInputChange={() => { }}
+                        onActionButtonClick={handleActionButton}
                     />
                 </div>
 
-                {/* Assets */}
+                {/* Assets Section */}
                 <div className="w-[400px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
                     <AssetsSection
-                        assets={assets}
-                        currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
-                        onUpload={handleFileUpload}
+                        assets={state.assets}
                     />
                 </div>
 
-                {/* Work Area with Tools */}
-                <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                    <div className="flex-1 overflow-hidden">
-                        <WorkspaceSection
-                            currentStep={getCurrentStepData()}
-                            previousStep={getPreviousStepData()}
-                            workItems={getCurrentWorkItems()}
-                        >
-                            <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-                                <ToolsSection
-                                    currentStep={workflowSteps[workflowState.currentStepIndex] || null}
-                                    isToolSearchOpen={isToolSearchOpen}
-                                    isMoreToolsOpen={isMoreToolsOpen}
-                                    toolSearchQuery={toolSearchQuery}
-                                    onToolSearch={() => setIsToolSearchOpen(true)}
-                                    onMoreTools={() => setIsMoreToolsOpen(true)}
-                                    onSearchClose={() => setIsToolSearchOpen(false)}
-                                    onMoreToolsClose={() => setIsMoreToolsOpen(false)}
-                                    onToolSearchQueryChange={setToolSearchQuery}
-                                />
-                            </div>
-                        </WorkspaceSection>
-                    </div>
+                {/* Work Area */}
+                <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
+                    <WorkspaceSection
+                        tasks={Object.values(state.tasks)}
+                    />
+                </div>
+
+                {/* Tools Section */}
+                <div className="w-[400px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <ToolsSection
+                        currentStep={null}
+                        isToolSearchOpen={isToolSearchOpen}
+                        isMoreToolsOpen={isMoreToolsOpen}
+                        toolSearchQuery={toolSearchQuery}
+                        onToolSearch={() => setIsToolSearchOpen(true)}
+                        onMoreTools={() => setIsMoreToolsOpen(true)}
+                        onSearchClose={() => setIsToolSearchOpen(false)}
+                        onMoreToolsClose={() => setIsMoreToolsOpen(false)}
+                        onToolSearchQueryChange={setToolSearchQuery}
+                    />
                 </div>
             </div>
 
-            {/* Navigation Controls - Full Width */}
-            <div className="flex-none p-4 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <WorkflowNavigation
-                    steps={workflowSteps}
-                    currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
-                    currentStage={demoStates[currentStateIndex].stage}
-                    onStepSelect={handleStepSelect}
-                    onNext={() => handleStateTransition('forward')}
-                    onBack={() => handleStateTransition('backward')}
-                    onRestart={handleRestart}
-                    isProcessing={workflowState.isProcessing}
-                />
+            {/* Navigation Controls */}
+            <div className="flex-none p-4 pt-2">
+                <div className="flex justify-between items-center">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleRestart}
+                            className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Restart Demo
+                        </button>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleNext}
+                            disabled={currentDemoIndex >= demoStates.length - 1}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            Next
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

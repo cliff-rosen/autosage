@@ -1,49 +1,11 @@
-// Asset types
-export interface InformationAsset {
-    id: string;
-    stepId?: string;
-    type: string;
-    name?: string;
-    title?: string;
-    content: any;
-    metadata: {
-        timestamp: string;
-        tags: string[];
-    };
-}
+// Basic types
+export type Phase = 'setup' | 'execution' | 'complete';
 
-// Workspace item types (for the third column)
-export interface WorkspaceItem {
-    id: string;
-    stepId: string;
-    type: 'step' | 'note' | 'decision' | 'checkpoint' | 'task' | 'result';
-    title: string;
-    description: string;
-    status: 'pending' | 'active' | 'completed' | 'failed' | 'error';
-    statusMessage?: string;
-    metadata?: Record<string, any>;
-    createdAt: string;
-}
-
-// Step types
-export interface WorkflowStep {
-    id: string;
-    name: string;
-    description: string;
-    status: 'pending' | 'running' | 'completed' | 'error';
-    agentType: 'user' | 'assistant';
-    level: number;
-    tools: string[];
-    subSteps?: WorkflowStep[];
-}
-
-// Step details including assets
-export interface StepDetails {
-    id: string;
-    status: 'pending' | 'running' | 'completed' | 'error';
-    content?: string;
-    assets?: InformationAsset[];
-}
+export type MessageType =
+    | 'text'
+    | 'action_prompt'
+    | 'task_update'
+    | 'asset_added';
 
 // Message types
 export interface ChatMessage {
@@ -51,87 +13,79 @@ export interface ChatMessage {
     role: 'user' | 'assistant';
     content: string;
     timestamp: string;
-    metadata?: {
-        phase: 'setup' | 'execution';
-        subPhase?: string;
-        type?: 'question' | 'clarification' | 'workflow' | 'result';
+    type: MessageType;
+    actionButton?: {
+        label: string;
+        action: string;
+        disabled?: boolean;
     };
 }
 
-// Workflow state
-export interface WorkflowState {
-    phase: 'setup' | 'execution';
-    currentStepIndex: number;
-    isProcessing: boolean;
-}
+// Task types
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'error';
 
-// Stage types
-export type Stage =
-    | 'initial'
-    | 'question_received'
-    | 'workflow_designing'
-    | 'workflow_ready'
-    | 'workflow_started'
-    | 'compiling_songs'
-    | 'songs_compiled'
-    | 'retrieving_lyrics'
-    | 'lyrics_retrieved'
-    | 'analyzing_lyrics'
-    | 'workflow_complete';
-
-// Stage data structure
-export interface StageData {
-    stage: Stage;
-    messages: ChatMessage[];
-    assets: InformationAsset[];
-    nextStages: Stage[];
-    prevStages: Stage[];
-    workspaceItems: WorkspaceItem[];
-}
-
-// State snapshot for a particular stage
-export interface StageState {
-    stage: Stage;
-    messages: ChatMessage[];
-    assets: InformationAsset[];
-    workspaceItems: WorkspaceItem[];
+export interface Task {
+    id: string;
+    title: string;
+    description: string;
+    status: TaskStatus;
+    createdAt: string;
+    completedAt?: string;
     metadata?: Record<string, any>;
 }
 
-// Master state table
+// Asset types
+export interface Asset {
+    id: string;
+    type: string;
+    name: string;
+    content: any;
+    metadata: {
+        timestamp: string;
+        tags: string[];
+        taskId?: string;
+        [key: string]: any;
+    };
+}
+
+// Turn state represents a single interaction cycle
+export interface TurnState {
+    messages: ChatMessage[];
+    newTasks: Task[];
+    updatedTasks: Record<string, Partial<Task>>;
+    newAssets: Asset[];
+}
+
+// Main state interface
 export interface FractalBotState {
-    currentStage: Stage;
-    stageStates: Record<Stage, StageState>;
-    globalAssets: InformationAsset[];
-    globalWorkspaceItems: WorkspaceItem[];
+    phase: Phase;
+    messages: ChatMessage[];
+    tasks: Record<string, Task>;
+    assets: Asset[];
+    currentTurn?: TurnState;
     metadata: {
         lastUpdated: string;
-        currentPhase: 'setup' | 'execution';
         isProcessing: boolean;
         [key: string]: any;
     };
 }
 
-// State update action types
-export type StateUpdateAction =
-    | { type: 'SET_STAGE'; payload: { stage: Stage } }
-    | { type: 'ADD_MESSAGE'; payload: { stage: Stage; message: ChatMessage } }
-    | { type: 'ADD_ASSET'; payload: { stage: Stage; asset: InformationAsset } }
-    | { type: 'ADD_WORKSPACE_ITEM'; payload: { stage: Stage; item: WorkspaceItem } }
-    | { type: 'UPDATE_WORKSPACE_ITEM'; payload: { stage: Stage; itemId: string; updates: Partial<WorkspaceItem> } }
-    | { type: 'ADD_GLOBAL_ASSET'; payload: { asset: InformationAsset } }
-    | { type: 'ADD_GLOBAL_WORKSPACE_ITEM'; payload: { item: WorkspaceItem } }
-    | { type: 'UPDATE_METADATA'; payload: { updates: Partial<FractalBotState['metadata']> } };
+// Action creators for managing turns
+export const createTurn = (): TurnState => ({
+    messages: [],
+    newTasks: [],
+    updatedTasks: {},
+    newAssets: []
+});
 
 // Initial state factory
 export const createInitialState = (): FractalBotState => ({
-    currentStage: 'initial',
-    stageStates: {} as Record<Stage, StageState>,
-    globalAssets: [],
-    globalWorkspaceItems: [],
+    phase: 'setup',
+    messages: [],
+    tasks: {},
+    assets: [],
     metadata: {
         lastUpdated: new Date().toISOString(),
-        currentPhase: 'setup',
         isProcessing: false
     }
 }); 
