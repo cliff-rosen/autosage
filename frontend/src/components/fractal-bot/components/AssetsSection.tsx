@@ -5,6 +5,7 @@ import { AssetModal } from './AssetModal';
 interface AssetsSectionProps {
     assets: Asset[];
     onUpload?: (file: File) => void;
+    onDelete?: (assetId: string) => void;
 }
 
 export const getAssetIcon = (type: string, metadata?: { type?: string; name?: string; timestamp?: string; tags?: string[];[key: string]: any }) => {
@@ -149,7 +150,7 @@ export const getAssetColor = (type: string, metadata?: { type?: string; name?: s
     }
 };
 
-export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }) => {
+export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload, onDelete }) => {
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [previewAsset, setPreviewAsset] = useState<{ asset: Asset; position: { x: number; y: number } } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +199,13 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    };
+
+    const handleDelete = (assetId: string, event: React.MouseEvent) => {
+        event.stopPropagation();
+        if (onDelete) {
+            onDelete(assetId);
+        }
     };
 
     return (
@@ -255,7 +263,7 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
                                             {asset.type} • {new Date(asset.metadata.timestamp).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <div className="flex items-center gap-2">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -266,6 +274,15 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDelete(asset.id, e)}
+                                            className="p-1 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                                            title="Delete Asset"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
                                     </div>

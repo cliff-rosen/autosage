@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ChatSection } from './components/ChatSection';
 import { WorkspaceSection } from './components/WorkspaceSection';
 import { AssetsSection } from './components/AssetsSection';
-import { demoStates } from './data/fractal_bot_data';
+import { demoScripts, defaultDemoScript, DemoScript } from './data/fractal_bot_data';
 import { FractalBotState, createInitialState, Asset } from './types/state';
 
 interface FractalBotProps {
@@ -13,15 +13,16 @@ interface FractalBotProps {
 export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
     const [state, setState] = useState<FractalBotState>(createInitialState());
     const [currentDemoIndex, setCurrentDemoIndex] = useState(0);
-    const [pendingActionState, setPendingActionState] = useState<typeof demoStates[0] | null>(null);
+    const [pendingActionState, setPendingActionState] = useState<DemoScript['states'][0] | null>(null);
+    const [selectedDemoScript, setSelectedDemoScript] = useState<DemoScript>(defaultDemoScript);
 
     // Initialize with the first demo state
     useEffect(() => {
-        applyDemoState(demoStates[0]);
-    }, []);
+        applyDemoState(selectedDemoScript.states[0]);
+    }, [selectedDemoScript]);
 
     // Apply the changes from a demo state
-    const applyDemoState = (demoState: typeof demoStates[0]) => {
+    const applyDemoState = (demoState: DemoScript['states'][0]) => {
         setState(prev => {
             // Add new messages, preventing duplicates by ID
             const existingMessageIds = new Set(prev.messages.map(m => m.id));
@@ -83,8 +84,8 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
 
     // Handle moving to the next demo state
     const handleNext = () => {
-        if (currentDemoIndex < demoStates.length - 1) {
-            const nextState = demoStates[currentDemoIndex + 1];
+        if (currentDemoIndex < selectedDemoScript.states.length - 1) {
+            const nextState = selectedDemoScript.states[currentDemoIndex + 1];
             // Apply the full next state immediately
             applyDemoState(nextState);
             setCurrentDemoIndex(currentDemoIndex + 1);
@@ -103,7 +104,17 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
         setCurrentDemoIndex(0);
         setPendingActionState(null);
         // Apply the initial state after reset
-        applyDemoState(demoStates[0]);
+        applyDemoState(selectedDemoScript.states[0]);
+    };
+
+    // Handle demo script selection
+    const handleDemoScriptChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedScript = demoScripts.find(script => script.id === event.target.value);
+        if (selectedScript) {
+            setSelectedDemoScript(selectedScript);
+            setCurrentDemoIndex(0);
+            setState(createInitialState());
+        }
     };
 
     const handleFileUpload = (file: File) => {
@@ -134,13 +145,22 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
         reader.readAsText(file);
     };
 
+    const handleDeleteAsset = (assetId: string) => {
+        setState(prev => ({
+            ...prev,
+            assets: prev.assets.filter(asset => asset.id !== assetId)
+        }));
+    };
+
     return (
         <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
             {/* Header */}
             <div className="flex-none px-6 py-3 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50">
-                <h2 className="text-xl font-medium text-gray-800 dark:text-gray-200">
-                    FractalBot Demo
-                </h2>
+                <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-medium text-gray-800 dark:text-gray-200">
+                        FractalBot Demo
+                    </h2>
+                </div>
             </div>
 
             {/* Main Content Area */}
@@ -163,24 +183,23 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                         <AssetsSection
                             assets={state.assets}
                             onUpload={handleFileUpload}
+                            onDelete={handleDeleteAsset}
                         />
                     </div>
                 </div>
 
                 {/* Right Column: Agents */}
-                <div className="flex-1 flex flex-col">
-                    <div className="flex-1 bg-white/20 dark:bg-gray-800/20 backdrop-blur-[2px] rounded-lg border border-gray-200/30 dark:border-gray-700/30 overflow-hidden">
-                        <WorkspaceSection
-                            agents={Object.values(state.agents)}
-                        />
-                    </div>
+                <div className="flex-1 bg-white/20 dark:bg-gray-800/20 backdrop-blur-[2px] rounded-lg border border-gray-200/30 dark:border-gray-700/30 overflow-hidden">
+                    <WorkspaceSection
+                        agents={Object.values(state.agents)}
+                    />
                 </div>
             </div>
 
             {/* Navigation Controls */}
-            <div className="flex-none px-6 py-3">
+            <div className="flex-none px-6 py-3 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-t border-gray-200/50 dark:border-gray-700/50">
                 <div className="flex justify-between items-center">
-                    <div className="flex gap-2">
+                    <div className="flex gap-4 items-center">
                         <button
                             onClick={handleRestart}
                             className="px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500/30 flex items-center gap-2 transition-colors"
@@ -190,17 +209,28 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                             </svg>
                             Restart Demo
                         </button>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">Demo Script:</span>
+                            <select
+                                value={selectedDemoScript.id}
+                                onChange={handleDemoScriptChange}
+                                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                {demoScripts.map(script => (
+                                    <option key={script.id} value={script.id}>
+                                        {script.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={handleNext}
-                            disabled={currentDemoIndex >= demoStates.length - 1}
-                            className="px-4 py-2 bg-blue-500/80 hover:bg-blue-500 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-400/50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors backdrop-blur-sm"
+                            disabled={currentDemoIndex >= selectedDemoScript.states.length - 1}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
-                            Next
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                            Next Step
                         </button>
                     </div>
                 </div>
