@@ -89,6 +89,30 @@ The Fractal Bot system enables deep collaboration between users and an AI assist
    - Generate final answer
    - Review and validate
 
+## State Transitions
+
+| From Stage | To Stage | Purpose | Trigger | Current Message | Notes |
+|------------|----------|----------|---------|-----------------|--------|
+| initial | question_received | Initial greeting to receiving user's question | User sends first message | "Hello! I'm FractalBot. What question can I help you with today?" | Entry point |
+| question_received | workflow_designing | Process user's question and start designing workflow | System processes the question | Shows user's question about analyzing Beatles songs | Captures initial query |
+| workflow_designing | workflow_ready | Present the proposed workflow steps | System finishes designing workflow | Shows the 3-step plan for analysis | Presents action plan |
+| workflow_ready | workflow_started | Begin workflow execution | User confirms to start | "Sounds good! Let's start." | Phase changes from 'setup' to 'execution' |
+| workflow_started | compiling_songs | Start the first analysis step | Automatic after workflow starts | "Starting the analysis..." | Creates song list asset |
+| compiling_songs | retrieving_lyrics | Move to lyrics retrieval step | After song list is compiled | "Generating the list of Beatles songs..." | Creates lyrics database asset |
+| retrieving_lyrics | analyzing_lyrics | Begin analysis of lyrics | After lyrics are retrieved | "Retrieving lyrics for analysis..." | Processes gathered data |
+| analyzing_lyrics | workflow_complete | Complete the workflow | After analysis is done | "Analyzing the lyrics for occurrences of 'love'..." | Final results presentation |
+
+### Areas for Improvement
+
+1. **Transition Timing**: Some transitions happen too quickly without showing meaningful progress
+2. **Asset Management**: Assets are only created in certain transitions (compiling_songs and retrieving_lyrics) but not others
+3. **Progress Feedback**: Messages could be more informative about what's happening
+4. **Error Handling**: No specific error states or recovery paths
+5. **User Interaction**: Limited points where user can interact or influence the workflow
+6. **State Persistence**: No mechanism to save progress between stages
+7. **Backward Navigation**: While supported in code, the UX for going backward isn't well defined
+8. **Transition Validation**: No validation to ensure prerequisites are met before transitions
+
 ## Key Benefits
 
 1. **Natural Problem Decomposition**

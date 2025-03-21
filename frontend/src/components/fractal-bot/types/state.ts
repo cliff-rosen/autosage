@@ -1,15 +1,15 @@
 // Asset types
 export interface InformationAsset {
     id: string;
-    type: 'data' | 'analysis' | 'chart' | 'document' | 'analysis_output';
-    title?: string;
+    stepId?: string;
+    type: string;
     name?: string;
+    title?: string;
     content: any;
-    metadata?: {
+    metadata: {
         timestamp: string;
         tags: string[];
     };
-    stepId?: string;
 }
 
 // Workspace item types (for the third column)
@@ -27,22 +27,20 @@ export interface WorkspaceItem {
 export interface WorkflowStep {
     id: string;
     name: string;
-    title?: string;
     description: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    subSteps?: WorkflowStep[];
-    parentId?: string;
+    status: 'pending' | 'running' | 'completed' | 'error';
+    agentType: 'user' | 'assistant';
     level: number;
-    agentType?: string;
-    tools?: string[];
+    tools: string[];
+    subSteps?: WorkflowStep[];
 }
 
 // Step details including assets
 export interface StepDetails {
     id: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    assets: InformationAsset[];
+    status: 'running' | 'completed' | 'error';
     content?: string;
+    assets?: InformationAsset[];
 }
 
 // Message types
@@ -52,8 +50,9 @@ export interface ChatMessage {
     content: string;
     timestamp: string;
     metadata?: {
-        phase?: 'setup' | 'execution';
-        type?: 'question' | 'clarification' | 'workflow' | 'result' | 'error';
+        phase: 'setup' | 'execution';
+        subPhase?: string;
+        type?: 'question' | 'clarification' | 'workflow' | 'result';
     };
 }
 
@@ -72,6 +71,7 @@ export type Stage =
     | 'workflow_ready'
     | 'workflow_started'
     | 'compiling_songs'
+    | 'songs_compiled'
     | 'retrieving_lyrics'
     | 'analyzing_lyrics'
     | 'workflow_complete';

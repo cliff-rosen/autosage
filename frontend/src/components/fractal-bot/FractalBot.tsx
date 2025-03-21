@@ -11,13 +11,13 @@ import {
     StepDetails,
     WorkflowState,
     Stage,
-    StageData,
-    InformationAsset
+    InformationAsset,
+    WorkspaceItem
 } from './types/state';
-import { FRACTAL_BOT_STATE } from './data/fractal_bot_data';
+import { demoStates } from './data/fractal_bot_data';
 
 const FractalBot: React.FC = () => {
-    const [currentStage, setCurrentStage] = useState<Stage>('initial');
+    const [currentStateIndex, setCurrentStateIndex] = useState<number>(0);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputMessage, setInputMessage] = useState('');
     const [workflowState, setWorkflowState] = useState<WorkflowState>({
@@ -27,14 +27,17 @@ const FractalBot: React.FC = () => {
     });
     const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
     const [stepDetails, setStepDetails] = useState<Record<string, StepDetails>>({});
+    const [assets, setAssets] = useState<InformationAsset[]>([]);
+    const [workspaceItems, setWorkspaceItems] = useState<WorkspaceItem[]>([]);
     const [isToolSearchOpen, setIsToolSearchOpen] = useState(false);
     const [isMoreToolsOpen, setIsMoreToolsOpen] = useState(false);
     const [toolSearchQuery, setToolSearchQuery] = useState('');
 
-    // Initialize chat with initial stage messages
+    // Initialize with initial state
     useEffect(() => {
-        const initialState = FRACTAL_BOT_STATE['initial'];
-        setMessages(initialState.messages);
+        const initialState = demoStates[0];
+        setMessages(initialState.addedMessages);
+        setWorkflowState(prev => ({ ...prev, phase: initialState.phase }));
     }, []);
 
     // Handle state transitions
@@ -44,124 +47,69 @@ const FractalBot: React.FC = () => {
         setWorkflowState(prev => ({ ...prev, isProcessing: true }));
 
         try {
-            const currentStageData = FRACTAL_BOT_STATE[currentStage];
-            const nextStages = direction === 'forward' ? currentStageData.nextStages : currentStageData.prevStages;
+            const nextIndex = direction === 'forward'
+                ? Math.min(currentStateIndex + 1, demoStates.length - 1)
+                : Math.max(currentStateIndex - 1, 0);
 
-            if (nextStages.length === 0) {
+            if (nextIndex === currentStateIndex) {
                 setWorkflowState(prev => ({ ...prev, isProcessing: false }));
                 return;
             }
 
-            const nextStage = nextStages[0];
-            const nextStageData = FRACTAL_BOT_STATE[nextStage];
+            const currentState = demoStates[currentStateIndex];
+            const nextState = demoStates[nextIndex];
 
-            // Generate song list when transitioning to compiling_songs stage
-            if (nextStage === 'compiling_songs' && direction === 'forward') {
-                const songListStep: WorkflowStep = {
-                    id: uuidv4(),
-                    name: 'Generate Beatles Song List',
-                    description: 'Create a comprehensive list of Beatles songs',
-                    status: 'running',
-                    agentType: 'user',
-                    level: 0,
-                    tools: []
-                };
-
-                // Add the step
-                setWorkflowSteps(prev => [...prev, songListStep]);
-
-                // Add step details
-                setStepDetails(prev => ({
-                    ...prev,
-                    [songListStep.id]: {
-                        id: songListStep.id,
-                        status: 'running',
-                        assets: [],
-                        content: 'Generating Beatles song list...'
-                    }
-                }));
-
-                // Simulate song list generation
-                setTimeout(() => {
-                    const songList: InformationAsset = {
-                        id: 'beatlesSongList',
-                        stepId: songListStep.id,
-                        type: 'analysis_output',
-                        name: 'Beatles Song List',
-                        content: [
-                            'Hey Jude',
-                            'Let It Be',
-                            'Yesterday',
-                            'All You Need Is Love',
-                            'Help!',
-                            'Come Together',
-                            'Here Comes the Sun',
-                            'Something',
-                            'While My Guitar Gently Weeps',
-                            'A Day in the Life'
-                        ],
-                        metadata: {
-                            timestamp: new Date().toISOString(),
-                            tags: ['songs', 'beatles', 'list']
-                        }
-                    };
-
-                    // Update step status and add asset
-                    setStepDetails(prev => ({
-                        ...prev,
-                        [songListStep.id]: {
-                            id: songListStep.id,
-                            status: 'completed',
-                            assets: [songList],
-                            content: 'Beatles song list generated successfully.'
-                        }
-                    }));
-
-                    // Update workflow step status
-                    setWorkflowSteps(prev =>
-                        prev.map(step =>
-                            step.id === songListStep.id
-                                ? { ...step, status: 'completed' }
-                                : step
-                        )
-                    );
-                }, 2000);
-            }
-
-            // Update messages based on direction
             if (direction === 'backward') {
-                // When going backward, rebuild message history up to this point
+                // When going backward, rebuild state up to this point
                 const messageHistory: ChatMessage[] = [];
-                let stage: Stage = nextStage;
+                const assetHistory: InformationAsset[] = [];
+                const workspaceHistory: WorkspaceItem[] = [];
+                let steps: WorkflowStep[] = [];
+                let details: Record<string, StepDetails> = {};
 
-                while (stage) {
-                    const stageData = FRACTAL_BOT_STATE[stage];
-                    messageHistory.unshift(...stageData.messages);
-                    stage = stageData.prevStages[0];
+                // Rebuild state by accumulating changes up to the target index
+                for (let i = 0; i <= nextIndex; i++) {
+                    const state = demoStates[i];
+                    messageHistory.push(...state.addedMessages);
+                    assetHistory.push(...state.addedAssets);
+                    workspaceHistory.push(...state.addedWorkspaceItems);
+
+                    if (state.workflowSteps) {
+                        steps = state.workflowSteps;
+                    }
+                    if (state.stepDetails) {
+                        details = { ...details, ...state.stepDetails };
+                    }
                 }
 
                 setMessages(messageHistory);
-                setWorkflowSteps([]);
-                setStepDetails({});
+                setAssets(assetHistory);
+                setWorkspaceItems(workspaceHistory);
+                setWorkflowSteps(steps);
+                setStepDetails(details);
             } else {
                 // When going forward, append new state data
-                setMessages(prev => [...prev, ...nextStageData.messages]);
+                setMessages(prev => [...prev, ...nextState.addedMessages]);
+                setAssets(prev => [...prev, ...nextState.addedAssets]);
+                setWorkspaceItems(prev => [...prev, ...nextState.addedWorkspaceItems]);
+
+                if (nextState.workflowSteps) {
+                    setWorkflowSteps(nextState.workflowSteps);
+                }
+                if (nextState.stepDetails) {
+                    setStepDetails(prev => ({ ...prev, ...nextState.stepDetails }));
+                }
             }
 
-            // Update phase if transitioning between setup and execution
-            const isTransitioningToExecution =
-                currentStage === 'workflow_ready' &&
-                nextStage === 'workflow_started' &&
-                direction === 'forward';
-
+            // Update phase
             setWorkflowState(prev => ({
                 ...prev,
-                phase: isTransitioningToExecution ? 'execution' : prev.phase,
-                currentStepIndex: isTransitioningToExecution ? 0 : prev.currentStepIndex,
+                phase: nextState.phase,
+                currentStepIndex: nextState.workflowSteps ? nextState.workflowSteps.length - 1 : 0,
                 isProcessing: false
             }));
 
-            setCurrentStage(nextStage);
+            setCurrentStateIndex(nextIndex);
 
         } catch (error) {
             console.error('Error during state transition:', error);
@@ -171,7 +119,8 @@ const FractalBot: React.FC = () => {
 
     // Handle completing the workflow
     const handleCompleteWorkflow = () => {
-        if (currentStage === 'workflow_ready') {
+        const currentState = demoStates[currentStateIndex];
+        if (currentState.stage === 'workflow_ready') {
             handleStateTransition('forward');
         }
     };
@@ -197,18 +146,19 @@ const FractalBot: React.FC = () => {
 
     // Handle restart
     const handleRestart = () => {
-        const initialState = FRACTAL_BOT_STATE['initial'];
-
+        const initialState = demoStates[0];
+        setCurrentStateIndex(0);
         setWorkflowState({
-            phase: 'setup',
+            phase: initialState.phase,
             currentStepIndex: 0,
             isProcessing: false
         });
-        setCurrentStage('initial');
-        setMessages(initialState.messages);
-        setInputMessage('');
+        setMessages(initialState.addedMessages);
+        setAssets([]);
+        setWorkspaceItems([]);
         setWorkflowSteps([]);
         setStepDetails({});
+        setInputMessage('');
         setIsToolSearchOpen(false);
         setIsMoreToolsOpen(false);
         setToolSearchQuery('');
@@ -240,27 +190,6 @@ const FractalBot: React.FC = () => {
         handleStateTransition('forward');
     };
 
-    // Handle tool search
-    const handleToolSearch = () => {
-        setIsToolSearchOpen(true);
-    };
-
-    // Handle more tools
-    const handleMoreTools = () => {
-        setIsMoreToolsOpen(true);
-    };
-
-    // Handle search close
-    const handleSearchClose = () => {
-        setIsToolSearchOpen(false);
-        setToolSearchQuery('');
-    };
-
-    // Handle more tools close
-    const handleMoreToolsClose = () => {
-        setIsMoreToolsOpen(false);
-    };
-
     return (
         <div className="flex flex-col h-screen">
             {/* Header */}
@@ -273,7 +202,7 @@ const FractalBot: React.FC = () => {
             {/* Main Content Area */}
             <div className="flex-1 flex overflow-hidden p-4 pb-2">
                 {/* Chat */}
-                <div className="w-1/4 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
+                <div className="w-[400px] flex-shrink-0 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
                     <ChatSection
                         messages={messages}
                         inputMessage={inputMessage}
@@ -281,8 +210,8 @@ const FractalBot: React.FC = () => {
                         currentPhase={workflowState.phase}
                         currentStepIndex={workflowState.currentStepIndex}
                         workflowSteps={workflowSteps}
-                        isQuestionComplete={currentStage === 'workflow_ready'}
-                        isWorkflowAgreed={currentStage === 'workflow_ready'}
+                        isQuestionComplete={demoStates[currentStateIndex].stage === 'workflow_ready'}
+                        isWorkflowAgreed={demoStates[currentStateIndex].stage === 'workflow_ready'}
                         onSendMessage={handleSendMessage}
                         onInputChange={setInputMessage}
                         onCompleteWorkflow={handleCompleteWorkflow}
@@ -291,36 +220,37 @@ const FractalBot: React.FC = () => {
                 </div>
 
                 {/* Assets */}
-                <div className="w-1/4 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
+                <div className="w-[400px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
                     <AssetsSection
-                        steps={workflowSteps}
-                        stepDetails={stepDetails}
+                        assets={assets}
                         currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
                     />
                 </div>
 
-                {/* Work Area */}
-                <div className="w-1/4 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mr-4">
-                    <WorkspaceSection
-                        steps={workflowSteps}
-                        stepDetails={stepDetails}
-                        currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
-                    />
-                </div>
-
-                {/* Tools */}
-                <div className="w-1/4 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                    <ToolsSection
-                        currentStep={workflowSteps[workflowState.currentStepIndex] || null}
-                        isToolSearchOpen={isToolSearchOpen}
-                        isMoreToolsOpen={isMoreToolsOpen}
-                        toolSearchQuery={toolSearchQuery}
-                        onToolSearch={handleToolSearch}
-                        onMoreTools={handleMoreTools}
-                        onSearchClose={handleSearchClose}
-                        onMoreToolsClose={handleMoreToolsClose}
-                        onToolSearchQueryChange={setToolSearchQuery}
-                    />
+                {/* Work Area with Tools */}
+                <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <div className="flex-1 overflow-hidden">
+                        <WorkspaceSection
+                            steps={workflowSteps}
+                            stepDetails={stepDetails}
+                            currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
+                            workspaceItems={workspaceItems}
+                        >
+                            <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                                <ToolsSection
+                                    currentStep={workflowSteps[workflowState.currentStepIndex] || null}
+                                    isToolSearchOpen={isToolSearchOpen}
+                                    isMoreToolsOpen={isMoreToolsOpen}
+                                    toolSearchQuery={toolSearchQuery}
+                                    onToolSearch={() => setIsToolSearchOpen(true)}
+                                    onMoreTools={() => setIsMoreToolsOpen(true)}
+                                    onSearchClose={() => setIsToolSearchOpen(false)}
+                                    onMoreToolsClose={() => setIsMoreToolsOpen(false)}
+                                    onToolSearchQueryChange={setToolSearchQuery}
+                                />
+                            </div>
+                        </WorkspaceSection>
+                    </div>
                 </div>
             </div>
 
@@ -329,7 +259,7 @@ const FractalBot: React.FC = () => {
                 <WorkflowNavigation
                     steps={workflowSteps}
                     currentStepId={workflowSteps[workflowState.currentStepIndex]?.id || null}
-                    currentStage={currentStage}
+                    currentStage={demoStates[currentStateIndex].stage}
                     onStepSelect={handleStepSelect}
                     onNext={() => handleStateTransition('forward')}
                     onBack={() => handleStateTransition('backward')}

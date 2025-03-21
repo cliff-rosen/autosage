@@ -1,148 +1,79 @@
 import React from 'react';
-import { WorkflowStep, StepDetails } from '../types/state';
+import { WorkflowStep, StepDetails, WorkspaceItem } from '../types/state';
 
 interface WorkspaceSectionProps {
     steps: WorkflowStep[];
     stepDetails: Record<string, StepDetails>;
     currentStepId: string | null;
+    workspaceItems: WorkspaceItem[];
+    children?: React.ReactNode;
 }
 
 export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
     steps,
     stepDetails,
     currentStepId,
+    workspaceItems,
+    children
 }) => {
-    return (
-        <div className="flex flex-col h-full">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Work Area</h3>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-                <div className="p-4 space-y-4">
-                    {steps.map((step, index) => {
-                        const isActive = step.id === currentStepId;
-                        const isPast = index < (steps.findIndex(s => s.id === currentStepId) || 0);
-                        const isFuture = index > (steps.findIndex(s => s.id === currentStepId) || 0);
-                        const stepDetail = stepDetails[step.id];
+    const currentStep = currentStepId ? steps.find(step => step.id === currentStepId) : null;
+    const currentStepDetails = currentStepId ? stepDetails[currentStepId] : null;
 
-                        return (
-                            <div
-                                key={step.id}
-                                className={`border rounded-lg transition-all duration-200 ${isActive
-                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                    : isPast
-                                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                                        : isFuture
-                                            ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50'
-                                            : 'border-gray-200 dark:border-gray-700'
-                                    }`}
-                            >
-                                <div
-                                    className={`p-4 flex items-center justify-between cursor-pointer ${isActive || isPast
-                                        ? 'text-gray-900 dark:text-gray-100'
-                                        : 'text-gray-500 dark:text-gray-400'
-                                        }`}
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <div
-                                            className={`w-6 h-6 flex items-center justify-center rounded-full ${isActive
-                                                ? 'bg-blue-500 text-white'
-                                                : isPast
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-gray-300 dark:bg-gray-600'
-                                                }`}
-                                        >
-                                            {isPast ? (
-                                                <svg
-                                                    className="w-4 h-4"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M5 13l4 4L19 7"
-                                                    />
-                                                </svg>
-                                            ) : (
-                                                <span>{index + 1}</span>
-                                            )}
-                                        </div>
-                                        <span className="font-medium">{step.name}</span>
-                                    </div>
-                                    <span
-                                        className={`text-sm ${step.status === 'completed'
-                                            ? 'text-green-500'
-                                            : step.status === 'running'
-                                                ? 'text-blue-500'
-                                                : step.status === 'failed'
-                                                    ? 'text-red-500'
-                                                    : 'text-gray-400'
-                                            }`}
-                                    >
-                                        {step.status}
-                                    </span>
-                                </div>
-                                {isActive && stepDetail && (
-                                    <div className="px-4 pb-4">
-                                        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                            <div className="prose dark:prose-invert max-w-none">
-                                                <p className="text-gray-600 dark:text-gray-300">
-                                                    {step.description}
-                                                </p>
-                                                {stepDetail.content && (
-                                                    <div className="mt-4">
-                                                        <pre className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-x-auto">
-                                                            <code>{stepDetail.content}</code>
-                                                        </pre>
-                                                    </div>
-                                                )}
-                                                {stepDetail.assets && stepDetail.assets.length > 0 && (
-                                                    <div className="mt-4 space-y-2">
-                                                        {stepDetail.assets.map((asset) => (
-                                                            <div
-                                                                key={asset.id}
-                                                                className="p-3 bg-white dark:bg-gray-700 rounded-lg shadow"
-                                                            >
-                                                                <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                                                                    {asset.name || asset.title}
-                                                                </h4>
-                                                                <div className="mt-2">
-                                                                    {Array.isArray(asset.content) ? (
-                                                                        <ul className="list-disc list-inside text-gray-600 dark:text-gray-300">
-                                                                            {asset.content.map(
-                                                                                (item, index) => (
-                                                                                    <li key={index}>
-                                                                                        {item}
-                                                                                    </li>
-                                                                                )
-                                                                            )}
-                                                                        </ul>
-                                                                    ) : (
-                                                                        <pre className="whitespace-pre-wrap text-gray-600 dark:text-gray-300">
-                                                                            {JSON.stringify(
-                                                                                asset.content,
-                                                                                null,
-                                                                                2
-                                                                            )}
-                                                                        </pre>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+    return (
+        <div className="h-full flex flex-col">
+            <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Work Area
+                </h3>
             </div>
+            <div className="flex-1 overflow-y-auto p-4">
+                {currentStep && (
+                    <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {currentStep.name}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            {currentStep.description}
+                        </p>
+                        {currentStepDetails?.content && (
+                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+                                <p className="text-sm text-gray-600 dark:text-gray-300">
+                                    {currentStepDetails.content}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
+                {workspaceItems.map(item => (
+                    <div
+                        key={item.id}
+                        className="mb-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg"
+                    >
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+                            {item.title}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                            {item.description}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                            <span className={`px-2 py-1 text-xs rounded-full ${item.status === 'completed'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                : item.status === 'failed'
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                                }`}>
+                                {item.status}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(item.createdAt).toLocaleDateString()}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {children}
         </div>
     );
-}; 
+};
+
+export type { WorkspaceSectionProps }; 
