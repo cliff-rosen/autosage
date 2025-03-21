@@ -241,6 +241,15 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
                             <div className="flex items-center gap-3">
                                 <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${getAssetColor(asset.type, asset.metadata)}`}>
                                     {getAssetIcon(asset.type, asset.metadata)}
+                                    {asset.metadata.status === 'in_progress' && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="absolute w-full h-full rounded-lg animate-pulse bg-current opacity-20"></div>
+                                            <svg className="absolute w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h5 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -248,6 +257,9 @@ export const AssetsSection: React.FC<AssetsSectionProps> = ({ assets, onUpload }
                                     </h5>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">
                                         {asset.type} • {new Date(asset.metadata.timestamp).toLocaleDateString()}
+                                        {asset.metadata.status === 'in_progress' && (
+                                            <span className="ml-1 text-blue-500 dark:text-blue-400">• Processing</span>
+                                        )}
                                     </p>
                                 </div>
                                 <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">

@@ -19,11 +19,20 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({ agents }) =>
                     {agents.map(agent => (
                         <div
                             key={agent.id}
-                            className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4"
+                            className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative
+                                      ${agent.status === 'in_progress' ? 'animate-glow-pulse' : ''}`}
                         >
+                            {agent.status === 'in_progress' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-1">
+                                    <div className="h-full bg-blue-500 dark:bg-blue-400 animate-workflow-progress"></div>
+                                </div>
+                            )}
                             <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                     {agent.title}
+                                    {agent.status === 'in_progress' && (
+                                        <div className="animate-flowing-dot text-blue-500">●</div>
+                                    )}
                                 </h4>
                                 <span className={`px-2 py-1 text-xs rounded-full ${agent.status === 'completed'
                                     ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
