@@ -21,6 +21,13 @@ export const BEATLES_SONGS = [
     'A Day in the Life'
 ];
 
+// Define constant IDs for assets
+const ASSET_IDS = {
+    SONG_LIST: 'beatles-song-list',
+    LYRICS_COLLECTION: 'beatles-lyrics',
+    COMPARISON_REPORT: 'song-list-comparison'
+} as const;
+
 // Define the demo state type
 interface DemoState {
     stage: string;
@@ -28,8 +35,25 @@ interface DemoState {
     phase: Phase;
     addedMessages: ChatMessage[];
     addedAssets: Asset[];
-    addedWorkspaceItems: Agent[];
+    workspaceUpdates: {
+        added: Agent[];
+        updated: Array<{
+            id: string;
+            updates: Partial<Agent>;
+        }>;
+    };
+    assetUpdates: Array<{
+        id: string;
+        updates: Partial<Asset>;
+    }>;
 }
+
+// Define constant IDs for agents
+const AGENT_IDS = {
+    SONG_LIST: 'song-list-agent',
+    LYRICS_RETRIEVAL: 'lyrics-retrieval-agent',
+    LIST_COMPARISON: 'list-comparison-agent'
+} as const;
 
 // FIXME: Current design quirk - Agent status updates (completed/failed) are handled directly in applyDemoState
 // rather than through state transitions. This means:
@@ -55,7 +79,11 @@ export const demoStates: DemoState[] = [
             timestamp: new Date().toISOString()
         }],
         addedAssets: [],
-        addedWorkspaceItems: []
+        workspaceUpdates: {
+            added: [],
+            updated: []
+        },
+        assetUpdates: []
     },
     {
         stage: 'question_received',
@@ -69,7 +97,11 @@ export const demoStates: DemoState[] = [
             timestamp: new Date().toISOString()
         }],
         addedAssets: [],
-        addedWorkspaceItems: []
+        workspaceUpdates: {
+            added: [],
+            updated: []
+        },
+        assetUpdates: []
     },
     {
         stage: 'workflow_designing',
@@ -87,7 +119,11 @@ export const demoStates: DemoState[] = [
             }
         }],
         addedAssets: [],
-        addedWorkspaceItems: []
+        workspaceUpdates: {
+            added: [],
+            updated: []
+        },
+        assetUpdates: []
     },
     {
         stage: 'workflow_started',
@@ -101,7 +137,11 @@ export const demoStates: DemoState[] = [
             timestamp: new Date().toISOString()
         }],
         addedAssets: [],
-        addedWorkspaceItems: []
+        workspaceUpdates: {
+            added: [],
+            updated: []
+        },
+        assetUpdates: []
     },
     {
         stage: 'compiling_songs',
@@ -116,16 +156,31 @@ export const demoStates: DemoState[] = [
                 type: 'text'
             }
         ],
-        addedWorkspaceItems: [
-            {
-                id: uuidv4(),
-                title: 'Song List Agent',
-                description: 'Compiling a comprehensive list of Beatles songs for analysis',
-                status: 'in_progress',
-                createdAt: new Date().toISOString()
+        workspaceUpdates: {
+            added: [
+                {
+                    id: AGENT_IDS.SONG_LIST,
+                    title: 'Song List Agent',
+                    description: 'Compiling a comprehensive list of Beatles songs for analysis',
+                    status: 'in_progress',
+                    createdAt: new Date().toISOString()
+                }
+            ],
+            updated: []
+        },
+        addedAssets: [{
+            id: ASSET_IDS.SONG_LIST,
+            type: 'data',
+            name: 'Beatles Song List',
+            content: BEATLES_SONGS,
+            ready: false,
+            metadata: {
+                timestamp: new Date().toISOString(),
+                tags: ['songs', 'beatles'],
+                agentId: AGENT_IDS.SONG_LIST
             }
-        ],
-        addedAssets: []
+        }],
+        assetUpdates: []
     },
     {
         stage: 'songs_compiled',
@@ -142,17 +197,25 @@ export const demoStates: DemoState[] = [
                 action: 'retrieve_lyrics'
             }
         }],
-        addedAssets: [{
-            id: 'beatlesSongList',
-            type: 'data',
-            name: 'Beatles Song List',
-            content: BEATLES_SONGS,
-            metadata: {
-                timestamp: new Date().toISOString(),
-                tags: ['songs', 'beatles']
+        workspaceUpdates: {
+            added: [],
+            updated: [
+                {
+                    id: AGENT_IDS.SONG_LIST,
+                    updates: {
+                        status: 'completed',
+                        completedAt: new Date().toISOString()
+                    }
+                }
+            ]
+        },
+        addedAssets: [],
+        assetUpdates: [{
+            id: ASSET_IDS.SONG_LIST,
+            updates: {
+                ready: true
             }
-        }],
-        addedWorkspaceItems: []
+        }]
     },
     {
         stage: 'lyrics_retrieval_started',
@@ -165,14 +228,31 @@ export const demoStates: DemoState[] = [
             content: 'Launching the Lyrics Retrieval Agent now.',
             timestamp: new Date().toISOString()
         }],
-        addedWorkspaceItems: [{
-            id: uuidv4(),
-            title: 'Lyrics Retrieval Agent',
-            description: 'Fetching lyrics for all Beatles songs from verified sources',
-            status: 'in_progress',
-            createdAt: new Date().toISOString()
+        workspaceUpdates: {
+            added: [
+                {
+                    id: AGENT_IDS.LYRICS_RETRIEVAL,
+                    title: 'Lyrics Retrieval Agent',
+                    description: 'Fetching lyrics for all Beatles songs from verified sources',
+                    status: 'in_progress',
+                    createdAt: new Date().toISOString()
+                }
+            ],
+            updated: []
+        },
+        addedAssets: [{
+            id: ASSET_IDS.LYRICS_COLLECTION,
+            type: 'data',
+            name: 'Beatles Lyrics Collection',
+            content: 'Lyrics for all Beatles songs',
+            ready: false,
+            metadata: {
+                timestamp: new Date().toISOString(),
+                tags: ['lyrics', 'beatles'],
+                agentId: AGENT_IDS.LYRICS_RETRIEVAL
+            }
         }],
-        addedAssets: []
+        assetUpdates: []
     },
     {
         stage: 'analysis_started',
@@ -191,15 +271,23 @@ export const demoStates: DemoState[] = [
                 }
             }
         ],
-        addedWorkspaceItems: [],
-        addedAssets: [{
-            id: 'beatlesLyrics',
-            type: 'data',
-            name: 'Beatles Lyrics Collection',
-            content: 'Lyrics for all Beatles songs',
-            metadata: {
-                timestamp: new Date().toISOString(),
-                tags: ['lyrics', 'beatles']
+        workspaceUpdates: {
+            added: [],
+            updated: [
+                {
+                    id: AGENT_IDS.LYRICS_RETRIEVAL,
+                    updates: {
+                        status: 'completed',
+                        completedAt: new Date().toISOString()
+                    }
+                }
+            ]
+        },
+        addedAssets: [],
+        assetUpdates: [{
+            id: ASSET_IDS.LYRICS_COLLECTION,
+            updates: {
+                ready: true
             }
         }]
     },
@@ -214,8 +302,12 @@ export const demoStates: DemoState[] = [
             content: "Actually I added a new asset to the list which is an old list of Beatles songs. Can you analyze that and compare it with the song list you created?",
             timestamp: new Date().toISOString()
         }],
-        addedWorkspaceItems: [],
-        addedAssets: []
+        workspaceUpdates: {
+            added: [],
+            updated: []
+        },
+        addedAssets: [],
+        assetUpdates: []
     },
     {
         stage: 'comparison_proposed',
@@ -232,8 +324,12 @@ export const demoStates: DemoState[] = [
                 action: 'start_comparison'
             }
         }],
-        addedWorkspaceItems: [],
-        addedAssets: []
+        workspaceUpdates: {
+            added: [],
+            updated: []
+        },
+        addedAssets: [],
+        assetUpdates: []
     },
     {
         stage: 'comparison_started',
@@ -246,14 +342,33 @@ export const demoStates: DemoState[] = [
             content: "I've launched the List Comparison Agent. It will analyze both song lists and generate a detailed comparison report.",
             timestamp: new Date().toISOString()
         }],
-        addedWorkspaceItems: [{
-            id: uuidv4(),
-            title: 'List Comparison Agent',
-            description: 'Comparing the original and user-provided Beatles song lists',
-            status: 'in_progress',
-            createdAt: new Date().toISOString()
+        workspaceUpdates: {
+            added: [
+                {
+                    id: AGENT_IDS.LIST_COMPARISON,
+                    title: 'List Comparison Agent',
+                    description: 'Comparing the original and user-provided Beatles song lists',
+                    status: 'in_progress',
+                    createdAt: new Date().toISOString()
+                }
+            ],
+            updated: []
+        },
+        addedAssets: [{
+            id: ASSET_IDS.COMPARISON_REPORT,
+            type: 'data',
+            name: 'Beatles Song Lists Comparison Report',
+            content: 'Detailed comparison of original and user-provided Beatles song lists',
+            ready: false,
+            metadata: {
+                timestamp: new Date().toISOString(),
+                tags: ['comparison', 'analysis', 'beatles', 'songs'],
+                icon: '🔄',
+                type: 'comparison',
+                agentId: AGENT_IDS.LIST_COMPARISON
+            }
         }],
-        addedAssets: []
+        assetUpdates: []
     },
     {
         stage: 'comparison_completed',
@@ -266,17 +381,23 @@ export const demoStates: DemoState[] = [
             content: "The List Comparison Agent has completed its analysis. I've added the comparison report to your assets. Would you like me to walk you through the key findings?",
             timestamp: new Date().toISOString()
         }],
-        addedWorkspaceItems: [],
-        addedAssets: [{
-            id: 'songListComparison',
-            type: 'data',
-            name: 'Beatles Song Lists Comparison Report',
-            content: 'Detailed comparison of original and user-provided Beatles song lists',
-            metadata: {
-                timestamp: new Date().toISOString(),
-                tags: ['comparison', 'analysis', 'beatles', 'songs'],
-                icon: '🔄',
-                type: 'comparison'
+        workspaceUpdates: {
+            added: [],
+            updated: [
+                {
+                    id: AGENT_IDS.LIST_COMPARISON,
+                    updates: {
+                        status: 'completed',
+                        completedAt: new Date().toISOString()
+                    }
+                }
+            ]
+        },
+        addedAssets: [],
+        assetUpdates: [{
+            id: ASSET_IDS.COMPARISON_REPORT,
+            updates: {
+                ready: true
             }
         }]
     }

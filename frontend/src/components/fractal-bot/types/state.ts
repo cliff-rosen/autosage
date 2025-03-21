@@ -40,6 +40,7 @@ export interface Asset {
     type: string;
     name: string;
     content: any;
+    ready: boolean;
     metadata: {
         timestamp: string;
         tags: string[];

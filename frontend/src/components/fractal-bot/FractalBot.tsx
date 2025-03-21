@@ -32,53 +32,40 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
             const agents = { ...prev.agents };
 
             // Add new agents
-            demoState.addedWorkspaceItems.forEach(item => {
+            demoState.workspaceUpdates.added.forEach(item => {
                 agents[item.id] = item;
             });
 
-            // Update existing agents based on stage
-            if (demoState.stage === 'songs_compiled') {
-                // Find and update the song list agent
-                Object.keys(agents).forEach(agentId => {
-                    const agent = agents[agentId];
-                    if (agent.title === 'Song List Agent') {
-                        agents[agentId] = {
-                            ...agent,
-                            status: 'completed',
-                            completedAt: new Date().toISOString()
-                        };
-                    }
-                });
-            } else if (demoState.stage === 'analysis_started') {
-                // Find and update the lyrics retrieval agent
-                Object.keys(agents).forEach(agentId => {
-                    const agent = agents[agentId];
-                    if (agent.title === 'Lyrics Retrieval Agent') {
-                        agents[agentId] = {
-                            ...agent,
-                            status: 'completed',
-                            completedAt: new Date().toISOString()
-                        };
-                    }
-                });
-            } else if (demoState.stage === 'comparison_completed') {
-                // Find and update the list comparison agent
-                Object.keys(agents).forEach(agentId => {
-                    const agent = agents[agentId];
-                    if (agent.title === 'List Comparison Agent') {
-                        agents[agentId] = {
-                            ...agent,
-                            status: 'completed',
-                            completedAt: new Date().toISOString()
-                        };
-                    }
-                });
-            }
+            // Update existing agents
+            demoState.workspaceUpdates.updated.forEach(update => {
+                if (agents[update.id]) {
+                    agents[update.id] = {
+                        ...agents[update.id],
+                        ...update.updates
+                    };
+                }
+            });
 
             // Add new assets, preventing duplicates by ID
             const existingAssetIds = new Set(prev.assets.map(a => a.id));
             const newAssets = demoState.addedAssets.filter(a => !existingAssetIds.has(a.id));
-            const assets = [...prev.assets, ...newAssets];
+            const assets = [...prev.assets];
+
+            // Add new assets
+            newAssets.forEach(asset => {
+                assets.push(asset);
+            });
+
+            // Update existing assets
+            demoState.assetUpdates.forEach(update => {
+                const assetIndex = assets.findIndex(a => a.id === update.id);
+                if (assetIndex !== -1) {
+                    assets[assetIndex] = {
+                        ...assets[assetIndex],
+                        ...update.updates
+                    };
+                }
+            });
 
             return {
                 ...prev,
@@ -129,6 +116,7 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
                     type: 'data',
                     name: file.name,
                     content: content.toString(),
+                    ready: true,
                     metadata: {
                         timestamp: new Date().toISOString(),
                         tags: ['uploaded'],
