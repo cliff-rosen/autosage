@@ -49,4 +49,16 @@ export const demoScripts: DemoScript[] = [
 ];
 
 // Export the default demo script (first one)
-export const defaultDemoScript = demoScripts[0]; 
+export const defaultDemoScript = demoScripts[0];
+
+// Define default agents that should always be available
+export const defaultAgents: Agent[] = [
+    {
+        id: 'fact-checker-agent',
+        title: 'Fact Checker',
+        description: 'Verify and validate information across multiple sources',
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        completedAt: new Date().toISOString()
+    }
+]; 

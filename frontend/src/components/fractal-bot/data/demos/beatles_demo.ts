@@ -136,7 +136,7 @@ const demoStates: DemoState[] = [
         addedAssets: [{
             id: ASSET_IDS.SONG_LIST,
             type: 'data',
-            name: 'Beatles Song List',
+            name: 'Beatles Song List.xls',
             content: BEATLES_SONGS,
             ready: false,
             metadata: {
@@ -208,7 +208,7 @@ const demoStates: DemoState[] = [
         addedAssets: [{
             id: ASSET_IDS.LYRICS_COLLECTION,
             type: 'data',
-            name: 'Beatles Lyrics Collection',
+            name: 'Beatles Lyrics Collection.xls',
             content: 'Lyrics for all Beatles songs',
             ready: false,
             metadata: {
@@ -321,8 +321,8 @@ const demoStates: DemoState[] = [
         },
         addedAssets: [{
             id: ASSET_IDS.COMPARISON_REPORT,
-            type: 'data',
-            name: 'Beatles Song Lists Comparison Report',
+            type: 'report',
+            name: 'Beatles Song Lists Comparison Report.pdf',
             content: 'Detailed comparison of original and user-provided Beatles song lists',
             ready: false,
             metadata: {

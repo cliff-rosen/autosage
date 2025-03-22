@@ -72,8 +72,8 @@ const demoStates: DemoState[] = [
         },
         addedAssets: [{
             id: ASSET_IDS.INVITATION_DRAFT,
-            type: 'document',
-            name: 'Birthday Party Invitation Draft',
+            type: 'file',
+            name: 'Birthday Party Invitation Draft.doc',
             content: 'Creating invitation draft...',
             ready: false,
             metadata: {
@@ -142,8 +142,8 @@ We can't wait to celebrate with you!
         addedAssets: [
             {
                 id: ASSET_IDS.CONTACT_LIST_1,
-                type: 'data',
-                name: 'Phone Contacts',
+                type: 'spreadsheet',
+                name: 'Phone Contacts.xls',
                 content: [
                     { name: 'John Smith', phone: '555-0101', email: 'john@email.com' },
                     { name: 'Sarah Johnson', phone: '555-0102', email: 'sarah@email.com' },
@@ -157,8 +157,8 @@ We can't wait to celebrate with you!
             },
             {
                 id: ASSET_IDS.CONTACT_LIST_2,
-                type: 'data',
-                name: 'Email Contacts',
+                type: 'spreadsheet',
+                name: 'Email Contacts.xls',
                 content: [
                     { name: 'John Smith', phone: '555-0101', email: 'john@email.com' },
                     { name: 'Emily Brown', phone: '555-0104', email: 'emily@email.com' },
@@ -202,8 +202,8 @@ We can't wait to celebrate with you!
         },
         addedAssets: [{
             id: ASSET_IDS.MERGED_CONTACTS,
-            type: 'data',
-            name: 'Merged Contact List',
+            type: 'spreadsheet',
+            name: 'Merged Contact List.xls',
             content: 'Merging contacts...',
             ready: false,
             metadata: {
@@ -295,8 +295,8 @@ We can't wait to celebrate with you!
         },
         addedAssets: [{
             id: ASSET_IDS.FINAL_INVITATIONS,
-            type: 'document',
-            name: 'Personalized Birthday Invitations',
+            type: 'pdf',
+            name: 'Personalized Birthday Invitations.pdf',
             content: 'Generating personalized invitations...',
             ready: false,
             metadata: {

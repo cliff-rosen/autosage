@@ -122,9 +122,22 @@ export const FractalBot: React.FC<FractalBotProps> = ({ onComplete }) => {
         reader.onload = (e) => {
             const content = e.target?.result;
             if (content) {
+                // Get file extension
+                const extension = file.name.split('.').pop()?.toLowerCase() || '';
+
+                // Set type based on extension
+                let type = 'data';
+                if (extension === 'txt') {
+                    type = 'file';
+                } else if (extension === 'xls' || extension === 'xlsx') {
+                    type = 'spreadsheet';
+                } else if (extension === 'pdf') {
+                    type = 'pdf';
+                }
+
                 const newAsset: Asset = {
                     id: uuidv4(),
-                    type: 'data',
+                    type,
                     name: file.name,
                     content: content.toString(),
                     ready: true,

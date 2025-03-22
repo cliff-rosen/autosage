@@ -83,7 +83,16 @@ export const createTurn = (): TurnState => ({
 export const createInitialState = (): FractalBotState => ({
     phase: 'setup',
     messages: [],
-    agents: {},
+    agents: {
+        'fact-checker-agent': {
+            id: 'fact-checker-agent',
+            title: 'Fact Checker',
+            description: 'Verify and validate information across multiple sources',
+            status: 'completed',
+            createdAt: new Date().toISOString(),
+            completedAt: new Date().toISOString()
+        }
+    },
     assets: [],
     metadata: {
         lastUpdated: new Date().toISOString(),
